@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => {
               if (id.includes('react-router')) return 'vendor-router';
               if (id.includes('react-dom')) return 'vendor-react-dom';
               if (id.includes('react/')) return 'vendor-react';
+              if (id.includes('date-fns')) return 'vendor-date-fns';
+              if (id.includes('razorpay')) return 'vendor-razorpay';
+              if (id.includes('@google/genai')) return 'vendor-genai';
               // Group all other node_modules into a single vendor chunk
               return 'vendor-others';
             }
