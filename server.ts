@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 // Trust proxy is important for apps behind a proxy like AI Studio's nginx
 app.set('trust proxy', true);
@@ -198,17 +198,25 @@ app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
 });
 
+// Start server listening before initializing Vite to prevent proxy timeouts
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[SERVER] Express server started on port ${PORT}`);
+  console.log(`[SERVER] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+});
+
 // Vite middleware for development
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV !== "production") {
   console.log("[SERVER] Starting Vite in development mode...");
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa",
-  });
-  app.use((req, res, next) => {
-    console.log(`[VITE] Request: ${req.method} ${req.url}`);
-    vite.middlewares(req, res, next);
-  });
+  try {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+    console.log("[SERVER] Vite middleware attached");
+  } catch (err) {
+    console.error("[SERVER] Failed to start Vite:", err);
+  }
 } else {
   const distPath = path.join(process.cwd(), "dist");
   app.use(express.static(distPath));
@@ -216,8 +224,3 @@ if (process.env.NODE_ENV === "development") {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[SERVER] Express server started on port ${PORT}`);
-  console.log(`[SERVER] NODE_ENV: ${process.env.NODE_ENV}`);
-});
