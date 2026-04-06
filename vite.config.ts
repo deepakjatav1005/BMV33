@@ -26,14 +26,19 @@ export default defineConfig(({ mode }) => {
             if (id.includes('node_modules')) {
               if (id.includes('jspdf')) return 'vendor-jspdf';
               if (id.includes('xlsx')) return 'vendor-xlsx';
+              if (id.includes('lucide-react')) return 'vendor-lucide';
+              if (id.includes('motion')) return 'vendor-motion';
+              if (id.includes('@supabase')) return 'vendor-supabase';
+              if (id.includes('react-router')) return 'vendor-router';
+              if (id.includes('react-dom')) return 'vendor-react-dom';
+              if (id.includes('react/')) return 'vendor-react';
               // Group all other node_modules into a single vendor chunk
-              // This avoids circular dependencies between smaller modules
-              return 'vendor';
+              return 'vendor-others';
             }
           },
         },
       },
-      chunkSizeWarningLimit: 2000,
+      chunkSizeWarningLimit: 1500,
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
