@@ -64,8 +64,9 @@ if (supabaseUrl && supabaseServiceKey) {
 }
 
 // Multer setup for memory storage
-const upload = multer({ 
-  storage: multer.memoryStorage(),
+const multerInstance = (multer as any).default || multer;
+const upload = multerInstance({ 
+  storage: multerInstance.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit (more than client's 5MB to be safe)
   }
@@ -198,25 +199,23 @@ app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
 });
 
-// Start server listening before initializing Vite to prevent proxy timeouts
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`[SERVER] Express server started on port ${PORT}`);
-  console.log(`[SERVER] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-});
-
 // Vite middleware for development
 if (process.env.NODE_ENV !== "production") {
-  console.log("[SERVER] Starting Vite in development mode...");
-  try {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-    console.log("[SERVER] Vite middleware attached");
-  } catch (err) {
-    console.error("[SERVER] Failed to start Vite:", err);
-  }
+  console.log("[SERVER] Initializing Vite in development mode...");
+  const vitePromise = createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
+  });
+
+  app.use(async (req, res, next) => {
+    try {
+      const vite = await vitePromise;
+      vite.middlewares(req, res, next);
+    } catch (err) {
+      console.error("[SERVER] Vite middleware error:", err);
+      next(err);
+    }
+  });
 } else {
   const distPath = path.join(process.cwd(), "dist");
   app.use(express.static(distPath));
@@ -224,3 +223,8 @@ if (process.env.NODE_ENV !== "production") {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[SERVER] Express server started on port ${PORT}`);
+  console.log(`[SERVER] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+});
