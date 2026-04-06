@@ -4,13 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npx vite --host 0.0.0.0 --port 3000",
     "start": "node server.js",
-    "build": "vite build && npm run build:server",
-    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --outfile=server.js --external:vite --external:esbuild",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "build": "vite build"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
