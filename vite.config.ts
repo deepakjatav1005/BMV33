@@ -26,10 +26,8 @@ export default defineConfig(({ mode }) => {
             if (id.includes('node_modules')) {
               if (id.includes('jspdf')) return 'vendor-jspdf';
               if (id.includes('xlsx')) return 'vendor-xlsx';
-              if (id.includes('supabase')) return 'vendor-supabase';
-              if (id.includes('react')) return 'vendor-react';
-              if (id.includes('lucide-react')) return 'vendor-lucide';
-              if (id.includes('motion')) return 'vendor-motion';
+              // Group all other node_modules into a single vendor chunk
+              // This avoids circular dependencies between smaller modules
               return 'vendor';
             }
           },
