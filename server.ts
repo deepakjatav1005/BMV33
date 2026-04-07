@@ -44,26 +44,43 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (isProduction) {
+    const distPath = path.resolve(__dirname, "dist");
+    console.log(`> Serving static files from: ${distPath}`);
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(distPath, "index.html"), (err) => {
+        if (err) {
+          console.error("> Error sending index.html:", err);
+          res.status(500).send("Server Error: index.html not found. Please ensure 'npm run build' was successful.");
+        }
+      });
     });
+  } else {
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("> Vite middleware enabled");
+    } catch (e) {
+      console.warn("> Vite not found, falling back to static serving");
+      const distPath = path.resolve(__dirname, "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`> Server is running on port ${PORT}`);
-    console.log(`> Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`> Mode: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development (Vite Middleware)'}`);
+    console.log(`> Environment: ${process.env.NODE_ENV || 'not set (defaulting to development/fallback)'}`);
+    console.log(`> Mode: ${isProduction ? 'Production' : 'Development/Fallback'}`);
   });
 }
 
