@@ -1,5 +1,5 @@
 {
-  "name": "Remix: Remix: Event Manager222",
+  "name": "BookMyVanue - Event Manager",
   "description": "A comprehensive event management platform for booking venues and services. Manage profiles, catalogs, and bookings with ease.",
   "requestFramePermissions": [
     "geolocation"
