@@ -14,7 +14,6 @@ export interface UserProfile {
   state?: string;
   district?: string;
   block?: string;
-  city?: string;
   pincode?: string;
   venueType?: VenueType;
   status: 'active' | 'disabled';
@@ -109,7 +108,6 @@ export interface Venue {
   district: string;
   block: string;
   pincode: string;
-  city: string;
   capacity: number;
   pricePerDay: number;
   images: string[];
@@ -140,6 +138,8 @@ export type ServiceType =
   | 'Fast food stalls'
   | 'Loundry service'
   | 'Helper'
+  | 'Pandit Ji Brahman'
+  | 'SPARKS AND Firecrackers'
   | 'Other Related Services';
 
 export interface ServiceProvider {
@@ -150,7 +150,6 @@ export interface ServiceProvider {
   description: string;
   priceRange: string;
   priceLevel?: 'per day' | 'as per hour' | 'as per time' | 'as per item' | 'as per plate' | 'as per work';
-  city: string;
   state: string;
   district?: string;
   block?: string;

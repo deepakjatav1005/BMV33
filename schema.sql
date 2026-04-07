@@ -5,9 +5,6 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS start_time TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS end_time TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_amount NUMERIC;
 
--- 1.1 Update `users` table to include `city`
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS city TEXT;
-
 -- 2. Create `admin_settings` table to store admin password
 CREATE TABLE IF NOT EXISTS admin_settings (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,

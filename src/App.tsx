@@ -82,6 +82,76 @@ import { supabase } from './supabase';
 import { locations } from './data/locations';
 import { cn } from './lib/utils';
 
+// --- Translation Data ---
+const translations: Record<string, any> = {
+  en: {
+    home: "Home",
+    gallery: "Gallery",
+    search: "Search",
+    about: "About",
+    rateUs: "Rate Us",
+    registration: "Registration",
+    login: "Login",
+    logout: "Logout",
+    adminPanel: "Admin Panel",
+    dashboard: "Dashboard",
+    bookingManager: "Booking Manager",
+    changePassword: "Change Password",
+    heroTitle: "Plan Your Perfect Event with Confidence",
+    heroTagline: "ALL IN ONE BOOKING PLAT FORM FOR YOUR SPECIAL TIME",
+    searchPlaceholder: "Search venues, caterers, DJs...",
+    searchNow: "Search Now",
+    allStates: "All States",
+    allDistricts: "All Districts",
+    allBlocks: "All Blocks",
+    whyPlanTitle: "Why Plan with BOOK MY VANUE?",
+    verifiedPartners: "Verified Partners",
+    bestPrices: "Best Prices",
+    support247: "24/7 Support",
+    footerCopyright: "© 2026 BOOK MY VANUE India. All rights reserved.",
+    joinAsOwner: "Join Us as Venue Owner",
+    joinAsProvider: "Join Us as Service Provider",
+    register: "Register",
+  },
+  hi: {
+    home: "होम",
+    gallery: "गैलरी",
+    search: "खोजें",
+    about: "हमारे बारे में",
+    rateUs: "हमें रेट करें",
+    registration: "पंजीकरण",
+    login: "लॉगिन",
+    logout: "लॉगआउट",
+    adminPanel: "एडमिन पैनल",
+    dashboard: "डैशबोर्ड",
+    bookingManager: "बुकिंग मैनेजर",
+    changePassword: "पासवर्ड बदलें",
+    heroTitle: "आत्मविश्वास के साथ अपने सही कार्यक्रम की योजना बनाएं",
+    heroTagline: "आपके विशेष समय के लिए ऑल इन वन बुकिंग प्लेटफॉर्म",
+    searchPlaceholder: "स्थान, कैटरर्स, डीजे खोजें...",
+    searchNow: "अभी खोजें",
+    allStates: "सभी राज्य",
+    allDistricts: "सभी जिले",
+    allBlocks: "सभी ब्लॉक",
+    whyPlanTitle: "BOOK MY VANUE के साथ योजना क्यों बनाएं?",
+    verifiedPartners: "सत्यापित भागीदार",
+    bestPrices: "सर्वोत्तम मूल्य",
+    support247: "24/7 सहायता",
+    footerCopyright: "© 2026 BOOK MY VANUE इंडिया। सर्वाधिकार सुरक्षित।",
+    joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
+    joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
+    register: "पंजीकरण करें",
+  }
+};
+
+const LanguageContext = React.createContext({
+  lang: 'en',
+  setLang: (lang: string) => {},
+  t: (key: string) => key
+});
+
+const useTranslation = () => React.useContext(LanguageContext);
+
 // --- Location Data ---
 const LOCATION_DATA = locations;
 
@@ -764,6 +834,7 @@ const ImageUpload = ({
 };
 
 const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: UserProfile | null, onLogout: () => void, onRateApp: () => void }) => {
+  const { lang, setLang, t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
@@ -811,30 +882,37 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
           <div className="flex justify-between h-16 items-center">
             <Link to="/" className="flex items-center space-x-2">
               <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-orange-200">EM</div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">Event Manager</span>
+              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">BOOK MY VANUE</span>
             </Link>
 
             <div className="hidden md:flex items-center space-x-8">
               <Link to="/" className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 font-bold transition-all bg-gray-50 px-4 py-2 rounded-xl border border-gray-100 hover:bg-orange-50">
                 <Home size={18} />
-                <span>Home</span>
+                <span>{t('home')}</span>
               </Link>
-              <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">Gallery</Link>
-              <Link to="/venues" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">Search</Link>
-              <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">About</Link>
+              <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
+              <Link to="/venues" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
+              <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
               
               <button 
                 onClick={onRateApp}
                 className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 font-bold transition-all bg-orange-50 px-4 py-2 rounded-xl border border-orange-100"
               >
                 <Star size={18} className="fill-orange-600" />
-                <span>Rate Us</span>
+                <span>{t('rateUs')}</span>
+              </button>
+
+              <button 
+                onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+                className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 font-bold transition-all bg-blue-50 px-4 py-2 rounded-xl border border-blue-100"
+              >
+                <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
               </button>
 
               {!user && (
                 <>
-                  <Link to="/registration" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">Registration</Link>
-                  <Link to="/login" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">Login</Link>
+                  <Link to="/registration" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('registration')}</Link>
+                  <Link to="/login" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">{t('login')}</Link>
                 </>
               )}
               {user && (
@@ -940,8 +1018,8 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
 };
 
 const Hero = () => {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const [city, setCity] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedBlock, setSelectedBlock] = useState('');
@@ -955,7 +1033,6 @@ const Hero = () => {
     e.preventDefault();
     const params = new URLSearchParams();
     if (search) params.set('q', search);
-    if (city) params.set('city', city);
     if (selectedState) params.set('state', selectedState);
     if (selectedDistrict) params.set('district', selectedDistrict);
     if (selectedBlock) params.set('block', selectedBlock);
@@ -981,19 +1058,19 @@ const Hero = () => {
         >
           <Link to="/registration?role=owner" className="bg-orange-600/90 backdrop-blur-sm text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-orange-700 transition-all shadow-lg border border-orange-500/50 flex items-center space-x-2">
             <Building2 size={16} />
-            <span>Join Us as Venue Owner</span>
+            <span>{t('joinAsOwner')}</span>
           </Link>
           <Link to="/registration?role=provider" className="bg-white/10 backdrop-blur-sm text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-white/20 transition-all border border-white/30 flex items-center space-x-2">
             <Briefcase size={16} />
-            <span>Join Us as Service Provider</span>
+            <span>{t('joinAsProvider')}</span>
           </Link>
           <Link to="/registration" className="bg-pink-600/90 backdrop-blur-sm text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-pink-700 transition-all shadow-lg border border-pink-500/50 flex items-center space-x-2">
             <UserPlus size={16} />
-            <span>Register</span>
+            <span>{t('register')}</span>
           </Link>
           <Link to="/login" className="bg-white text-orange-600 px-5 py-2.5 rounded-full font-bold text-sm hover:bg-orange-50 transition-all shadow-lg flex items-center space-x-2">
             <LogIn size={16} />
-            <span>Login</span>
+            <span>{t('login')}</span>
           </Link>
         </motion.div>
 
@@ -1002,7 +1079,7 @@ const Hero = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-4xl md:text-7xl font-black text-white mb-6 drop-shadow-2xl tracking-tight"
         >
-          Plan Your <span className="text-orange-500">Perfect Event</span> with Confidence
+          {t('heroTitle')}
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
@@ -1010,7 +1087,7 @@ const Hero = () => {
           transition={{ delay: 0.1 }}
           className="text-xl md:text-2xl text-gray-200 mb-12 font-medium max-w-3xl mx-auto"
         >
-          Discover top-rated wedding halls, farmhouses, and event services across India.
+          {t('heroTagline')}
         </motion.p>
 
         <motion.form 
@@ -1025,20 +1102,10 @@ const Hero = () => {
               <Search className="text-orange-500 mr-3" size={20} />
               <input 
                 type="text" 
-                placeholder="Search venues, caterers, DJs..." 
+                placeholder={t('searchPlaceholder')} 
                 className="w-full focus:outline-none text-gray-700 bg-transparent"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex-1 flex items-center px-4 py-3 border border-gray-100 rounded-2xl w-full">
-              <MapPin className="text-orange-500 mr-3" size={20} />
-              <input 
-                type="text" 
-                placeholder="City (e.g. Mumbai, Delhi)" 
-                className="w-full focus:outline-none text-gray-700 bg-transparent"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
               />
             </div>
           </div>
@@ -1053,7 +1120,7 @@ const Hero = () => {
               }}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
             >
-              <option value="">All States</option>
+              <option value="">{t('allStates')}</option>
               {states.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <select 
@@ -1065,7 +1132,7 @@ const Hero = () => {
               disabled={!selectedState}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
             >
-              <option value="">All Districts</option>
+              <option value="">{t('allDistricts')}</option>
               {districts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
             <select 
@@ -1074,7 +1141,7 @@ const Hero = () => {
               disabled={!selectedDistrict}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
             >
-              <option value="">All Blocks</option>
+              <option value="">{t('allBlocks')}</option>
               {blocks.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
@@ -1083,7 +1150,7 @@ const Hero = () => {
             type="submit"
             className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-lg shadow-orange-200"
           >
-            Search Now
+            {t('searchNow')}
           </button>
         </motion.form>
       </div>
@@ -1098,6 +1165,8 @@ const CategorySection = () => {
     { name: 'DJ & Music', icon: <Music2 />, color: 'bg-purple-50 text-purple-600', link: '/services?type=DJ and Sounds', desc: 'Sound & Lighting' },
     { name: 'Tent House', icon: <Tent />, color: 'bg-green-50 text-green-600', link: '/services?type=Tent House', desc: 'Decor & Setup' },
     { name: 'Photography', icon: <Camera />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Photo and Videographer', desc: 'Capture Memories' },
+    { name: 'Pandit Ji', icon: <User />, color: 'bg-red-50 text-red-600', link: '/services?type=Pandit Ji Brahman', desc: 'Religious Services' },
+    { name: 'Firecrackers', icon: <Sparkles />, color: 'bg-orange-50 text-orange-600', link: '/services?type=SPARKS AND Firecrackers', desc: 'Sparks & Fire' },
     { name: 'Mehendi', icon: <Palette />, color: 'bg-yellow-50 text-yellow-600', link: '/services?type=Mehendi Service', desc: 'Traditional Art' },
     { name: 'Drone', icon: <Plane />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Drone Camera', desc: 'Aerial Shots' },
     { name: 'Event Manager', icon: <Briefcase />, color: 'bg-indigo-50 text-indigo-600', link: '/services?type=Event Manager', desc: 'Expert Planning' },
@@ -1197,12 +1266,12 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
         </div>
         <div className="flex items-center text-gray-500 text-sm mb-3">
           <MapPin size={14} className="mr-1" />
-          <span>{venue.city}, {venue.state}</span>
+          <span>{venue.district}, {venue.state}</span>
         </div>
         <div className="flex items-center justify-between mb-4">
           <div className="text-orange-600 font-bold text-sm">
             <IndianRupee size={12} className="inline mr-1" />
-            {venue.pricePerDay.toLocaleString()}/day
+            {(venue.pricePerDay || 0).toLocaleString()}/day
           </div>
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{venue.venueType}</div>
         </div>
@@ -1242,7 +1311,7 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
           </div>
           <div className="flex items-center text-gray-500 text-sm mb-3">
             <MapPin size={14} className="mr-1" />
-            <span>{service.city}</span>
+            <span>{service.district}, {service.state}</span>
           </div>
           <div className="mb-4">
             <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest bg-purple-50 px-2 py-1 rounded-md">
@@ -1283,7 +1352,7 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             <CheckCircle size={40} className="text-white" />
           </div>
           <h2 className="text-3xl font-bold">Registration Successful!</h2>
-          <p className="mt-2 opacity-90">Welcome to the Event Manager family</p>
+          <p className="mt-2 opacity-90">Welcome to the BOOK MY VANUE family</p>
         </div>
 
         <div className="p-8 space-y-6">
@@ -1581,7 +1650,6 @@ const RegistrationView = () => {
     state: '',
     district: '',
     block: '',
-    city: '',
     pincode: '',
     venueType: 'Marriage Garden' as VenueType
   });
@@ -1630,9 +1698,9 @@ const RegistrationView = () => {
       const nextNum = (count || 0) + 1;
       let regId = '';
       if (formData.role === 'owner') {
-        regId = 'EVOW' + (900000 + nextNum).toString();
+        regId = 'BMVVO' + (900000 + nextNum).toString();
       } else if (formData.role === 'provider') {
-        regId = 'EVSP' + (800000 + nextNum).toString();
+        regId = 'BMVSP' + (800000 + nextNum).toString();
       } else {
         regId = 'UTSAV' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
       }
@@ -1652,7 +1720,6 @@ const RegistrationView = () => {
         state: formData.state,
         district: formData.district,
         block: formData.block,
-        city: formData.city,
         pincode: formData.pincode
         // password is omitted to avoid schema cache issues; mobile_number is used as default password
       };
@@ -1670,7 +1737,7 @@ const RegistrationView = () => {
       }
       
       // Send WhatsApp Message (Mocked)
-      const whatsappMsg = `*Welcome to Event Manager!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
+      const whatsappMsg = `*Welcome to BOOK MY VANUE!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
       const waUrl = `https://wa.me/91${formData.mobileNumber}?text=${whatsappMsg}`;
       
       // In a real app, you'd call a backend API to send this. 
@@ -2069,20 +2136,22 @@ const GalleryView = () => {
   );
 };
 
-const AboutView = () => (
-  <div className="max-w-4xl mx-auto px-4 py-20 text-center relative">
-    <Link to="/" className="absolute top-0 left-0 flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-orange-50 px-4 py-2 rounded-full">
-      <Home size={18} />
-      <span>Home</span>
-    </Link>
-    <div className="w-24 h-24 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-5xl font-bold mx-auto mb-8 shadow-2xl shadow-orange-200">EM</div>
-    <h1 className="text-4xl font-bold text-gray-900 mb-6">About Event Manager</h1>
-    <p className="text-xl text-gray-600 leading-relaxed mb-12">
-      Event Manager is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
-      We bridge the gap between hosts and the finest venues and service providers in the country. 
-      Whether it's a grand wedding, a corporate gala, or an intimate birthday party, Event Manager provides 
-      the tools and connections you need to plan with ease and celebrate with joy.
-    </p>
+const AboutView = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-20 text-center relative">
+      <Link to="/" className="absolute top-0 left-0 flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-orange-50 px-4 py-2 rounded-full">
+        <Home size={18} />
+        <span>{t('home')}</span>
+      </Link>
+      <div className="w-24 h-24 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-5xl font-bold mx-auto mb-8 shadow-2xl shadow-orange-200">EM</div>
+      <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BOOK MY VANUE</h1>
+      <p className="text-xl text-gray-600 leading-relaxed mb-12">
+        BOOK MY VANUE is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
+        We bridge the gap between hosts and the finest venues and service providers in the country. 
+        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BOOK MY VANUE provides 
+        the tools and connections you need to plan with ease and celebrate with joy.
+      </p>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div className="p-8 bg-orange-50 rounded-3xl">
         <div className="text-3xl font-bold text-orange-600 mb-2">500+</div>
@@ -2099,6 +2168,7 @@ const AboutView = () => (
     </div>
   </div>
 );
+};
 
 const useAutoScroll = (speed = 0.5) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2516,7 +2586,7 @@ const HomeView = ({ user }: { user: any }) => {
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/20 rounded-full -ml-32 -mb-32 blur-3xl" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h2 className="text-4xl font-bold mb-16">Why Plan with Event Manager?</h2>
+          <h2 className="text-4xl font-bold mb-16">Why Plan with BOOK MY VANUE?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
@@ -2888,7 +2958,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
               <h1 className="text-4xl font-bold text-gray-900 mb-2">{venue.name}</h1>
               <div className="flex items-center justify-center md:justify-start text-gray-500">
                 <MapPin size={18} className="mr-1 text-orange-500" />
-                <span>{venue.address}, {venue.city}</span>
+                <span>{venue.address}, {venue.district}, {venue.state}</span>
               </div>
               {ownerProfile && (
                 <div className="flex flex-col space-y-1 mt-2">
@@ -3034,7 +3104,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
           <div className="sticky top-24 space-y-8">
             <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8">
               <div className="flex items-baseline space-x-2 mb-6">
-                <span className="text-3xl font-bold text-gray-900">₹{venue.pricePerDay.toLocaleString()}</span>
+                <span className="text-3xl font-bold text-gray-900">₹{(venue.pricePerDay || 0).toLocaleString()}</span>
                 <span className="text-gray-500">/ day</span>
               </div>
 
@@ -3329,7 +3399,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                 <h1 className="text-4xl font-bold text-gray-900 mb-2">{service.name}</h1>
                 <div className="flex items-center justify-center md:justify-start text-gray-500">
                   <MapPin size={18} className="mr-1 text-orange-500" />
-                  <span>{service.city}, {service.state}</span>
+                  <span>{service.district}, {service.state}</span>
                 </div>
                 {providerProfile && (
                   <div className="flex flex-col space-y-1 mt-2">
@@ -3615,7 +3685,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       
       if (!error && data) {
         setBookings(data.map(d => ({
-          id: d.id,
+          ...d,
           userId: d.user_id,
           ownerId: d.owner_id,
           targetId: d.target_id,
@@ -3626,9 +3696,12 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
           eventType: d.event_type,
           partyName: d.party_name,
           partyAddress: d.party_address,
+          visitorName: d.visitor_name,
           visitorMobile: d.visitor_mobile,
           status: d.status,
           isManual: d.is_manual,
+          totalAmount: d.total_amount || 0,
+          updatedAmount: d.updated_amount,
           is_invoice_generated: d.is_invoice_generated,
           createdAt: d.created_at
         } as Booking)));
@@ -3707,7 +3780,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const confirmInvoice = async () => {
     if (selectedBooking) {
       generateInvoice(selectedBooking, expenditure);
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount) + expenditure;
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure;
       const msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
@@ -4090,8 +4163,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                 <div className="text-xs font-bold text-gray-400 uppercase mb-1">Current Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.partyName}</div>
-                <div className="text-sm text-gray-500">Original Amount: ₹{selectedBooking?.totalAmount.toLocaleString()}</div>
+                <div className="font-bold text-gray-900">{selectedBooking?.partyName || selectedBooking?.visitorName}</div>
+                <div className="text-sm text-gray-500">Original Amount: ₹{(selectedBooking?.totalAmount || 0).toLocaleString()}</div>
               </div>
               <div>
                 <label className="block text-sm font-bold mb-1 text-gray-700">New Amount (INR)</label>
@@ -4209,7 +4282,7 @@ const sendWhatsAppAlert = (mobile: string, message: string) => {
 const generateInvoice = (booking: Booking, expenditure: number) => {
   const doc = new jsPDF();
   const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
-  const baseAmount = booking.updatedAmount || booking.totalAmount;
+  const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
   const totalAmount = baseAmount + expenditure;
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
   const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile; // Both use visitorMobile field in DB
@@ -4641,7 +4714,7 @@ const VenueManageView = ({ user, venues }: { user: any, venues: Venue[] }) => {
           <div key={v.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex justify-between items-center">
             <div>
               <h3 className="font-bold text-lg">{v.name}</h3>
-              <p className="text-sm text-gray-500">{v.address}, {v.city}</p>
+              <p className="text-sm text-gray-500">{v.address}, {v.district}, {v.state}</p>
             </div>
             <div className="flex space-x-2">
               <button onClick={() => navigate(`/edit-venue/${v.id}`)} className="p-2 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50">
@@ -4739,7 +4812,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
       generateInvoice(selectedBooking, expenditure);
       
       // Also send to WhatsApp if possible
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount) + expenditure;
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure;
       const msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
       sendWhatsAppAlert(selectedBooking.visitorMobile, msg);
       
@@ -4857,7 +4930,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
               </div>
               <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2 mt-2">
                 <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={14} className="mr-1 text-orange-600" /> {b.eventDate}</span>
-                <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={14} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount).toLocaleString()}</span>
+                <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={14} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
                 {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-lg border border-orange-100 font-bold"><Clock size={14} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
               </div>
               
@@ -5096,7 +5169,7 @@ const ServicesManageView = ({ user, services }: { user: any, services: ServicePr
           <div key={s.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex justify-between items-center">
             <div>
               <h3 className="font-bold text-lg">{s.name}</h3>
-              <p className="text-sm text-gray-500">{s.serviceType} • {s.city}</p>
+              <p className="text-sm text-gray-500">{s.serviceType} • {s.district}, {s.state}</p>
             </div>
             <div className="flex space-x-2">
               <button onClick={() => navigate(`/edit-service/${s.id}`)} className="p-2 bg-white text-blue-600 rounded-lg shadow-sm hover:bg-blue-50">
@@ -5566,7 +5639,6 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     description: '',
     priceRange: '',
     priceLevel: 'per day',
-    city: '',
     images: [''],
   });
 
@@ -5580,7 +5652,6 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        city: profile?.city || '',
         state: profile?.state || '',
         district: profile?.district || '',
         block: profile?.block || '',
@@ -5640,6 +5711,8 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <option value="Fast food stalls">Fast food stalls</option>
               <option value="Loundry service">Loundry service</option>
               <option value="Helper">Helper</option>
+              <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
+              <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
               <option value="Other Related Services">Other Related Services</option>
             </select>
           </div>
@@ -5739,7 +5812,6 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        city: formData.city,
         state: profile?.state || formData.state,
         district: profile?.district || formData.district,
         block: profile?.block || formData.block,
@@ -5796,18 +5868,10 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <option value="Fast food stalls">Fast food stalls</option>
               <option value="Loundry service">Loundry service</option>
               <option value="Helper">Helper</option>
+              <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
+              <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
               <option value="Other Related Services">Other Related Services</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">City</label>
-            <input 
-              required
-              type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.city}
-              onChange={(e) => setFormData({...formData, city: e.target.value})}
-            />
           </div>
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -5903,7 +5967,6 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        city: formData.city,
         state: profile?.state || formData.state,
         district: profile?.district || formData.district,
         block: profile?.block || formData.block,
@@ -5960,16 +6023,6 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={formData.pincode}
               onChange={(e) => setFormData({...formData, pincode: e.target.value})}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">City</label>
-            <input 
-              required
-              type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.city}
-              onChange={(e) => setFormData({...formData, city: e.target.value})}
             />
           </div>
           <div className="md:col-span-2">
@@ -6051,7 +6104,6 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
     state: profile?.state || '',
     district: profile?.district || '',
     block: profile?.block || '',
-    city: profile?.city || '',
     pincode: profile?.pincode || '',
     venueType: profile?.venueType || '',
   });
@@ -6075,7 +6127,6 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
           state: formData.state,
           district: formData.district,
           block: formData.block,
-          city: formData.city,
           pincode: formData.pincode,
           venue_type: formData.venueType
         })
@@ -6221,7 +6272,6 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     name: '',
     description: '',
     address: '',
-    city: '',
     pincode: '',
     venueType: 'Marriage Garden',
     capacity: 0,
@@ -6238,7 +6288,6 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        city: profile?.city || '',
         state: profile?.state || '',
         district: profile?.district || '',
         block: profile?.block || '',
@@ -6367,7 +6416,6 @@ const SearchResultsView = () => {
   const [selectedBlock, setSelectedBlock] = useState('');
 
   const query = searchParams.get('q')?.toLowerCase() || '';
-  const city = searchParams.get('city')?.toLowerCase() || '';
 
   const states = Object.keys(LOCATION_DATA || {});
   const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
@@ -6387,7 +6435,6 @@ const SearchResultsView = () => {
           ownerId: d.owner_id,
           name: d.name,
           venueType: d.venue_type,
-          city: d.city,
           state: d.state,
           district: d.district,
           block: d.block,
@@ -6408,11 +6455,9 @@ const SearchResultsView = () => {
           vData = vData.filter(v => 
             v.name.toLowerCase().includes(query) || 
             v.venueType.toLowerCase().includes(query) ||
-            v.city.toLowerCase().includes(query) ||
             v.description?.toLowerCase().includes(query)
           );
         }
-        if (city) vData = vData.filter(v => v.city.toLowerCase().includes(city));
         if (selectedState) vData = vData.filter(v => v.state === selectedState);
         if (selectedDistrict) vData = vData.filter(v => v.district === selectedDistrict);
         if (selectedBlock) vData = vData.filter(v => v.block === selectedBlock);
@@ -6427,7 +6472,8 @@ const SearchResultsView = () => {
           name: d.name,
           serviceType: d.service_type,
           state: d.state,
-          city: d.city,
+          district: d.district,
+          block: d.block,
           experience: d.experience,
           priceRange: d.price_range,
           description: d.description,
@@ -6441,11 +6487,9 @@ const SearchResultsView = () => {
           sData = sData.filter(s => 
             s.name.toLowerCase().includes(query) || 
             s.serviceType.toLowerCase().includes(query) ||
-            s.city.toLowerCase().includes(query) ||
             s.description?.toLowerCase().includes(query)
           );
         }
-        if (city) sData = sData.filter(s => s.city.toLowerCase().includes(city));
         if (selectedState) sData = sData.filter(s => s.state === selectedState);
         if (selectedDistrict) sData = sData.filter(s => s.district === selectedDistrict);
         if (selectedBlock) sData = sData.filter(s => s.block === selectedBlock);
@@ -6455,7 +6499,7 @@ const SearchResultsView = () => {
       setLoading(false);
     };
     fetchData();
-  }, [query, city, selectedState, selectedDistrict, selectedBlock]);
+  }, [query, selectedState, selectedDistrict, selectedBlock]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -6463,7 +6507,7 @@ const SearchResultsView = () => {
         <div>
           <h1 className="text-4xl font-black text-gray-900 mb-4">Search Results</h1>
           <p className="text-gray-500">
-            Showing results for "{query}" {city && `in ${city}`}
+            Showing results for "{query}"
           </p>
         </div>
         
@@ -6562,6 +6606,14 @@ const SearchResultsView = () => {
 };
 
 export default function App() {
+  const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
+  
+  useEffect(() => {
+    localStorage.setItem('app_lang', lang);
+  }, [lang]);
+
+  const t = (key: string) => translations[lang][key] || key;
+
   console.log('[APP] Rendering App component');
   const [user, setUser] = useState<any>(() => {
     const saved = localStorage.getItem('custom_user');
@@ -6840,11 +6892,11 @@ export default function App() {
                     <div className="h-10 w-px bg-gray-700 mx-2" />
                     <div className="flex items-center space-x-2">
                       <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg text-center">EM</div>
-                      <span className="text-2xl font-bold">Event Manager</span>
+                      <span className="text-2xl font-bold">BOOK MY VANUE</span>
                     </div>
                   </div>
                   <p className="text-gray-400 max-w-sm mb-6">
-                    India's premier platform for wedding and event planning. We connect you with the best venues and service providers to make your celebrations truly special.
+                    {t('heroTagline')}
                   </p>
                   <div className="bg-gray-800/50 p-6 rounded-3xl border border-gray-700 inline-block">
                     <div className="flex items-center space-x-4">
@@ -6862,7 +6914,7 @@ export default function App() {
                         onClick={() => setIsAppRatingOpen(true)}
                         className="ml-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
                       >
-                        Rate Us
+                        {t('rateUs')}
                       </button>
                     </div>
                   </div>
@@ -6870,12 +6922,12 @@ export default function App() {
                 <div>
                   <h4 className="text-lg font-bold mb-6">Quick Links</h4>
                   <ul className="space-y-4 text-gray-400">
-                    <li><Link to="/" className="hover:text-orange-400 transition-colors">Home</Link></li>
-                    <li><Link to="/gallery" className="hover:text-orange-400 transition-colors">Gallery</Link></li>
-                    <li><Link to="/venues" className="hover:text-orange-400 transition-colors">Search</Link></li>
-                    <li><Link to="/about" className="hover:text-orange-400 transition-colors">About</Link></li>
-                    <li><Link to="/registration" className="hover:text-orange-400 transition-colors">Registration</Link></li>
-                    <li><Link to="/login" className="hover:text-orange-400 transition-colors">Login</Link></li>
+                    <li><Link to="/" className="hover:text-orange-400 transition-colors">{t('home')}</Link></li>
+                    <li><Link to="/gallery" className="hover:text-orange-400 transition-colors">{t('gallery')}</Link></li>
+                    <li><Link to="/venues" className="hover:text-orange-400 transition-colors">{t('search')}</Link></li>
+                    <li><Link to="/about" className="hover:text-orange-400 transition-colors">{t('about')}</Link></li>
+                    <li><Link to="/registration" className="hover:text-orange-400 transition-colors">{t('registration')}</Link></li>
+                    <li><Link to="/login" className="hover:text-orange-400 transition-colors">{t('login')}</Link></li>
                   </ul>
                 </div>
                 <div>
@@ -6890,7 +6942,7 @@ export default function App() {
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
                 <PoweredByCNZ />
                 <div className="text-gray-500 text-sm">
-                  © 2026 Event Manager India. All rights reserved.
+                  © 2026 BOOK MY VANUE India. All rights reserved.
                 </div>
               </div>
             </div>
@@ -7438,7 +7490,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                           'Stage Decorator', 'Flower Decorator', 'Makeup Artist', 'Halbai', 
                           'Event Manager', 'Waiters', 'Dhol Bands', 'Light Decorator', 
                           'Drone Camera', 'Mehendi Service', 'Event Cloth and Jwellary on Rent', 
-                          'Fast food stalls', 'Loundry service', 'Helper', 'Other Related Services'
+                          'Fast food stalls', 'Loundry service', 'Helper', 'Pandit Ji Brahman', 
+                          'SPARKS AND Firecrackers', 'Other Related Services'
                         ].map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <label className="cursor-pointer bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 transition-all">
@@ -7532,7 +7585,6 @@ const VenueListView = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [cityFilter, setCityFilter] = useState(searchParams.get('city') || '');
 
   useEffect(() => {
     const fetchVenues = async () => {
@@ -7551,7 +7603,6 @@ const VenueListView = () => {
         ownerId: d.owner_id,
         name: d.name,
         venueType: d.venue_type,
-        city: d.city,
         state: d.state,
         district: d.district,
         block: d.block,
@@ -7569,16 +7620,13 @@ const VenueListView = () => {
       } as Venue));
       
       const search = searchParams.get('search')?.toLowerCase();
-      const city = searchParams.get('city')?.toLowerCase();
 
       if (search) {
         data = data.filter(v => 
           v.name.toLowerCase().includes(search) || 
-          v.venueType.toLowerCase().includes(search) ||
-          v.city.toLowerCase().includes(search)
+          v.venueType.toLowerCase().includes(search)
         );
       }
-      if (city) data = data.filter(v => v.city.toLowerCase().includes(city));
 
       setVenues(data);
       setLoading(false);
@@ -7586,31 +7634,10 @@ const VenueListView = () => {
     fetchVenues();
   }, [searchParams]);
 
-  const handleCityFilter = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newParams = new URLSearchParams(searchParams);
-    if (cityFilter) newParams.set('city', cityFilter);
-    else newParams.delete('city');
-    setSearchParams(newParams);
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Available Venues</h1>
-        <form onSubmit={handleCityFilter} className="flex items-center space-x-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm w-full md:w-auto">
-          <MapPin size={18} className="text-orange-500" />
-          <input 
-            type="text" 
-            placeholder="Filter by City..." 
-            className="focus:outline-none text-sm w-full"
-            value={cityFilter}
-            onChange={e => setCityFilter(e.target.value)}
-          />
-          <button type="submit" className="bg-orange-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-orange-700">
-            Filter
-          </button>
-        </form>
       </div>
       
       {loading ? (
@@ -7635,7 +7662,6 @@ const ServiceListView = ({ user }: { user: any }) => {
   const [services, setServices] = useState<ServiceProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [cityFilter, setCityFilter] = useState(searchParams.get('city') || '');
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -7655,7 +7681,8 @@ const ServiceListView = ({ user }: { user: any }) => {
         name: d.name,
         serviceType: d.service_type,
         state: d.state,
-        city: d.city,
+        district: d.district,
+        block: d.block,
         experience: d.experience,
         priceRange: d.price_range,
         description: d.description,
@@ -7667,17 +7694,14 @@ const ServiceListView = ({ user }: { user: any }) => {
       
       const type = searchParams.get('type');
       const search = searchParams.get('search')?.toLowerCase();
-      const city = searchParams.get('city')?.toLowerCase();
 
       if (type) data = data.filter(s => s.serviceType === type);
       if (search) {
         data = data.filter(s => 
           s.name.toLowerCase().includes(search) || 
-          s.serviceType.toLowerCase().includes(search) ||
-          s.city.toLowerCase().includes(search)
+          s.serviceType.toLowerCase().includes(search)
         );
       }
-      if (city) data = data.filter(s => s.city.toLowerCase().includes(city));
 
       setServices(data);
       setLoading(false);
@@ -7685,31 +7709,10 @@ const ServiceListView = ({ user }: { user: any }) => {
     fetchServices();
   }, [searchParams]);
 
-  const handleCityFilter = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newParams = new URLSearchParams(searchParams);
-    if (cityFilter) newParams.set('city', cityFilter);
-    else newParams.delete('city');
-    setSearchParams(newParams);
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Event Services</h1>
-        <form onSubmit={handleCityFilter} className="flex items-center space-x-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm w-full md:w-auto">
-          <MapPin size={18} className="text-orange-500" />
-          <input 
-            type="text" 
-            placeholder="Filter by City..." 
-            className="focus:outline-none text-sm w-full"
-            value={cityFilter}
-            onChange={e => setCityFilter(e.target.value)}
-          />
-          <button type="submit" className="bg-orange-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-orange-700">
-            Filter
-          </button>
-        </form>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {loading ? (
