@@ -3,77 +3,48 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Razorpay from "razorpay";
 import dotenv from "dotenv";
-
 console.log("> Initializing server environment...");
 dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 async function startServer() {
   console.log("> Starting server function...");
   const app = express();
-  const PORT = process.env.PORT || 3000;
-
+  const PORT = process.env.PORT || 3e3;
   app.use(express.json());
-
-  // Check for critical environment variables
-  const requiredEnv = [
-    'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
-    'VITE_RAZORPAY_KEY_ID',
-    'RAZORPAY_KEY_SECRET'
-  ];
-  
-  console.log("> Checking environment variables...");
-  requiredEnv.forEach(key => {
-    if (!process.env[key]) {
-      console.warn(`> WARNING: Missing environment variable: ${key}`);
-    } else {
-      console.log(`> Found environment variable: ${key}`);
-    }
-  });
-
-  // Global error handlers for debugging
   process.on("uncaughtException", (err) => {
     console.error("> Uncaught Exception:", err);
   });
   process.on("unhandledRejection", (reason, promise) => {
     console.error("> Unhandled Rejection at:", promise, "reason:", reason);
   });
-
-  // Razorpay instance with ESM interop fix
-  const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+  const RazorpayConstructor = Razorpay.default || Razorpay;
   console.log("> Initializing Razorpay...");
   const razorpay = new RazorpayConstructor({
     key_id: process.env.VITE_RAZORPAY_KEY_ID || "",
-    key_secret: process.env.RAZORPAY_KEY_SECRET || "",
+    key_secret: process.env.RAZORPAY_KEY_SECRET || ""
   });
-
-  // API routes
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV || 'development'
+    res.json({
+      status: "ok",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      env: process.env.NODE_ENV || "development"
     });
   });
-
   app.get("/api/test", (req, res) => {
     res.send("Server is alive and reachable! Version 2.0");
   });
-
   app.post("/api/razorpay/order", async (req, res) => {
     console.log("> Received Razorpay order request");
     try {
       const { amount, currency, receipt, notes } = req.body;
       const options = {
-        amount: amount * 100, // amount in the smallest currency unit (paise)
+        amount: amount * 100,
+        // amount in the smallest currency unit (paise)
         currency,
         receipt,
-        notes,
+        notes
       };
-
       const order = await razorpay.orders.create(options);
       res.json(order);
     } catch (error) {
@@ -81,10 +52,8 @@ async function startServer() {
       res.status(500).json({ error: "Failed to create Razorpay order" });
     }
   });
-
   const isProduction = process.env.NODE_ENV === "production";
-  console.log(`> Mode: ${isProduction ? 'Production' : 'Development/Fallback'}`);
-
+  console.log(`> Mode: ${isProduction ? "Production" : "Development/Fallback"}`);
   if (isProduction) {
     const distPath = path.resolve(__dirname, "dist");
     console.log(`> Serving static files from: ${distPath}`);
@@ -103,7 +72,7 @@ async function startServer() {
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
-        appType: "spa",
+        appType: "spa"
       });
       app.use(vite.middlewares);
       console.log("> Vite middleware enabled");
@@ -120,13 +89,11 @@ async function startServer() {
       });
     }
   }
-
   app.listen(PORT, () => {
     console.log(`> Server is running on port ${PORT}`);
     console.log(`> Access it at http://localhost:${PORT} or your domain`);
   });
 }
-
 console.log("> Calling startServer()...");
 startServer().catch((err) => {
   console.error("> Failed to start server:", err);
