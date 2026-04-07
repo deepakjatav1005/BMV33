@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     state TEXT,
     district TEXT,
     block TEXT,
+    city TEXT,
     pincode TEXT,
     venue_type TEXT,
     status TEXT CHECK (status IN ('active', 'disabled')) DEFAULT 'active',
