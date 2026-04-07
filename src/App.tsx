@@ -2379,6 +2379,7 @@ const ServiceTypePhotosScroll = () => {
 };
 
 const HomeView = ({ user }: { user: any }) => {
+  const { t } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.6);
   const topProvidersScrollRef = useAutoScroll(0.5);
   const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
@@ -2484,18 +2485,18 @@ const HomeView = ({ user }: { user: any }) => {
                         {banners[currentBannerIndex].title}
                       </h1>
                       <p className="text-xl text-gray-200 mb-10 leading-relaxed">
-                        India's Most Trusted Platform for Wedding & Event Planning. Find the perfect venue and services for your special day.
+                        {t('heroTagline')}
                       </p>
                       <div className="flex flex-wrap gap-4">
                         <Link to="/venues" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
-                          Explore Venues
+                          {t('searchNow')}
                           <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                         </Link>
                         <Link to="/registration?role=owner" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">
-                          Join as Venue Owner
+                          {t('joinAsOwner')}
                         </Link>
                         <Link to="/registration?role=provider" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">
-                          Join as Service Provider
+                          {t('joinAsProvider')}
                         </Link>
                       </div>
                     </div>
@@ -2586,27 +2587,27 @@ const HomeView = ({ user }: { user: any }) => {
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/20 rounded-full -ml-32 -mb-32 blur-3xl" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h2 className="text-4xl font-bold mb-16">Why Plan with BOOK MY VANUE?</h2>
+          <h2 className="text-4xl font-bold mb-16">{t('whyPlanTitle')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
                 <CheckCircle size={40} />
               </div>
-              <h3 className="text-2xl font-bold mb-4">Verified Listings</h3>
+              <h3 className="text-2xl font-bold mb-4">{t('verifiedPartners')}</h3>
               <p className="text-orange-100 opacity-80">Every venue and provider is manually verified for quality and reliability.</p>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
                 <IndianRupee size={40} />
               </div>
-              <h3 className="text-2xl font-bold mb-4">Best Price Guarantee</h3>
+              <h3 className="text-2xl font-bold mb-4">{t('bestPrices')}</h3>
               <p className="text-orange-100 opacity-80">Get the best rates by booking directly through our platform.</p>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
                 <Clock size={40} />
               </div>
-              <h3 className="text-2xl font-bold mb-4">Instant Support</h3>
+              <h3 className="text-2xl font-bold mb-4">{t('support247')}</h3>
               <p className="text-orange-100 opacity-80">Our team is here to help you with every step of your event planning.</p>
             </div>
           </div>
@@ -6835,8 +6836,9 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary>
-      <Router>
+    <LanguageContext.Provider value={{ lang, setLang, t }}>
+      <ErrorBoundary>
+        <Router>
         <div className="min-h-screen bg-white font-sans text-gray-900">
           <Toaster position="top-center" />
           
@@ -6942,7 +6944,7 @@ export default function App() {
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
                 <PoweredByCNZ />
                 <div className="text-gray-500 text-sm">
-                  © 2026 BOOK MY VANUE India. All rights reserved.
+                  {t('footerCopyright')}
                 </div>
               </div>
             </div>
@@ -6950,6 +6952,7 @@ export default function App() {
         </div>
       </Router>
     </ErrorBoundary>
+  </LanguageContext.Provider>
   );
 }
 
