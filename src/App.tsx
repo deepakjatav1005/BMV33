@@ -1058,6 +1058,36 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
             <Link to="/venues" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Search</Link>
             <Link to="/about" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>About</Link>
             
+            <div className="pt-4 border-t border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">Explore Categories</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Link to="/venues" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <Building2 size={14} />
+                  <span>Venues</span>
+                </Link>
+                <Link to="/services?type=Caterer" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <UtensilsCrossed size={14} />
+                  <span>Catering</span>
+                </Link>
+                <Link to="/services?type=DJ and Sounds" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <Music2 size={14} />
+                  <span>DJ & Music</span>
+                </Link>
+                <Link to="/services?type=Photo and Videographer" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <Camera size={14} />
+                  <span>Photography</span>
+                </Link>
+                <Link to="/services?type=Light Decorator" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <Lightbulb size={14} />
+                  <span>Lighting</span>
+                </Link>
+                <Link to="/services?type=Makeup Artist" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
+                  <Sparkles size={14} />
+                  <span>Makeup</span>
+                </Link>
+              </div>
+            </div>
+            
             <button 
               onClick={() => { onRateApp(); setIsMenuOpen(false); }}
               className="flex items-center space-x-2 text-orange-600 font-bold bg-orange-50 px-4 py-2 rounded-xl w-full"
@@ -1238,7 +1268,7 @@ const Hero = () => {
   );
 };
 
-const CategorySection = () => {
+const CategorySection = ({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) => {
   const categories = [
     { name: 'Venues', icon: <Building2 />, color: 'bg-blue-50 text-blue-600', link: '/venues', desc: 'Wedding Halls & Resorts' },
     { name: 'Catering', icon: <UtensilsCrossed />, color: 'bg-orange-50 text-orange-600', link: '/services?type=Caterer', desc: 'Delicious Food Stalls' },
@@ -1292,14 +1322,14 @@ const CategorySection = () => {
           <div className="w-24 h-2 bg-orange-500 mx-auto rounded-full" />
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-8">
+        <div 
+          ref={scrollRef}
+          className="flex overflow-x-auto space-x-8 pb-10 scrollbar-hide snap-x"
+        >
           {categories.map((cat, idx) => (
             <motion.div
               key={idx}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.05, type: 'spring', stiffness: 100 }}
+              className="flex-shrink-0 w-40 snap-center"
               whileHover={{ y: -10 }}
             >
               <Link 
@@ -1319,7 +1349,7 @@ const CategorySection = () => {
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
                 </div>
                 <span className="font-black text-gray-900 text-center text-sm group-hover:text-orange-600 transition-colors uppercase tracking-tight">{cat.name}</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">{cat.desc}</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 text-center">{cat.desc}</span>
               </Link>
             </motion.div>
           ))}
@@ -2472,10 +2502,55 @@ const ServiceTypePhotosScroll = () => {
   );
 };
 
+const TermsView = () => {
+  return (
+    <div className="min-h-screen bg-gray-50 pt-32 pb-20">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-sm border border-gray-100">
+          <h1 className="text-4xl font-black text-gray-900 mb-8">Terms & Conditions</h1>
+          <div className="prose prose-orange max-w-none text-gray-600 space-y-6">
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
+              <p>By accessing and using the BOOK MY VANUE application, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
+            </section>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">2. User Responsibilities</h2>
+              <p>Users are responsible for providing accurate information during registration and booking. Any misuse of the platform or fraudulent activities will lead to immediate account termination.</p>
+            </section>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">3. Booking & Payments</h2>
+              <p>Bookings are subject to availability and confirmation by the venue owner or service provider. Payments made through the platform or directly are governed by the respective cancellation policies.</p>
+            </section>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">4. Liability</h2>
+              <p>BOOK MY VANUE acts as a facilitator between customers and providers. We are not liable for any disputes, damages, or service failures between the parties.</p>
+            </section>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">5. Contact Information</h2>
+              <p>For any queries or support, please contact us at:</p>
+              <ul className="list-none space-y-2 mt-2">
+                <li className="flex items-center space-x-2">
+                  <Phone size={16} className="text-orange-600" />
+                  <span>+91 8349076918</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <MessageSquare size={16} className="text-orange-600" />
+                  <span>Chanchalnetzone2026@gmail.com</span>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HomeView = ({ user }: { user: any }) => {
   const { t } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.6);
   const topProvidersScrollRef = useAutoScroll(0.5);
+  const categoriesScrollRef = useAutoScroll(0.4);
   const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
   const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
@@ -2543,7 +2618,7 @@ const HomeView = ({ user }: { user: any }) => {
   }, []);
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 pt-16">
       {/* Notifications Bar */}
       {notifications.length > 0 && (
         <div className="bg-orange-600 text-white py-2 overflow-hidden relative">
@@ -2634,7 +2709,7 @@ const HomeView = ({ user }: { user: any }) => {
       </div>
 
       <ServiceTypePhotosScroll />
-      <CategorySection />
+      <CategorySection scrollRef={categoriesScrollRef} />
       <ServiceInfoStickers />
       
       <section className="py-16 bg-gray-50">
@@ -3791,6 +3866,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const bookingsPerPage = 20;
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -3886,6 +3963,11 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   });
 
   const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const indexOfLastBooking = currentPage * bookingsPerPage;
+  const indexOfFirstBooking = indexOfLastBooking - bookingsPerPage;
+  const currentBookings = sortedBookings.slice(indexOfFirstBooking, indexOfLastBooking);
+  const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
   const handleStatusUpdate = async (id: string, status: 'confirmed' | 'cancelled') => {
     if (status === 'confirmed' && !isCallSatisfied) {
@@ -4047,8 +4129,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {sortedBookings.length > 0 ? (
-          sortedBookings.map(booking => (
+        {currentBookings.length > 0 ? (
+          currentBookings.map(booking => (
             <div key={booking.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-start space-x-4">
                 <div className={cn(
@@ -4151,6 +4233,26 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center space-x-4 mt-10">
+          <button 
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            className="p-2 rounded-xl border border-gray-200 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+          >
+            <ChevronRight size={20} className="rotate-180" />
+          </button>
+          <span className="font-bold text-gray-600">Page {currentPage} of {totalPages}</span>
+          <button 
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            className="p-2 rounded-xl border border-gray-200 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      )}
 
       {/* Manual Booking Modal */}
       <AnimatePresence>
@@ -4723,7 +4825,84 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
 const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'subscription' | 'booking-manager'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'subscription' | 'booking-manager' | 'reports'>(initialTab);
+  const [reportFilters, setReportFilters] = useState({
+    name: '',
+    mobile: '',
+    startDate: '',
+    endDate: '',
+    paymentMode: '',
+    paymentStatus: ''
+  });
+
+  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+    const filteredBookings = bookings.filter(b => {
+      const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+      const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+      const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
+      const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+      const bDate = new Date(b.eventDate);
+      const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
+      const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
+      return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
+    });
+
+    if (type === 'excel') {
+      const data = filteredBookings.map((b, index) => ({
+        'S.No': index + 1,
+        'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
+        'Customer Name': b.partyName || b.visitorName || 'N/A',
+        'Mobile Number': b.visitorMobile || 'N/A',
+        'Address': b.partyAddress || 'N/A',
+        'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
+        'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
+        'Invoice Amount (Rs)': b.updatedAmount || b.totalAmount || 0,
+        'Payment Mode': b.paymentMode || 'N/A',
+        'Payment Status': b.paymentStatus || 'Pending',
+        'Booking Type': b.isManual ? 'Manual' : 'Order'
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
+      XLSX.writeFile(workbook, "booking_report.xlsx");
+    } else {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("Booking Transaction Report", 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+      
+      let y = 40;
+      doc.setFont("helvetica", "bold");
+      doc.text("S.No", 10, y);
+      doc.text("Customer", 22, y);
+      doc.text("Venue/Service", 55, y);
+      doc.text("Date", 95, y);
+      doc.text("Amount", 125, y);
+      doc.text("Mode", 150, y);
+      doc.text("Status", 170, y);
+      doc.text("B.Status", 190, y);
+      y += 10;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      
+      filteredBookings.forEach((b, index) => {
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text((index + 1).toString(), 10, y);
+        doc.text((b.partyName || b.visitorName || 'N/A').substring(0, 15), 22, y);
+        doc.text((b.targetName || 'N/A').substring(0, 15), 55, y);
+        doc.text(b.eventDate, 95, y);
+        doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 125, y);
+        doc.text(b.paymentMode || 'N/A', 150, y);
+        doc.text(b.paymentStatus || 'Pending', 170, y);
+        doc.text(b.status.substring(0, 8), 190, y);
+        y += 8;
+      });
+      doc.save("booking_report.pdf");
+    }
+    toast.success(`Report downloaded as ${type.toUpperCase()}`);
+  };
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [services, setServices] = useState<ServiceProvider[]>([]);
@@ -4866,6 +5045,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
     { id: 'orders', label: 'Order Manage', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'booking-manager', label: 'Booking Manager', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
+    { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
     { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
@@ -5037,7 +5217,163 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               {activeTab === 'catalogue' && (
                 <CatalogueManageView venues={venues} services={services} />
               )}
-              {activeTab === 'subscription' && (
+              {activeTab === 'reports' && (
+                <div className="space-y-8">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-900">Booking Reports</h3>
+                      <div className="flex space-x-4">
+                        <button onClick={() => downloadReport('excel')} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-colors">
+                          <Download size={18} />
+                          <span>Excel</span>
+                        </button>
+                        <button onClick={() => downloadReport('pdf')} className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-colors">
+                          <Download size={18} />
+                          <span>PDF</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Search Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="Customer name..."
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.name}
+                          onChange={(e) => setReportFilters({...reportFilters, name: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Mobile</label>
+                        <input 
+                          type="text" 
+                          placeholder="Mobile number..."
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.mobile}
+                          onChange={(e) => setReportFilters({...reportFilters, mobile: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Start Date</label>
+                        <input 
+                          type="date" 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.startDate}
+                          onChange={(e) => setReportFilters({...reportFilters, startDate: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">End Date</label>
+                        <input 
+                          type="date" 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.endDate}
+                          onChange={(e) => setReportFilters({...reportFilters, endDate: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Payment Mode</label>
+                        <select 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.paymentMode}
+                          onChange={(e) => setReportFilters({...reportFilters, paymentMode: e.target.value})}
+                        >
+                          <option value="">All Modes</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Online">Online</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Payment Status</label>
+                        <select 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.paymentStatus}
+                          onChange={(e) => setReportFilters({...reportFilters, paymentStatus: e.target.value})}
+                        >
+                          <option value="">All Status</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Pending">Pending</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100 pb-4">
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">S.No</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Venue/Service</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Booking Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {bookings.filter(b => {
+                            const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+                            const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+                            const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
+                            const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+                            const bDate = new Date(b.eventDate);
+                            const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
+                            const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
+                            return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
+                          }).map((b, index) => (
+                            <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-4 text-sm text-gray-500">{index + 1}</td>
+                              <td className="py-4">
+                                <div className="font-bold text-gray-900">{b.partyName || b.visitorName}</div>
+                                <div className="text-xs text-gray-500">{b.visitorMobile}</div>
+                              </td>
+                              <td className="py-4">
+                                <div className="text-sm text-gray-900">{b.targetName}</div>
+                                <div className="text-xs text-gray-500 uppercase">{b.targetType}</div>
+                              </td>
+                              <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">
+                                {b.partyAddress || 'N/A'}
+                              </td>
+                              <td className="py-4 text-sm text-gray-600">
+                                {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
+                              </td>
+                              <td className="py-4 text-xs font-mono text-gray-500">
+                                INV-{b.id.substring(0, 8).toUpperCase()}
+                              </td>
+                              <td className="py-4 font-bold text-gray-900">
+                                ₹{b.updatedAmount || b.totalAmount}
+                              </td>
+                              <td className="py-4 text-sm text-gray-600">
+                                {b.paymentMode || 'N/A'}
+                              </td>
+                              <td className="py-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                  b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                                }`}>
+                                  {b.paymentStatus || 'Pending'}
+                                </span>
+                              </td>
+                              <td className="py-4">
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                  b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
+                                  b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
+                                }`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
                 <SubscriptionManageView user={user} profile={profile} />
               )}
             </motion.div>
@@ -6116,7 +6452,15 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     priceRange: '',
     priceLevel: 'per day',
     images: [''],
+    availableFor: [] as string[],
+    state: profile?.state || '',
+    district: profile?.district || '',
+    block: profile?.block || '',
   });
+
+  const selectedState = formData.state;
+  const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
+  const blocks = (selectedState && formData.district) ? (LOCATION_DATA[selectedState][formData.district] || []) : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6128,11 +6472,12 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: profile?.state || '',
-        district: profile?.district || '',
-        block: profile?.block || '',
+        state: formData.state,
+        district: formData.district,
+        block: formData.block,
         images: formData.images.filter(i => i !== ''),
         provider_id: user.uid,
+        available_for: formData.availableFor,
         rating: 0,
         review_count: 0
       }]);
@@ -6237,12 +6582,35 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor.includes(option)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
+                      } else {
+                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
         <button 
           type="submit"
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg"
+          disabled={loading}
+          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg disabled:opacity-50"
         >
-          Register Service
+          {loading ? 'Registering...' : 'Register Service'}
         </button>
       </form>
     </div>
@@ -6270,7 +6638,8 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           providerId: data.provider_id,
           serviceType: data.service_type,
           priceRange: data.price_range,
-          priceLevel: data.price_level || 'per day'
+          priceLevel: data.price_level || 'per day',
+          availableFor: data.available_for || []
         });
       }
       setLoading(false);
@@ -6291,7 +6660,8 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         state: profile?.state || formData.state,
         district: profile?.district || formData.district,
         block: profile?.block || formData.block,
-        images: formData.images
+        images: formData.images,
+        available_for: formData.availableFor
       }).eq('id', id);
       if (error) throw error;
       toast.success('Service updated successfully!');
@@ -6394,6 +6764,29 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.availableFor || [];
+                      if (e.target.checked) {
+                        setFormData({...formData, availableFor: [...current, option]});
+                      } else {
+                        setFormData({...formData, availableFor: current.filter(o => o !== option)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
         <button 
           type="submit"
@@ -6426,7 +6819,8 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           ...data,
           ownerId: data.owner_id,
           venueType: data.venue_type,
-          pricePerDay: data.price_per_day
+          pricePerDay: data.price_per_day,
+          availableFor: data.available_for || []
         });
       }
       setLoading(false);
@@ -6450,7 +6844,8 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images,
-        facilities: formData.facilities
+        facilities: formData.facilities,
+        available_for: formData.availableFor
       }).eq('id', id);
       if (error) throw error;
       toast.success('Venue updated successfully!');
@@ -6557,6 +6952,51 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               value={formData.facilities.join(', ')}
               onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
             />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor.includes(option)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
+                      } else {
+                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.availableFor || [];
+                      if (e.target.checked) {
+                        setFormData({...formData, availableFor: [...current, option]});
+                      } else {
+                        setFormData({...formData, availableFor: current.filter(o => o !== option)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <button 
@@ -6754,6 +7194,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     pricePerDay: 0,
     images: [''],
     facilities: [''],
+    availableFor: [] as string[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -6772,6 +7213,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
         facilities: formData.facilities.filter(a => a !== ''),
+        available_for: formData.availableFor,
         owner_id: user.uid,
         rating: 0,
         review_count: 0
@@ -6868,6 +7310,28 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               value={formData.facilities.join(', ')}
               onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
             />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor.includes(option)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
+                      } else {
+                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <button 
@@ -7386,6 +7850,7 @@ export default function App() {
               }} />} />
               <Route path="/gallery" element={<GalleryView />} />
               <Route path="/about" element={<AboutView />} />
+              <Route path="/terms" element={<TermsView />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </main>
@@ -7440,8 +7905,9 @@ export default function App() {
                   <h4 className="text-lg font-bold mb-6">Support</h4>
                   <ul className="space-y-4 text-gray-400">
                     <li><a href="#" className="hover:text-orange-400 transition-colors">Help Center</a></li>
-                    <li><a href="#" className="hover:text-orange-400 transition-colors">Contact Us</a></li>
-                    <li><a href="#" className="hover:text-orange-400 transition-colors">Privacy Policy</a></li>
+                    <li><a href="mailto:Chanchalnetzone2026@gmail.com" className="hover:text-orange-400 transition-colors">Contact Us</a></li>
+                    <li><Link to="/terms" className="hover:text-orange-400 transition-colors">Terms & Conditions</Link></li>
+                    <li><a href="tel:8349076918" className="hover:text-orange-400 transition-colors">+91 8349076918</a></li>
                   </ul>
                 </div>
               </div>
@@ -7680,18 +8146,25 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const updatePlanPrice = async (id: string, newPrice: number) => {
-    if (isNaN(newPrice)) {
+    if (isNaN(newPrice) || newPrice < 0) {
       toast.error('Invalid price entered');
       return;
     }
-    console.log(`Updating plan ${id} price to ${newPrice}`);
-    const { error } = await supabase.from('subscription_plans').update({ price: newPrice }).eq('id', id);
-    if (!error) {
-      toast.success('Plan price updated');
+    
+    setLoading(true);
+    try {
+      console.log(`Updating plan ${id} price to ${newPrice}`);
+      const { error } = await supabase.from('subscription_plans').update({ price: newPrice }).eq('id', id);
+      
+      if (error) throw error;
+      
+      toast.success('Plan price updated successfully');
       setPlans(prev => prev.map(p => p.id === id ? { ...p, price: newPrice } : p));
-    } else {
-      console.error('Update plan error:', error);
-      toast.error('Failed to update plan price: ' + error.message);
+    } catch (err: any) {
+      console.error('Update plan error:', err);
+      toast.error('Failed to update plan price: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -7722,7 +8195,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       toast.success('User report downloaded');
     } else if (activeTab === 'reports') {
       const filteredBookings = bookings.filter(b => {
-        const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+        const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
         const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
         const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
         const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
@@ -7733,16 +8206,18 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       });
 
       if (type === 'excel') {
-        const data = filteredBookings.map(b => ({
-          'Customer Name': b.visitorName,
-          'Mobile': b.visitorMobile,
-          'Target Name': b.targetName,
-          'Type': b.targetType,
-          'Event Date': b.eventDate,
-          'Amount': b.updatedAmount || b.totalAmount,
+        const data = filteredBookings.map((b, index) => ({
+          'S.No': index + 1,
+          'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
+          'Customer Name': b.partyName || b.visitorName || 'N/A',
+          'Mobile Number': b.visitorMobile || 'N/A',
+          'Address': b.partyAddress || 'N/A',
+          'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
+          'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
+          'Invoice Amount (Rs)': b.updatedAmount || b.totalAmount || 0,
           'Payment Mode': b.paymentMode || 'N/A',
-          'Status': b.paymentStatus || 'Pending',
-          'Created At': new Date(b.createdAt).toLocaleString()
+          'Payment Status': b.paymentStatus || 'Pending',
+          'Booking Type': b.isManual ? 'Manual' : 'Order'
         }));
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
@@ -7750,29 +8225,36 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         XLSX.writeFile(workbook, "booking_report.xlsx");
       } else {
         const doc = new jsPDF();
-        doc.setFontSize(20);
-        doc.text("Booking Report", 105, 20, { align: 'center' });
+        doc.setFontSize(18);
+        doc.text("Booking Transaction Report", 14, 20);
         doc.setFontSize(10);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 30, { align: 'center' });
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
         
         let y = 40;
         doc.setFont("helvetica", "bold");
-        doc.text("Customer", 20, y);
-        doc.text("Venue/Service", 70, y);
-        doc.text("Date", 130, y);
-        doc.text("Amount", 160, y);
-        doc.text("Status", 185, y);
+        doc.text("S.No", 10, y);
+        doc.text("Customer", 22, y);
+        doc.text("Venue/Service", 55, y);
+        doc.text("Date", 95, y);
+        doc.text("Amount", 125, y);
+        doc.text("Mode", 150, y);
+        doc.text("Status", 170, y);
+        doc.text("B.Status", 190, y);
         y += 10;
         doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
         
-        filteredBookings.forEach(b => {
+        filteredBookings.forEach((b, index) => {
           if (y > 280) { doc.addPage(); y = 20; }
-          doc.text(b.visitorName || 'N/A', 20, y);
-          doc.text(b.targetName.substring(0, 25), 70, y);
-          doc.text(b.eventDate, 130, y);
-          doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 160, y);
-          doc.text(b.paymentStatus || 'Pending', 185, y);
-          y += 10;
+          doc.text((index + 1).toString(), 10, y);
+          doc.text((b.partyName || b.visitorName || 'N/A').substring(0, 15), 22, y);
+          doc.text((b.targetName || 'N/A').substring(0, 15), 55, y);
+          doc.text(b.eventDate, 95, y);
+          doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 125, y);
+          doc.text(b.paymentMode || 'N/A', 150, y);
+          doc.text(b.paymentStatus || 'Pending', 170, y);
+          doc.text(b.status.substring(0, 8), 190, y);
+          y += 8;
         });
         doc.save("booking_report.pdf");
       }
@@ -8111,17 +8593,22 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       <table className="w-full text-left">
                         <thead>
                           <tr className="border-b border-gray-100 pb-4">
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">S.No</th>
                             <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
                             <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Venue/Service</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
                             <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
                             <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Booking Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {bookings
                             .filter(b => {
-                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
                               const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
                               const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
                               const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
@@ -8130,27 +8617,45 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                               const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
                               return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
                             })
-                            .map(b => (
+                            .map((b, index) => (
                               <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="py-4 text-sm text-gray-500">{index + 1}</td>
                                 <td className="py-4">
-                                  <div className="font-bold text-gray-900">{b.visitorName}</div>
+                                  <div className="font-bold text-gray-900">{b.partyName || b.visitorName}</div>
                                   <div className="text-xs text-gray-500">{b.visitorMobile}</div>
                                 </td>
                                 <td className="py-4">
                                   <div className="text-sm text-gray-900">{b.targetName}</div>
                                   <div className="text-xs text-gray-500 uppercase">{b.targetType}</div>
                                 </td>
+                                <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">
+                                  {b.partyAddress || 'N/A'}
+                                </td>
                                 <td className="py-4 text-sm text-gray-600">
-                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')}
+                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
+                                </td>
+                                <td className="py-4 text-xs font-mono text-gray-500">
+                                  INV-{b.id.substring(0, 8).toUpperCase()}
                                 </td>
                                 <td className="py-4 font-bold text-gray-900">
                                   ₹{b.updatedAmount || b.totalAmount}
+                                </td>
+                                <td className="py-4 text-sm text-gray-600">
+                                  {b.paymentMode || 'N/A'}
                                 </td>
                                 <td className="py-4">
                                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
                                     b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
                                   }`}>
                                     {b.paymentStatus || 'Pending'}
+                                  </span>
+                                </td>
+                                <td className="py-4">
+                                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                    b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
+                                    b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
+                                  }`}>
+                                    {b.status}
                                   </span>
                                 </td>
                               </tr>
@@ -8257,16 +8762,26 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         </span>
                       </div>
                       <div className="flex items-center space-x-4 mb-6">
-                        <span className="text-3xl font-bold text-gray-900">₹{plan.price}</span>
-                        <button 
-                          onClick={() => {
-                            const newPrice = prompt('Enter new price:', plan.price.toString());
-                            if (newPrice) updatePlanPrice(plan.id, parseFloat(newPrice));
-                          }}
-                          className="text-orange-500 font-bold text-sm hover:underline"
-                        >
-                          Edit Price
-                        </button>
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Plan Price (₹)</label>
+                          <div className="flex items-center space-x-2">
+                            <input 
+                              type="number" 
+                              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900"
+                              defaultValue={plan.price}
+                              onBlur={(e) => {
+                                const newPrice = parseFloat(e.target.value);
+                                if (newPrice !== plan.price) updatePlanPrice(plan.id, newPrice);
+                              }}
+                            />
+                            <button 
+                              className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors"
+                              title="Update Price"
+                            >
+                              <Check size={18} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <button 
                         onClick={() => togglePlanStatus(plan.id, plan.isActive)}

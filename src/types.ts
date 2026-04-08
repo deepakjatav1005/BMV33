@@ -116,6 +116,7 @@ export interface Venue {
   reviewCount?: number;
   rateChart?: { item: string; price: number }[];
   catalogue?: CatalogueItem[];
+  availableFor?: string[];
   createdAt: any;
 }
 
@@ -159,6 +160,7 @@ export interface ServiceProvider {
   reviews?: Review[];
   rateChart?: { item: string; price: number }[];
   catalogue?: CatalogueItem[];
+  availableFor?: string[];
   createdAt: any;
 }
 
