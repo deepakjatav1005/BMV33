@@ -40,6 +40,7 @@ import {
   AlertCircle,
   IndianRupee,
   ChevronRight,
+  ChevronDown,
   Filter,
   Trash2,
   Edit2,
@@ -73,7 +74,15 @@ import {
   Tag,
   MessageSquare,
   Play,
-  Flower2
+  Flower2,
+  FileText,
+  LayoutDashboard,
+  Lightbulb,
+  ChefHat,
+  PersonStanding,
+  HandHelping,
+  Layout,
+  Users2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
@@ -113,6 +122,10 @@ const translations: Record<string, any> = {
     joinAsOwner: "Join Us as Venue Owner",
     joinAsProvider: "Join Us as Service Provider",
     register: "Register",
+    termsAndConditions: "Terms & Conditions",
+    helpCenter: "Help Center",
+    contactUs: "Contact Us",
+    loginNow: "Login Now"
   },
   hi: {
     home: "होम",
@@ -142,6 +155,10 @@ const translations: Record<string, any> = {
     joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
     joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
     register: "पंजीकरण करें",
+    termsAndConditions: "नियम और शर्तें",
+    helpCenter: "सहायता केंद्र",
+    contactUs: "संपर्क करें",
+    loginNow: "अभी लॉगिन करें"
   }
 };
 
@@ -837,6 +854,7 @@ const ImageUpload = ({
 const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: UserProfile | null, onLogout: () => void, onRateApp: () => void }) => {
   const { lang, setLang, t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isExploreOpen, setIsExploreOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
 
@@ -891,6 +909,67 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                 <Home size={18} />
                 <span>{t('home')}</span>
               </Link>
+              
+              <div className="relative group">
+                <button 
+                  onMouseEnter={() => setIsExploreOpen(true)}
+                  className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 font-medium transition-colors py-2"
+                >
+                  <span>Explore</span>
+                  <ChevronDown size={16} className={cn("transition-transform", isExploreOpen ? "rotate-180" : "")} />
+                </button>
+                
+                <AnimatePresence>
+                  {isExploreOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      onMouseLeave={() => setIsExploreOpen(false)}
+                      className="absolute top-full left-0 w-64 bg-white rounded-2xl shadow-2xl border border-orange-100 py-4 z-50"
+                    >
+                      <div className="grid grid-cols-1 gap-1 px-2">
+                        <Link to="/venues" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <Building2 size={16} />
+                          <span>Venues</span>
+                        </Link>
+                        <Link to="/services?type=Caterer" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <UtensilsCrossed size={16} />
+                          <span>Catering</span>
+                        </Link>
+                        <Link to="/services?type=DJ and Sounds" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <Music2 size={16} />
+                          <span>DJ & Music</span>
+                        </Link>
+                        <Link to="/services?type=Photo and Videographer" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <Camera size={16} />
+                          <span>Photography</span>
+                        </Link>
+                        <Link to="/services?type=Light Decorator" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <Lightbulb size={16} />
+                          <span>Lighting</span>
+                        </Link>
+                        <Link to="/services?type=Makeup Artist" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <Sparkles size={16} />
+                          <span>Makeup</span>
+                        </Link>
+                        <Link to="/services?type=Halbai" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <ChefHat size={16} />
+                          <span>Halbai</span>
+                        </Link>
+                        <Link to="/services?type=Pandit Ji Brahman" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
+                          <PersonStanding size={16} />
+                          <span>Pandit Ji</span>
+                        </Link>
+                        <Link to="/services" className="px-4 py-2 mt-2 border-t border-gray-50 text-orange-600 text-xs font-black uppercase tracking-widest text-center hover:bg-orange-50 rounded-xl">
+                          View All Services
+                        </Link>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
               <Link to="/venues" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
@@ -1166,22 +1245,22 @@ const CategorySection = () => {
     { name: 'DJ & Music', icon: <Music2 />, color: 'bg-purple-50 text-purple-600', link: '/services?type=DJ and Sounds', desc: 'Sound & Lighting' },
     { name: 'Tent House', icon: <Tent />, color: 'bg-green-50 text-green-600', link: '/services?type=Tent House', desc: 'Decor & Setup' },
     { name: 'Photography', icon: <Camera />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Photo and Videographer', desc: 'Capture Memories' },
-    { name: 'Pandit Ji', icon: <User />, color: 'bg-red-50 text-red-600', link: '/services?type=Pandit Ji Brahman', desc: 'Religious Services' },
+    { name: 'Pandit Ji', icon: <PersonStanding />, color: 'bg-red-50 text-red-600', link: '/services?type=Pandit Ji Brahman', desc: 'Religious Services' },
     { name: 'Firecrackers', icon: <Sparkles />, color: 'bg-orange-50 text-orange-600', link: '/services?type=SPARKS AND Firecrackers', desc: 'Sparks & Fire' },
     { name: 'Mehendi', icon: <Palette />, color: 'bg-yellow-50 text-yellow-600', link: '/services?type=Mehendi Service', desc: 'Traditional Art' },
     { name: 'Drone', icon: <Plane />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Drone Camera', desc: 'Aerial Shots' },
     { name: 'Event Manager', icon: <Briefcase />, color: 'bg-indigo-50 text-indigo-600', link: '/services?type=Event Manager', desc: 'Expert Planning' },
-    { name: 'Light Decorator', icon: <Sparkles />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Light Decorator', desc: 'Night Illumination' },
+    { name: 'Light Decorator', icon: <Lightbulb />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Light Decorator', desc: 'Night Illumination' },
     { name: 'Rentals', icon: <Gem />, color: 'bg-cyan-50 text-cyan-600', link: '/services?type=Event Cloth and Jwellary on Rent', desc: 'Jewelry & Clothes' },
     { name: 'Fast Food', icon: <Pizza />, color: 'bg-red-50 text-red-600', link: '/services?type=Fast food stalls', desc: 'Quick Bites' },
     { name: 'Laundry', icon: <WashingMachine />, color: 'bg-sky-50 text-sky-600', link: '/services?type=Loundry service', desc: 'Clean & Fresh' },
-    { name: 'Helper', icon: <Users />, color: 'bg-emerald-50 text-emerald-600', link: '/services?type=Helper', desc: 'Event Support' },
-    { name: 'Makeup', icon: <User />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Makeup Artist', desc: 'Beauty & Style' },
-    { name: 'Stage Decor', icon: <Palette />, color: 'bg-purple-50 text-purple-600', link: '/services?type=Stage Decorator', desc: 'Grand Setup' },
+    { name: 'Helper', icon: <HandHelping />, color: 'bg-emerald-50 text-emerald-600', link: '/services?type=Helper', desc: 'Event Support' },
+    { name: 'Makeup', icon: <Sparkles />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Makeup Artist', desc: 'Beauty & Style' },
+    { name: 'Stage Decor', icon: <Layout />, color: 'bg-purple-50 text-purple-600', link: '/services?type=Stage Decorator', desc: 'Grand Setup' },
     { name: 'Flower Decor', icon: <Flower2 />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Flower Decorator', desc: 'Floral Magic' },
-    { name: 'Waiters', icon: <Users />, color: 'bg-blue-50 text-blue-600', link: '/services?type=Waiters', desc: 'Service Staff' },
+    { name: 'Waiters', icon: <Users2 />, color: 'bg-blue-50 text-blue-600', link: '/services?type=Waiters', desc: 'Service Staff' },
     { name: 'Dhol Bands', icon: <Music />, color: 'bg-orange-50 text-orange-600', link: '/services?type=Dhol Bands', desc: 'Traditional Music' },
-    { name: 'Halbai', icon: <Utensils />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Halbai', desc: 'Traditional Sweets' },
+    { name: 'Halbai', icon: <ChefHat />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Halbai', desc: 'Traditional Sweets' },
     { name: 'Other', icon: <Plus />, color: 'bg-slate-50 text-slate-600', link: '/services?type=Other Related Services', desc: 'More Services' },
   ];
 
@@ -2069,6 +2148,14 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 const GalleryView = () => {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportFilters, setReportFilters] = useState({
+    name: '',
+    mobile: '',
+    startDate: '',
+    endDate: '',
+    paymentMode: '',
+    paymentStatus: ''
+  });
   const [displayCount, setDisplayCount] = useState(20);
 
   useEffect(() => {
@@ -2432,7 +2519,7 @@ const HomeView = ({ user }: { user: any }) => {
         const { data: bData } = await supabase.from('banners').select('*').eq('is_active', true);
         if (bData) setBanners(bData.map(d => ({ id: d.id, title: d.title, imageUrl: d.image_url, link: d.link, isActive: d.is_active, createdAt: d.created_at }) as AppBanner));
 
-        const { data: nData } = await supabase.from('notifications').select('*').eq('is_active', true);
+        const { data: nData } = await supabase.from('notifications').select('*').eq('is_active', true).order('created_at', { ascending: false });
         if (nData) setNotifications(nData.map(d => ({ id: d.id, title: d.title, message: d.message, createdAt: d.created_at }) as AppNotification));
       } catch (err) {
         console.error('Home data error:', err);
@@ -2440,7 +2527,19 @@ const HomeView = ({ user }: { user: any }) => {
         setLoading(false);
       }
     };
+
     fetchHomeData();
+
+    const channel = supabase
+      .channel('home_notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        fetchHomeData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
@@ -2498,6 +2597,10 @@ const HomeView = ({ user }: { user: any }) => {
                         <Link to="/venues" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
                           {t('searchNow')}
                           <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+                        </Link>
+                        <Link to="/login" className="bg-white text-orange-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-100 transition-all shadow-xl flex items-center">
+                          <LogIn className="mr-2" />
+                          {t('loginNow')}
                         </Link>
                         <Link to="/registration?role=owner" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">
                           {t('joinAsOwner')}
@@ -2875,6 +2978,22 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
     setBookingStatus('loading');
     try {
+      // Check for existing pending booking from this visitor for this venue
+      const { data: existingPending, error: pendingError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('target_id', venue?.id)
+        .eq('visitor_mobile', visitorMobile)
+        .eq('status', 'pending');
+
+      if (pendingError) throw pendingError;
+
+      if (existingPending && existingPending.length > 0) {
+        toast.error('You already have a pending booking query for this venue. Please wait for a response.');
+        setBookingStatus('idle');
+        return;
+      }
+
       // Check for existing booking on this date and overlapping time slot
       const { data: existingBookings, error: conflictError } = await supabase
         .from('bookings')
@@ -3312,6 +3431,22 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
     setBookingStatus('loading');
     try {
+      // Check for existing pending booking from this visitor for this service
+      const { data: existingPending, error: pendingError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('target_id', service?.id)
+        .eq('visitor_mobile', visitorMobile)
+        .eq('status', 'pending');
+
+      if (pendingError) throw pendingError;
+
+      if (existingPending && existingPending.length > 0) {
+        toast.error('You already have a pending booking query for this service. Please wait for a response.');
+        setBookingStatus('idle');
+        return;
+      }
+
       // Check for existing booking on this date and overlapping time slot
       const { data: existingBookings, error: conflictError } = await supabase
         .from('bookings')
@@ -3662,9 +3797,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
   const [expenditure, setExpenditure] = useState(0);
-  const [additionalServiceName, setAdditionalServiceName] = useState('');
-  const [additionalServiceAmount, setAdditionalServiceAmount] = useState(0);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
+  const [extraServices, setExtraServices] = useState<{ name: string; amount: number }[]>([]);
+  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
+  const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [manualBooking, setManualBooking] = useState({
     partyName: '',
     partyAddress: '',
@@ -3744,9 +3879,10 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   }, [user]);
 
   const filteredBookings = bookings.filter(b => {
+    const matchesManual = b.isManual;
     const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
-    return matchesStatus && matchesDate;
+    return matchesManual && matchesStatus && matchesDate;
   });
 
   const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -3790,29 +3926,31 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     if (selectedBooking) {
       const updatedBooking = {
         ...selectedBooking,
-        additional_service_name: additionalServiceName,
-        additional_service_amount: additionalServiceAmount,
-        status: paymentStatus
+        extra_services: extraServices,
+        paymentMode,
+        paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       };
       
       generateInvoice(updatedBooking, expenditure, profile);
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + additionalServiceAmount;
-      const msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
+      const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
+      const msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}. Please check your PDF invoice.`;
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
       await supabase.from('bookings').update({ 
         is_invoice_generated: true,
-        additional_service_name: additionalServiceName,
-        additional_service_amount: additionalServiceAmount,
-        status: paymentStatus
+        extra_services: extraServices,
+        payment_mode: paymentMode,
+        payment_status: paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
       setExpenditure(0);
-      setAdditionalServiceName('');
-      setAdditionalServiceAmount(0);
-      setPaymentStatus('pending');
+      setExtraServices([]);
+      setPaymentStatus('Pending');
       toast.success('Invoice generated and shared via WhatsApp');
     }
   };
@@ -4240,17 +4378,55 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       {/* Invoice Modal */}
       {isInvoiceModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <h3 className="text-2xl font-bold mb-6">Generate Invoice</h3>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                 <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
                 <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
-                <div className="text-sm text-gray-500">{selectedBooking?.partyName} | {selectedBooking?.eventDate}</div>
+                <div className="text-sm text-gray-500">{selectedBooking?.partyName || selectedBooking?.visitorName} | {selectedBooking?.eventDate}</div>
                 <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
+                  <div className="flex space-x-4">
+                    {['Cash', 'Online'].map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setPaymentMode(mode as any)}
+                        className={cn(
+                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
+                          paymentMode === mode ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                        )}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Status</label>
+                  <div className="flex space-x-4">
+                    {['Pending', 'Paid'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setPaymentStatus(status as any)}
+                        className={cn(
+                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
+                          paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                        )}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">Additional Expenditure (INR)</label>
+                <label className="block text-sm font-bold mb-2 text-gray-700">Additional Expenditure (INR)</label>
                 <input 
                   type="number" 
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
@@ -4259,57 +4435,61 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                   placeholder="Enter extra costs if any"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold mb-1 text-gray-700">Another Service Name (Optional)</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                    value={additionalServiceName} 
-                    onChange={e => setAdditionalServiceName(e.target.value)}
-                    placeholder="e.g. Extra Lighting"
-                  />
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-bold text-gray-700">Extra Services & Charges</label>
+                  <button 
+                    onClick={() => setExtraServices([...extraServices, { name: '', amount: 0 }])}
+                    className="text-orange-600 text-sm font-bold flex items-center hover:text-orange-700"
+                  >
+                    <Plus size={16} className="mr-1" /> Add Another
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1 text-gray-700">Service Charges (INR)</label>
-                  <input 
-                    type="number" 
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                    value={additionalServiceAmount} 
-                    onChange={e => setAdditionalServiceAmount(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">Payment Status</label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                {extraServices.map((service, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
                     <input 
-                      type="radio" 
-                      name="paymentStatus" 
-                      value="pending"
-                      checked={paymentStatus === 'pending'}
-                      onChange={() => setPaymentStatus('pending')}
-                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                      type="text" 
+                      placeholder="Service Name"
+                      className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                      value={service.name}
+                      onChange={e => {
+                        const newServices = [...extraServices];
+                        newServices[index].name = e.target.value;
+                        setExtraServices(newServices);
+                      }}
                     />
-                    <span className="text-sm font-medium">Pending</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="paymentStatus" 
-                      value="paid"
-                      checked={paymentStatus === 'paid'}
-                      onChange={() => setPaymentStatus('paid')}
-                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                    />
-                    <span className="text-sm font-medium">Paid</span>
-                  </label>
-                </div>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="number" 
+                        placeholder="Amount"
+                        className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={service.amount || ''}
+                        onChange={e => {
+                          const newServices = [...extraServices];
+                          newServices[index].amount = parseFloat(e.target.value) || 0;
+                          setExtraServices(newServices);
+                        }}
+                      />
+                      <button 
+                        onClick={() => setExtraServices(extraServices.filter((_, i) => i !== index))}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex space-x-4 pt-4">
-                <button onClick={() => setIsInvoiceModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
-                <button onClick={confirmInvoice} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Generate & Send</button>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+                <div className="text-lg font-bold text-gray-900">
+                  Total: ₹{((selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0) + expenditure + extraServices.reduce((sum, s) => sum + s.amount, 0)).toLocaleString()}
+                </div>
+                <div className="flex space-x-3">
+                  <button onClick={() => setIsInvoiceModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
+                  <button onClick={confirmInvoice} className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200">Generate & Send</button>
+                </div>
               </div>
             </div>
           </div>
@@ -4402,8 +4582,8 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   const doc = new jsPDF();
   const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
   const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
-  const addServiceAmount = booking.additional_service_amount || 0;
-  const totalAmount = baseAmount + expenditure + addServiceAmount;
+  const extraServicesTotal = booking.extra_services?.reduce((sum, s) => sum + s.amount, 0) || 0;
+  const totalAmount = baseAmount + expenditure + extraServicesTotal;
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
   const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
   
@@ -4483,15 +4663,17 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
 
   let currentY = 150;
   if (expenditure > 0) {
-    doc.text("Additional Expenditure / Extra Services", 25, currentY);
+    doc.text("Additional Expenditure", 25, currentY);
     doc.text(expenditure.toLocaleString(), 160, currentY, { align: 'right' });
     currentY += 10;
   }
 
-  if (booking.additional_service_name && addServiceAmount > 0) {
-    doc.text(booking.additional_service_name, 25, currentY);
-    doc.text(addServiceAmount.toLocaleString(), 160, currentY, { align: 'right' });
-    currentY += 10;
+  if (booking.extra_services && booking.extra_services.length > 0) {
+    booking.extra_services.forEach(service => {
+      doc.text(service.name, 25, currentY);
+      doc.text(service.amount.toLocaleString(), 160, currentY, { align: 'right' });
+      currentY += 10;
+    });
   }
 
   // Total
@@ -4698,9 +4880,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const stats = {
     total: bookings.length,
-    pending: bookings.filter(b => b.status === 'pending').length,
+    pending: bookings.filter(b => b.status === 'pending' || b.paymentStatus === 'Pending').length,
     approved: bookings.filter(b => b.status === 'confirmed').length,
-    paid: bookings.filter(b => b.status === 'paid').length
+    paid: bookings.filter(b => b.status === 'paid' || b.paymentStatus === 'Paid').length
   };
 
   return (
@@ -4955,9 +5137,9 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [expenditure, setExpenditure] = useState(0);
-  const [additionalServiceName, setAdditionalServiceName] = useState('');
-  const [additionalServiceAmount, setAdditionalServiceAmount] = useState(0);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
+  const [extraServices, setExtraServices] = useState<{ name: string; amount: number }[]>([]);
+  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
+  const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [newAmount, setNewAmount] = useState(0);
 
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
@@ -4999,31 +5181,32 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
     if (selectedBooking) {
       const updatedBooking = {
         ...selectedBooking,
-        additional_service_name: additionalServiceName,
-        additional_service_amount: additionalServiceAmount,
-        status: paymentStatus
+        extra_services: extraServices,
+        paymentMode,
+        paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       };
       
       generateInvoice(updatedBooking, expenditure, profile);
       
-      // Also send to WhatsApp if possible
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + additionalServiceAmount;
-      const msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
+      const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
+      const msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}. Please check your PDF invoice.`;
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
       await supabase.from('bookings').update({ 
         is_invoice_generated: true,
-        additional_service_name: additionalServiceName,
-        additional_service_amount: additionalServiceAmount,
-        status: paymentStatus
+        extra_services: extraServices,
+        payment_mode: paymentMode,
+        payment_status: paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
       setExpenditure(0);
-      setAdditionalServiceName('');
-      setAdditionalServiceAmount(0);
-      setPaymentStatus('pending');
+      setExtraServices([]);
+      setPaymentStatus('Pending');
       toast.success('Invoice generated and shared via WhatsApp');
     }
   };
@@ -5231,17 +5414,55 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
 
       {isInvoiceModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold mb-6">Generate Invoice</h3>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                 <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
                 <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
                 <div className="text-sm text-gray-500">{selectedBooking?.visitorName} | {selectedBooking?.eventDate}</div>
                 <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
+                  <div className="flex space-x-4">
+                    {['Cash', 'Online'].map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setPaymentMode(mode as any)}
+                        className={cn(
+                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
+                          paymentMode === mode ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                        )}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Status</label>
+                  <div className="flex space-x-4">
+                    {['Pending', 'Paid'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setPaymentStatus(status as any)}
+                        className={cn(
+                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
+                          paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                        )}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">Additional Expenditure (INR)</label>
+                <label className="block text-sm font-bold mb-2 text-gray-700">Additional Expenditure (INR)</label>
                 <input 
                   type="number" 
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
@@ -5250,57 +5471,61 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                   placeholder="Enter extra costs if any"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold mb-1 text-gray-700">Another Service Name (Optional)</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                    value={additionalServiceName} 
-                    onChange={e => setAdditionalServiceName(e.target.value)}
-                    placeholder="e.g. Extra Lighting"
-                  />
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-bold text-gray-700">Extra Services & Charges</label>
+                  <button 
+                    onClick={() => setExtraServices([...extraServices, { name: '', amount: 0 }])}
+                    className="text-orange-600 text-sm font-bold flex items-center hover:text-orange-700"
+                  >
+                    <Plus size={16} className="mr-1" /> Add Another
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1 text-gray-700">Service Charges (INR)</label>
-                  <input 
-                    type="number" 
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                    value={additionalServiceAmount} 
-                    onChange={e => setAdditionalServiceAmount(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">Payment Status</label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                {extraServices.map((service, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
                     <input 
-                      type="radio" 
-                      name="paymentStatus_order" 
-                      value="pending"
-                      checked={paymentStatus === 'pending'}
-                      onChange={() => setPaymentStatus('pending')}
-                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                      type="text" 
+                      placeholder="Service Name"
+                      className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                      value={service.name}
+                      onChange={e => {
+                        const newServices = [...extraServices];
+                        newServices[index].name = e.target.value;
+                        setExtraServices(newServices);
+                      }}
                     />
-                    <span className="text-sm font-medium">Pending</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="paymentStatus_order" 
-                      value="paid"
-                      checked={paymentStatus === 'paid'}
-                      onChange={() => setPaymentStatus('paid')}
-                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                    />
-                    <span className="text-sm font-medium">Paid</span>
-                  </label>
-                </div>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="number" 
+                        placeholder="Amount"
+                        className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={service.amount || ''}
+                        onChange={e => {
+                          const newServices = [...extraServices];
+                          newServices[index].amount = parseFloat(e.target.value) || 0;
+                          setExtraServices(newServices);
+                        }}
+                      />
+                      <button 
+                        onClick={() => setExtraServices(extraServices.filter((_, i) => i !== index))}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex space-x-4 pt-4">
-                <button onClick={() => setIsInvoiceModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
-                <button onClick={confirmInvoice} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Generate & Send</button>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+                <div className="text-lg font-bold text-gray-900">
+                  Total: ₹{((selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0) + expenditure + extraServices.reduce((sum, s) => sum + s.amount, 0)).toLocaleString()}
+                </div>
+                <div className="flex space-x-3">
+                  <button onClick={() => setIsInvoiceModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
+                  <button onClick={confirmInvoice} className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200">Generate & Send</button>
+                </div>
               </div>
             </div>
           </div>
@@ -6547,7 +6772,9 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
         facilities: formData.facilities.filter(a => a !== ''),
-        owner_id: user.uid
+        owner_id: user.uid,
+        rating: 0,
+        review_count: 0
       }]);
       if (error) throw error;
       toast.success('Venue added successfully!');
@@ -7071,6 +7298,34 @@ export default function App() {
     initAndSeed();
   }, []);
 
+  const [appRating, setAppRating] = useState(4.9);
+  const [totalFeedback, setTotalFeedback] = useState(0);
+
+  useEffect(() => {
+    const fetchAppRating = async () => {
+      const { data, error } = await supabase
+        .from('app_feedback')
+        .select('rating');
+      
+      if (!error && data && data.length > 0) {
+        const sum = data.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+        const avg = sum / data.length;
+        setAppRating(parseFloat(avg.toFixed(1)));
+        setTotalFeedback(data.length);
+      }
+    };
+    fetchAppRating();
+    
+    const channel = supabase
+      .channel('app_feedback_footer')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_feedback' }, fetchAppRating)
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-orange-50">
@@ -7156,8 +7411,9 @@ export default function App() {
                       <div>
                         <p className="text-sm text-gray-400 font-bold uppercase tracking-wider">App Rating</p>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl font-black text-white">4.9</span>
+                          <span className="text-2xl font-black text-white">{appRating}</span>
                           <span className="text-gray-500">/ 5.0</span>
+                          <span className="text-xs text-gray-600 ml-2">({totalFeedback} reviews)</span>
                         </div>
                       </div>
                       <button 
@@ -7208,13 +7464,24 @@ export default function App() {
 
 const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'profile'>('users');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'reports' | 'profile'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 10;
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [servicePhotos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportFilters, setReportFilters] = useState({
+    name: '',
+    mobile: '',
+    startDate: '',
+    endDate: '',
+    paymentMode: '',
+    paymentStatus: ''
+  });
 
   // Modal states for adding notification/banner/servicePhoto
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
@@ -7240,10 +7507,50 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     fetchData();
   }, [user, activeTab]);
 
+  useEffect(() => {
+    if (!user || user.email !== 'admin@eventmanager.com') return;
+
+    const channel = supabase
+      .channel('admin_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscription_plans' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_type_photos' }, fetchData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, activeTab]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'users') {
+      if (activeTab === 'dashboard' || activeTab === 'reports') {
+        const { data: bData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        if (bData) setBookings(bData.map(d => ({
+          ...d,
+          userId: d.user_id,
+          visitorName: d.visitor_name,
+          visitorMobile: d.visitor_mobile,
+          targetId: d.target_id,
+          targetType: d.target_type,
+          targetName: d.target_name,
+          ownerId: d.owner_id,
+          eventDate: d.event_date,
+          totalAmount: d.total_amount,
+          updatedAmount: d.updated_amount,
+          paymentMode: d.payment_mode,
+          paymentStatus: d.payment_status,
+          is_invoice_generated: d.is_invoice_generated,
+          extra_services: d.extra_services,
+          createdAt: d.created_at
+        } as Booking)));
+      }
+
+      if (activeTab === 'dashboard' || activeTab === 'users') {
         const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false });
         if (data) setUsers(data.map(d => ({
           uid: d.uid,
@@ -7289,6 +7596,32 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
+  const resetAllRatings = async () => {
+    if (!confirm('Are you sure you want to reset all ratings and review counts? This will set them to 0 for all venues and services and delete all existing reviews.')) return;
+    
+    setLoading(true);
+    try {
+      // Update all venues
+      const { error: vError } = await supabase.from('venues').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+      // Update all service providers
+      const { error: sError } = await supabase.from('service_providers').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+      // Delete all reviews
+      const { error: rError } = await supabase.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (vError || sError || rError) {
+        console.error('Reset error:', { vError, sError, rError });
+        throw new Error('Failed to reset some data');
+      }
+      
+      toast.success('All ratings and reviews have been reset');
+    } catch (err) {
+      console.error('Reset error:', err);
+      toast.error('Failed to reset ratings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteNotification = async (id: string) => {
     if (!confirm('Are you sure you want to delete this notification?')) return;
     const { error } = await supabase.from('notifications').delete().eq('id', id);
@@ -7324,12 +7657,14 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
   const toggleUserStatus = async (uid: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    console.log(`Toggling user ${uid} status to ${newStatus}`);
     const { error } = await supabase.from('users').update({ status: newStatus }).eq('uid', uid);
     if (!error) {
       toast.success(`User ${newStatus === 'active' ? 'enabled' : 'disabled'}`);
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, status: newStatus } : u));
     } else {
-      toast.error('Failed to update user status');
+      console.error('Toggle status error:', error);
+      toast.error('Failed to update user status: ' + error.message);
     }
   };
 
@@ -7345,10 +7680,18 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const updatePlanPrice = async (id: string, newPrice: number) => {
+    if (isNaN(newPrice)) {
+      toast.error('Invalid price entered');
+      return;
+    }
+    console.log(`Updating plan ${id} price to ${newPrice}`);
     const { error } = await supabase.from('subscription_plans').update({ price: newPrice }).eq('id', id);
     if (!error) {
       toast.success('Plan price updated');
-      fetchData();
+      setPlans(prev => prev.map(p => p.id === id ? { ...p, price: newPrice } : p));
+    } else {
+      console.error('Update plan error:', error);
+      toast.error('Failed to update plan price: ' + error.message);
     }
   };
 
@@ -7360,22 +7703,81 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
-  const downloadReport = () => {
-    const data = users.map(u => ({
-      'Registration ID': u.registrationId,
-      'Name': u.displayName,
-      'Mobile': u.mobileNumber,
-      'Email': u.email,
-      'Role': u.role,
-      'Status': u.status,
-      'Created At': new Date(u.createdAt).toLocaleString()
-    }));
-    
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-    XLSX.writeFile(workbook, "registered_users_report.xlsx");
-    toast.success('Report downloaded as Excel');
+  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+    if (activeTab === 'users') {
+      const data = users.map(u => ({
+        'Registration ID': u.registrationId,
+        'Name': u.displayName,
+        'Mobile': u.mobileNumber,
+        'Email': u.email,
+        'Role': u.role,
+        'Status': u.status,
+        'Created At': new Date(u.createdAt).toLocaleString()
+      }));
+      
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+      XLSX.writeFile(workbook, "registered_users_report.xlsx");
+      toast.success('User report downloaded');
+    } else if (activeTab === 'reports') {
+      const filteredBookings = bookings.filter(b => {
+        const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+        const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+        const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
+        const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+        const bDate = new Date(b.eventDate);
+        const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
+        const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
+        return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
+      });
+
+      if (type === 'excel') {
+        const data = filteredBookings.map(b => ({
+          'Customer Name': b.visitorName,
+          'Mobile': b.visitorMobile,
+          'Target Name': b.targetName,
+          'Type': b.targetType,
+          'Event Date': b.eventDate,
+          'Amount': b.updatedAmount || b.totalAmount,
+          'Payment Mode': b.paymentMode || 'N/A',
+          'Status': b.paymentStatus || 'Pending',
+          'Created At': new Date(b.createdAt).toLocaleString()
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
+        XLSX.writeFile(workbook, "booking_report.xlsx");
+      } else {
+        const doc = new jsPDF();
+        doc.setFontSize(20);
+        doc.text("Booking Report", 105, 20, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 30, { align: 'center' });
+        
+        let y = 40;
+        doc.setFont("helvetica", "bold");
+        doc.text("Customer", 20, y);
+        doc.text("Venue/Service", 70, y);
+        doc.text("Date", 130, y);
+        doc.text("Amount", 160, y);
+        doc.text("Status", 185, y);
+        y += 10;
+        doc.setFont("helvetica", "normal");
+        
+        filteredBookings.forEach(b => {
+          if (y > 280) { doc.addPage(); y = 20; }
+          doc.text(b.visitorName || 'N/A', 20, y);
+          doc.text(b.targetName.substring(0, 25), 70, y);
+          doc.text(b.eventDate, 130, y);
+          doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 160, y);
+          doc.text(b.paymentStatus || 'Pending', 185, y);
+          y += 10;
+        });
+        doc.save("booking_report.pdf");
+      }
+      toast.success(`Report downloaded as ${type.toUpperCase()}`);
+    }
   };
 
   const handleAddNotification = async (e: React.FormEvent) => {
@@ -7389,7 +7791,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       const inserts = messages.map(msg => ({
         title: newNotification.title || 'System Update',
         message: msg.trim(),
-        target_role: 'all'
+        target_role: 'all',
+        is_active: true
       }));
       
       const { error } = await supabase.from('notifications').insert(inserts);
@@ -7512,7 +7915,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Admin Control Panel</h1>
           <div className="flex space-x-4">
-            <button onClick={downloadReport} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 transition-colors">
+            <button onClick={() => downloadReport('excel')} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 transition-colors">
               <Download size={18} />
               <span>Download User Report</span>
             </button>
@@ -7521,11 +7924,13 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
         <div className="flex space-x-4 mb-8 overflow-x-auto pb-2">
           {[
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
             { id: 'users', label: 'User Management', icon: Users },
             { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
             { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'banners', label: 'Banners', icon: Image },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
+            { id: 'reports', label: 'Reports', icon: FileText },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
           ].map(tab => (
             <button
@@ -7548,53 +7953,291 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             </div>
           ) : (
             <>
-              {activeTab === 'users' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-gray-100 pb-4">
-                        <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">User</th>
-                        <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Role</th>
-                        <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
-                        <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {users.map(u => (
-                        <tr key={u.uid} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-4">
-                            <div className="font-bold text-gray-900">{u.displayName}</div>
-                            <div className="text-sm text-gray-500">{u.registrationId} | {u.mobileNumber}</div>
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                              u.role === 'owner' ? 'bg-blue-100 text-blue-600' : 
-                              u.role === 'provider' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'
+              {activeTab === 'dashboard' && (
+                <div className="space-y-8">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-gray-900">System Overview</h3>
+                    <button 
+                      onClick={resetAllRatings}
+                      className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors flex items-center space-x-2"
+                    >
+                      <Trash2 size={16} />
+                      <span>Reset All Ratings</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="bg-blue-50 p-3 rounded-2xl text-blue-600">
+                          <Users size={24} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</span>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">{users.length}</div>
+                      <div className="mt-2 text-sm text-gray-500">
+                        {users.filter(u => u.role === 'owner').length} Owners | {users.filter(u => u.role === 'provider').length} Providers
+                      </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="bg-orange-50 p-3 rounded-2xl text-orange-600">
+                          <Calendar size={24} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Bookings</span>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">{bookings.length}</div>
+                      <div className="mt-2 text-sm text-gray-500">All time inquiries</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="bg-yellow-50 p-3 rounded-2xl text-yellow-600">
+                          <Clock size={24} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pending Bookings</span>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">
+                        {bookings.filter(b => b.paymentStatus === 'Pending' || b.status === 'pending').length}
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500">Awaiting payment/confirmation</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="bg-green-50 p-3 rounded-2xl text-green-600">
+                          <CheckCircle size={24} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Paid Bookings</span>
+                      </div>
+                      <div className="text-3xl font-black text-gray-900">
+                        {bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid').length}
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500">Successfully completed</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-xl font-bold text-gray-900 mb-6">Recent Activity</h3>
+                    <div className="space-y-4">
+                      {bookings.slice(0, 5).map(b => (
+                        <div key={b.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                              b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
                             }`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                              u.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                            }`}>
-                              {u.status}
-                            </span>
-                          </td>
-                          <td className="py-4">
-                            <div className="flex space-x-2">
-                              <button onClick={() => toggleUserStatus(u.uid, u.status)} className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-600">
-                                {u.status === 'active' ? <XCircle size={18} /> : <CheckCircle size={18} />}
-                              </button>
-                              <button onClick={() => deleteUser(u.uid)} className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600">
-                                <Trash2 size={18} />
-                              </button>
+                              {b.visitorName?.charAt(0) || 'B'}
                             </div>
-                          </td>
-                        </tr>
+                            <div>
+                              <div className="font-bold text-gray-900">{b.visitorName}</div>
+                              <div className="text-xs text-gray-500">{b.targetName} | {format(new Date(b.createdAt), 'MMM dd, yyyy')}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-gray-900">₹{b.updatedAmount || b.totalAmount}</div>
+                            <div className={`text-xs font-bold uppercase ${
+                              b.paymentStatus === 'Paid' ? 'text-green-600' : 'text-yellow-600'
+                            }`}>{b.paymentStatus || b.status}</div>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'reports' && (
+                <div className="space-y-8">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-900">Booking Reports</h3>
+                      <div className="flex space-x-4">
+                        <button onClick={() => downloadReport('excel')} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-colors">
+                          <Download size={18} />
+                          <span>Excel</span>
+                        </button>
+                        <button onClick={() => downloadReport('pdf')} className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-colors">
+                          <Download size={18} />
+                          <span>PDF</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                      <input 
+                        type="text" 
+                        placeholder="Name" 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.name}
+                        onChange={e => setReportFilters({...reportFilters, name: e.target.value})}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Mobile" 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.mobile}
+                        onChange={e => setReportFilters({...reportFilters, mobile: e.target.value})}
+                      />
+                      <input 
+                        type="date" 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.startDate}
+                        onChange={e => setReportFilters({...reportFilters, startDate: e.target.value})}
+                      />
+                      <input 
+                        type="date" 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.endDate}
+                        onChange={e => setReportFilters({...reportFilters, endDate: e.target.value})}
+                      />
+                      <select 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.paymentMode}
+                        onChange={e => setReportFilters({...reportFilters, paymentMode: e.target.value})}
+                      >
+                        <option value="">All Modes</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Online">Online</option>
+                      </select>
+                      <select 
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
+                        value={reportFilters.paymentStatus}
+                        onChange={e => setReportFilters({...reportFilters, paymentStatus: e.target.value})}
+                      >
+                        <option value="">All Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Paid">Paid</option>
+                      </select>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100 pb-4">
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Venue/Service</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
+                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {bookings
+                            .filter(b => {
+                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+                              const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+                              const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
+                              const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+                              const bDate = new Date(b.eventDate);
+                              const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
+                              const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
+                              return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
+                            })
+                            .map(b => (
+                              <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="py-4">
+                                  <div className="font-bold text-gray-900">{b.visitorName}</div>
+                                  <div className="text-xs text-gray-500">{b.visitorMobile}</div>
+                                </td>
+                                <td className="py-4">
+                                  <div className="text-sm text-gray-900">{b.targetName}</div>
+                                  <div className="text-xs text-gray-500 uppercase">{b.targetType}</div>
+                                </td>
+                                <td className="py-4 text-sm text-gray-600">
+                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')}
+                                </td>
+                                <td className="py-4 font-bold text-gray-900">
+                                  ₹{b.updatedAmount || b.totalAmount}
+                                </td>
+                                <td className="py-4">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                    b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                                  }`}>
+                                    {b.paymentStatus || 'Pending'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'users' && (
+                <div className="space-y-6">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-100 pb-4">
+                          <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">User</th>
+                          <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Role</th>
+                          <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
+                          <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {users.slice((currentPage - 1) * usersPerPage, currentPage * usersPerPage).map(u => (
+                          <tr key={u.uid} className="hover:bg-gray-50 transition-colors">
+                            <td className="py-4">
+                              <div className="font-bold text-gray-900">{u.displayName}</div>
+                              <div className="text-sm text-gray-500">{u.registrationId} | {u.mobileNumber}</div>
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                u.role === 'owner' ? 'bg-blue-100 text-blue-600' : 
+                                u.role === 'provider' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                u.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                              }`}>
+                                {u.status}
+                              </span>
+                            </td>
+                            <td className="py-4">
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={() => toggleUserStatus(u.uid, u.status)} 
+                                  className={`p-2 rounded-lg transition-colors ${u.status === 'active' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                  title={u.status === 'active' ? 'Disable User' : 'Enable User'}
+                                >
+                                  {u.status === 'active' ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                                </button>
+                                <button onClick={() => deleteUser(u.uid)} className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600">
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {users.length > usersPerPage && (
+                    <div className="flex justify-center items-center space-x-4 pt-6">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        className="p-2 rounded-xl bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition-colors"
+                      >
+                        <ChevronRight size={20} className="rotate-180" />
+                      </button>
+                      <span className="font-bold text-gray-600">
+                        Page {currentPage} of {Math.ceil(users.length / usersPerPage)}
+                      </span>
+                      <button
+                        disabled={currentPage === Math.ceil(users.length / usersPerPage)}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        className="p-2 rounded-xl bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition-colors"
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -190,9 +190,9 @@ export interface Booking {
   partyName?: string; // For manual booking
   partyAddress?: string; // For manual booking
   paymentMode?: 'Cash' | 'Online';
+  paymentStatus?: 'Pending' | 'Paid';
   isManual?: boolean;
   is_invoice_generated?: boolean;
-  additional_service_name?: string;
-  additional_service_amount?: number;
+  extra_services?: { name: string; amount: number }[];
   createdAt: any;
 }
