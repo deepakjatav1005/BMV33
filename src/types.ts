@@ -189,7 +189,10 @@ export interface Booking {
   message?: string;
   partyName?: string; // For manual booking
   partyAddress?: string; // For manual booking
+  paymentMode?: 'Cash' | 'Online';
   isManual?: boolean;
   is_invoice_generated?: boolean;
+  additional_service_name?: string;
+  additional_service_amount?: number;
   createdAt: any;
 }

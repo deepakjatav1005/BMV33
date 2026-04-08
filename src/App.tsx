@@ -72,7 +72,8 @@ import {
   User,
   Tag,
   MessageSquare,
-  Play
+  Play,
+  Flower2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
@@ -854,7 +855,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
       fetchPending();
 
       const subscription = supabase
-        .channel('pending_bookings')
+        .channel(`pending_bookings_${user.uid}`)
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
@@ -1175,6 +1176,12 @@ const CategorySection = () => {
     { name: 'Fast Food', icon: <Pizza />, color: 'bg-red-50 text-red-600', link: '/services?type=Fast food stalls', desc: 'Quick Bites' },
     { name: 'Laundry', icon: <WashingMachine />, color: 'bg-sky-50 text-sky-600', link: '/services?type=Loundry service', desc: 'Clean & Fresh' },
     { name: 'Helper', icon: <Users />, color: 'bg-emerald-50 text-emerald-600', link: '/services?type=Helper', desc: 'Event Support' },
+    { name: 'Makeup', icon: <User />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Makeup Artist', desc: 'Beauty & Style' },
+    { name: 'Stage Decor', icon: <Palette />, color: 'bg-purple-50 text-purple-600', link: '/services?type=Stage Decorator', desc: 'Grand Setup' },
+    { name: 'Flower Decor', icon: <Flower2 />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Flower Decorator', desc: 'Floral Magic' },
+    { name: 'Waiters', icon: <Users />, color: 'bg-blue-50 text-blue-600', link: '/services?type=Waiters', desc: 'Service Staff' },
+    { name: 'Dhol Bands', icon: <Music />, color: 'bg-orange-50 text-orange-600', link: '/services?type=Dhol Bands', desc: 'Traditional Music' },
+    { name: 'Halbai', icon: <Utensils />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Halbai', desc: 'Traditional Sweets' },
     { name: 'Other', icon: <Plus />, color: 'bg-slate-50 text-slate-600', link: '/services?type=Other Related Services', desc: 'More Services' },
   ];
 
@@ -3655,6 +3662,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
   const [expenditure, setExpenditure] = useState(0);
+  const [additionalServiceName, setAdditionalServiceName] = useState('');
+  const [additionalServiceAmount, setAdditionalServiceAmount] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
   const [manualBooking, setManualBooking] = useState({
     partyName: '',
     partyAddress: '',
@@ -3665,7 +3675,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     endTime: '21:00',
     eventType: '',
     targetId: '',
-    targetName: ''
+    targetName: '',
+    paymentMode: 'Cash'
   });
   const [venues, setVenues] = useState<Venue[]>([]);
   const [services, setServices] = useState<ServiceProvider[]>([]);
@@ -3681,7 +3692,6 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         .from('bookings')
         .select('*')
         .eq('owner_id', user.uid)
-        .eq('is_manual', true)
         .order('created_at', { ascending: false });
       
       if (!error && data) {
@@ -3713,11 +3723,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     fetchBookings();
 
     const channel = supabase
-      .channel('booking_manager_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
-        if (payload.new && (payload.new as any).owner_id === user.uid) {
-          fetchBookings();
-        }
+      .channel(`booking_manager_changes_${user.uid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        fetchBookings();
       })
       .subscribe();
 
@@ -3780,16 +3788,31 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
-      generateInvoice(selectedBooking, expenditure);
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure;
+      const updatedBooking = {
+        ...selectedBooking,
+        additional_service_name: additionalServiceName,
+        additional_service_amount: additionalServiceAmount,
+        status: paymentStatus
+      };
+      
+      generateInvoice(updatedBooking, expenditure, profile);
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + additionalServiceAmount;
       const msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
-      await supabase.from('bookings').update({ is_invoice_generated: true }).eq('id', selectedBooking.id);
+      await supabase.from('bookings').update({ 
+        is_invoice_generated: true,
+        additional_service_name: additionalServiceName,
+        additional_service_amount: additionalServiceAmount,
+        status: paymentStatus
+      }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
       setExpenditure(0);
+      setAdditionalServiceName('');
+      setAdditionalServiceAmount(0);
+      setPaymentStatus('pending');
       toast.success('Invoice generated and shared via WhatsApp');
     }
   };
@@ -3822,7 +3845,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         party_address: manualBooking.partyAddress,
         visitor_mobile: manualBooking.mobileNumber,
         status: 'confirmed',
-        is_manual: true
+        is_manual: true,
+        payment_mode: manualBooking.paymentMode
       }]);
       if (error) throw error;
       setIsManualModalOpen(false);
@@ -3839,7 +3863,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         endTime: '21:00',
         eventType: '',
         targetId: '',
-        targetName: ''
+        targetName: '',
+        paymentMode: 'Cash'
       });
       setManualCallSatisfied(false);
     } catch (err) {
@@ -3940,13 +3965,13 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                     )}>
                       {booking.status}
                     </span>
-                    {booking.status === 'confirmed' && (
+                    {booking.status === 'confirmed' || booking.status === 'paid' ? (
                       <>
                         <button 
-                          disabled={booking.is_invoice_generated}
+                          disabled={booking.is_invoice_generated || booking.status === 'paid'}
                           onClick={() => {
-                            if (booking.is_invoice_generated) {
-                              toast.error('Amount cannot be updated after invoice generation');
+                            if (booking.is_invoice_generated || booking.status === 'paid') {
+                              toast.error('Amount cannot be updated after invoice generation or payment');
                               return;
                             }
                             setSelectedBooking(booking);
@@ -3955,9 +3980,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                           }}
                           className={cn(
                             "p-2 rounded-xl transition-all",
-                            booking.is_invoice_generated ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                            (booking.is_invoice_generated || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
                           )}
-                          title={booking.is_invoice_generated ? "Amount locked after invoice" : "Update Amount"}
+                          title={(booking.is_invoice_generated || booking.status === 'paid') ? "Amount locked after invoice or payment" : "Update Amount"}
                         >
                           <Edit2 size={18} />
                         </button>
@@ -3972,7 +3997,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                           <Download size={18} />
                         </button>
                       </>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -4121,6 +4146,33 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                         onChange={(e) => setManualBooking({...manualBooking, eventType: e.target.value})}
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Payment Mode</label>
+                      <div className="flex space-x-4">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="paymentMode" 
+                            value="Cash"
+                            checked={manualBooking.paymentMode === 'Cash'}
+                            onChange={(e) => setManualBooking({...manualBooking, paymentMode: e.target.value})}
+                            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-sm font-medium">Cash</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="paymentMode" 
+                            value="Online"
+                            checked={manualBooking.paymentMode === 'Online'}
+                            onChange={(e) => setManualBooking({...manualBooking, paymentMode: e.target.value})}
+                            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-sm font-medium">Online</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="md:col-span-2">
@@ -4207,6 +4259,54 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                   placeholder="Enter extra costs if any"
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Another Service Name (Optional)</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                    value={additionalServiceName} 
+                    onChange={e => setAdditionalServiceName(e.target.value)}
+                    placeholder="e.g. Extra Lighting"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Service Charges (INR)</label>
+                  <input 
+                    type="number" 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                    value={additionalServiceAmount} 
+                    onChange={e => setAdditionalServiceAmount(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-1 text-gray-700">Payment Status</label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="paymentStatus" 
+                      value="pending"
+                      checked={paymentStatus === 'pending'}
+                      onChange={() => setPaymentStatus('pending')}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-sm font-medium">Pending</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="paymentStatus" 
+                      value="paid"
+                      checked={paymentStatus === 'paid'}
+                      onChange={() => setPaymentStatus('paid')}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-sm font-medium">Paid</span>
+                  </label>
+                </div>
+              </div>
               <div className="flex space-x-4 pt-4">
                 <button onClick={() => setIsInvoiceModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
                 <button onClick={confirmInvoice} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Generate & Send</button>
@@ -4280,84 +4380,160 @@ const sendWhatsAppAlert = (mobile: string, message: string) => {
   window.open(url, '_blank');
 };
 
-const generateInvoice = (booking: Booking, expenditure: number) => {
+const numberToWords = (num: number): string => {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  
+  if (num === 0) return 'Zero';
+  
+  const convert = (n: number): string => {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convert(n % 100) : '');
+    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convert(n % 1000) : '');
+    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convert(n % 100000) : '');
+    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
+  };
+  
+  return convert(num) + ' Rupees Only';
+};
+
+const generateInvoice = (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
   const doc = new jsPDF();
   const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
   const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
-  const totalAmount = baseAmount + expenditure;
+  const addServiceAmount = booking.additional_service_amount || 0;
+  const totalAmount = baseAmount + expenditure + addServiceAmount;
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
-  const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile; // Both use visitorMobile field in DB
+  const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
   
-  // Add company logo/name
+  // --- Letterhead Header ---
+  // Venue/Service Name as Heading
   doc.setFontSize(24);
   doc.setTextColor(234, 88, 12); // orange-600
-  doc.text("UTSAV EVENT MANAGER", 105, 20, { align: 'center' });
+  doc.setFont("helvetica", "bold");
+  doc.text(booking.targetName.toUpperCase(), 105, 20, { align: 'center' });
   
+  // Left side: Owner/Provider Name & Mobile
   doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text("Your Perfect Event Partner", 105, 28, { align: 'center' });
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 30);
+  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 35);
+  
+  // Right side: Address
+  if (providerProfile) {
+    const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
+    doc.text(address, 190, 30, { align: 'right', maxWidth: 80 });
+  }
   
   doc.setDrawColor(234, 88, 12);
-  doc.line(20, 35, 190, 35);
+  doc.setLineWidth(0.5);
+  doc.line(20, 42, 190, 42);
   
-  // Invoice Details
+  // --- Invoice Body ---
   doc.setFontSize(16);
   doc.setTextColor(0);
-  doc.text("BOOKING INVOICE", 20, 50);
+  doc.setFont("helvetica", "bold");
+  doc.text("INVOICE", 20, 55);
   
   doc.setFontSize(10);
-  doc.text(`Invoice No: INV-${booking.id.substring(0, 8).toUpperCase()}`, 140, 50);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Invoice No: INV-${booking.id.substring(0, 8).toUpperCase()}`, 140, 55);
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 55);
   doc.text(`Time: ${timestamp.split(' ')[1]}`, 140, 60);
   
-  // Party Details
+  // Customer Details (Bill To)
   doc.setFontSize(12);
-  doc.text("Bill To:", 20, 70);
+  doc.setFont("helvetica", "bold");
+  doc.text("BILL TO:", 20, 75);
+  
   doc.setFontSize(10);
-  doc.text(`Name: ${partyName}`, 20, 78);
-  doc.text(`Mobile: ${partyMobile}`, 20, 83);
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 88);
-  doc.text(`Date: ${booking.eventDate}`, 20, 93);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Name: ${partyName}`, 20, 83);
+  doc.text(`Mobile: ${partyMobile}`, 20, 88);
+  if (booking.partyAddress) {
+    doc.text(`Address: ${booking.partyAddress}`, 20, 93);
+  }
+  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 98);
+  doc.text(`Date: ${booking.eventDate}${booking.endDate ? ' to ' + booking.endDate : ''}`, 20, 103);
   if (booking.startTime) {
-    doc.text(`Timing: ${booking.startTime} - ${booking.endTime}`, 20, 98);
+    doc.text(`Timing: ${booking.startTime} - ${booking.endTime}`, 20, 108);
   }
 
-  // Service Details
-  doc.setFontSize(12);
-  doc.text("Service Details:", 110, 70);
-  doc.setFontSize(10);
-  doc.text(`Provider: ${booking.targetName}`, 110, 78);
-  doc.text(`Type: ${booking.targetType.toUpperCase()}`, 110, 83);
+  // Payment Mode & Status
+  doc.setFont("helvetica", "bold");
+  doc.text(`Payment Mode: ${booking.paymentMode || 'Not Specified'}`, 140, 75);
+  doc.text(`Payment Status: ${(booking.status || 'pending').toUpperCase()}`, 140, 80);
+  doc.setFont("helvetica", "normal");
 
   // Table Header
   doc.setFillColor(245, 245, 245);
-  doc.rect(20, 110, 170, 10, 'F');
+  doc.rect(20, 120, 170, 10, 'F');
   doc.setFontSize(10);
-  doc.text("Description", 25, 117);
-  doc.text("Amount (INR)", 160, 117, { align: 'right' });
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  doc.text("Description", 25, 127);
+  doc.text("Amount (INR)", 160, 127, { align: 'right' });
 
   // Table Rows
-  doc.text(`Base Booking Amount for ${booking.targetName}`, 25, 130);
-  doc.text(baseAmount.toLocaleString(), 160, 130, { align: 'right' });
+  doc.setFont("helvetica", "normal");
+  doc.text(`Base Booking Amount for ${booking.targetName}`, 25, 140);
+  doc.text(baseAmount.toLocaleString(), 160, 140, { align: 'right' });
 
+  let currentY = 150;
   if (expenditure > 0) {
-    doc.text("Additional Expenditure / Extra Services", 25, 140);
-    doc.text(expenditure.toLocaleString(), 160, 140, { align: 'right' });
+    doc.text("Additional Expenditure / Extra Services", 25, currentY);
+    doc.text(expenditure.toLocaleString(), 160, currentY, { align: 'right' });
+    currentY += 10;
+  }
+
+  if (booking.additional_service_name && addServiceAmount > 0) {
+    doc.text(booking.additional_service_name, 25, currentY);
+    doc.text(addServiceAmount.toLocaleString(), 160, currentY, { align: 'right' });
+    currentY += 10;
   }
 
   // Total
   doc.setDrawColor(200);
-  doc.line(20, 150, 190, 150);
+  doc.line(20, currentY + 5, 190, currentY + 5);
   doc.setFontSize(14);
   doc.setTextColor(234, 88, 12);
-  doc.text("Total Amount:", 110, 165);
-  doc.text(`INR ${totalAmount.toLocaleString()}`, 160, 165, { align: 'right' });
+  doc.setFont("helvetica", "bold");
+  doc.text("Total Amount:", 110, currentY + 20);
+  doc.text(`INR ${totalAmount.toLocaleString()}`, 185, currentY + 20, { align: 'right' });
 
-  // Footer
+  // Amount in words
   doc.setFontSize(10);
-  doc.setTextColor(150);
-  doc.text("Thank you for choosing UTSAV EVENT MANAGER!", 105, 200, { align: 'center' });
-  doc.text("This is a computer-generated invoice.", 105, 205, { align: 'center' });
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "italic");
+  doc.text(`Amount in words: ${numberToWords(totalAmount)}`, 20, currentY + 30);
+
+  // --- Footer ---
+  doc.setDrawColor(234, 88, 12);
+  doc.line(20, 265, 190, 265);
+  
+  // App Logo (EM) in footer
+  doc.setFillColor(234, 88, 12);
+  doc.circle(25, 275, 6, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.text("EM", 25, 276, { align: 'center' });
+
+  doc.setFontSize(14);
+  doc.setTextColor(234, 88, 12);
+  doc.text("BOOK MY VANUE", 35, 276);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.setFont("helvetica", "normal");
+  doc.text("ALL IN ONE BOOKING PLAT FORM FOR YOUR SPECIAL TIME", 35, 281);
+  
+  doc.setTextColor(234, 88, 12);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("www.bookmyvanue.in", 190, 276, { align: 'right' });
 
   doc.save(`Invoice_${booking.visitorName}_${booking.id.substring(0, 8)}.pdf`);
 };
@@ -4483,7 +4659,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     fetchDashboardData();
 
     const subscription = supabase
-      .channel('dashboard_changes')
+      .channel(`dashboard_changes_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchDashboardData();
       })
@@ -4523,7 +4699,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   const stats = {
     total: bookings.length,
     pending: bookings.filter(b => b.status === 'pending').length,
-    approved: bookings.filter(b => b.status === 'confirmed' || b.status === 'paid').length
+    approved: bookings.filter(b => b.status === 'confirmed').length,
+    paid: bookings.filter(b => b.status === 'paid').length
   };
 
   return (
@@ -4628,27 +4805,34 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                     <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
                         <Calendar size={24} />
                       </div>
                       <div className="text-3xl font-black text-gray-900 mb-1">{stats.total}</div>
-                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total Bookings</div>
+                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total</div>
                     </div>
                     <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center mb-4">
                         <Clock size={24} />
                       </div>
                       <div className="text-3xl font-black text-gray-900 mb-1">{stats.pending}</div>
-                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Pending Requests</div>
+                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Pending</div>
                     </div>
                     <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4">
                         <CheckCircle size={24} />
                       </div>
                       <div className="text-3xl font-black text-gray-900 mb-1">{stats.approved}</div>
-                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Approved Bookings</div>
+                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Approved</div>
+                    </div>
+                    <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
+                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                        <IndianRupee size={24} />
+                      </div>
+                      <div className="text-3xl font-black text-gray-900 mb-1">{stats.paid}</div>
+                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Paid</div>
                     </div>
                   </div>
                 </div>
@@ -4771,6 +4955,9 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [expenditure, setExpenditure] = useState(0);
+  const [additionalServiceName, setAdditionalServiceName] = useState('');
+  const [additionalServiceAmount, setAdditionalServiceAmount] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
   const [newAmount, setNewAmount] = useState(0);
 
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
@@ -4810,18 +4997,33 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
-      generateInvoice(selectedBooking, expenditure);
+      const updatedBooking = {
+        ...selectedBooking,
+        additional_service_name: additionalServiceName,
+        additional_service_amount: additionalServiceAmount,
+        status: paymentStatus
+      };
+      
+      generateInvoice(updatedBooking, expenditure, profile);
       
       // Also send to WhatsApp if possible
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure;
+      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + additionalServiceAmount;
       const msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Please check your PDF invoice.`;
-      sendWhatsAppAlert(selectedBooking.visitorMobile, msg);
+      sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
-      await supabase.from('bookings').update({ is_invoice_generated: true }).eq('id', selectedBooking.id);
+      await supabase.from('bookings').update({ 
+        is_invoice_generated: true,
+        additional_service_name: additionalServiceName,
+        additional_service_amount: additionalServiceAmount,
+        status: paymentStatus
+      }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
       setExpenditure(0);
+      setAdditionalServiceName('');
+      setAdditionalServiceAmount(0);
+      setPaymentStatus('pending');
       toast.success('Invoice generated and shared via WhatsApp');
     }
   };
@@ -4983,10 +5185,10 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
               {(b.status === 'confirmed' || b.status === 'paid') && b.ownerId === user?.uid && (
                 <>
                   <button 
-                    disabled={b.is_invoice_generated}
+                    disabled={b.is_invoice_generated || b.status === 'paid'}
                     onClick={() => {
-                      if (b.is_invoice_generated) {
-                        toast.error('Amount cannot be updated after invoice generation');
+                      if (b.is_invoice_generated || b.status === 'paid') {
+                        toast.error('Amount cannot be updated after invoice generation or payment');
                         return;
                       }
                       setSelectedBooking(b);
@@ -4995,7 +5197,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                     }}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      b.is_invoice_generated ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                      (b.is_invoice_generated || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
                     )}
                   >
                     <Edit2 size={16} />
@@ -5047,6 +5249,54 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                   onChange={e => setExpenditure(parseFloat(e.target.value) || 0)}
                   placeholder="Enter extra costs if any"
                 />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Another Service Name (Optional)</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                    value={additionalServiceName} 
+                    onChange={e => setAdditionalServiceName(e.target.value)}
+                    placeholder="e.g. Extra Lighting"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Service Charges (INR)</label>
+                  <input 
+                    type="number" 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                    value={additionalServiceAmount} 
+                    onChange={e => setAdditionalServiceAmount(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-1 text-gray-700">Payment Status</label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="paymentStatus_order" 
+                      value="pending"
+                      checked={paymentStatus === 'pending'}
+                      onChange={() => setPaymentStatus('pending')}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-sm font-medium">Pending</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="paymentStatus_order" 
+                      value="paid"
+                      checked={paymentStatus === 'paid'}
+                      onChange={() => setPaymentStatus('paid')}
+                      className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-sm font-medium">Paid</span>
+                  </label>
+                </div>
               </div>
               <div className="flex space-x-4 pt-4">
                 <button onClick={() => setIsInvoiceModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
@@ -6889,9 +7139,7 @@ export default function App() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
                 <div className="col-span-1 md:col-span-2">
-                  <div className="flex items-center space-x-4 mb-6">
-                    <CNZLogo size="lg" lightText={true} />
-                    <div className="h-10 w-px bg-gray-700 mx-2" />
+                  <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
                     <div className="flex items-center space-x-2">
                       <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg text-center">EM</div>
                       <span className="text-2xl font-bold">BOOK MY VANUE</span>
