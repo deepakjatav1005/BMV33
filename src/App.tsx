@@ -5374,6 +5374,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                   </div>
                 </div>
               )}
+              {activeTab === 'subscription' && (
                 <SubscriptionManageView user={user} profile={profile} />
               )}
             </motion.div>
@@ -6574,6 +6575,44 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                value={formData.state}
+                onChange={(e) => setFormData({...formData, state: e.target.value, district: '', block: ''})}
+              >
+                <option value="">Select State</option>
+                {Object.keys(locations).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                value={formData.district}
+                onChange={(e) => setFormData({...formData, district: e.target.value, block: ''})}
+                disabled={!formData.state}
+              >
+                <option value="">Select District</option>
+                {districts.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Block/Tehsil</label>
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                value={formData.block}
+                onChange={(e) => setFormData({...formData, block: e.target.value})}
+                disabled={!formData.district}
+              >
+                <option value="">Select Block</option>
+                {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
           </div>
           <div className="md:col-span-2">
             <ImageUpload 
@@ -7930,7 +7969,7 @@ export default function App() {
 
 const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'reports' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'profile'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -7994,7 +8033,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'dashboard' || activeTab === 'reports') {
+      if (activeTab === 'dashboard') {
         const { data: bData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
         if (bData) setBookings(bData.map(d => ({
           ...d,
@@ -8193,72 +8232,6 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
       XLSX.writeFile(workbook, "registered_users_report.xlsx");
       toast.success('User report downloaded');
-    } else if (activeTab === 'reports') {
-      const filteredBookings = bookings.filter(b => {
-        const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
-        const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
-        const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
-        const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
-        const bDate = new Date(b.eventDate);
-        const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
-        const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-        return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
-      });
-
-      if (type === 'excel') {
-        const data = filteredBookings.map((b, index) => ({
-          'S.No': index + 1,
-          'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
-          'Customer Name': b.partyName || b.visitorName || 'N/A',
-          'Mobile Number': b.visitorMobile || 'N/A',
-          'Address': b.partyAddress || 'N/A',
-          'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
-          'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
-          'Invoice Amount (Rs)': b.updatedAmount || b.totalAmount || 0,
-          'Payment Mode': b.paymentMode || 'N/A',
-          'Payment Status': b.paymentStatus || 'Pending',
-          'Booking Type': b.isManual ? 'Manual' : 'Order'
-        }));
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
-        XLSX.writeFile(workbook, "booking_report.xlsx");
-      } else {
-        const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text("Booking Transaction Report", 14, 20);
-        doc.setFontSize(10);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
-        
-        let y = 40;
-        doc.setFont("helvetica", "bold");
-        doc.text("S.No", 10, y);
-        doc.text("Customer", 22, y);
-        doc.text("Venue/Service", 55, y);
-        doc.text("Date", 95, y);
-        doc.text("Amount", 125, y);
-        doc.text("Mode", 150, y);
-        doc.text("Status", 170, y);
-        doc.text("B.Status", 190, y);
-        y += 10;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        
-        filteredBookings.forEach((b, index) => {
-          if (y > 280) { doc.addPage(); y = 20; }
-          doc.text((index + 1).toString(), 10, y);
-          doc.text((b.partyName || b.visitorName || 'N/A').substring(0, 15), 22, y);
-          doc.text((b.targetName || 'N/A').substring(0, 15), 55, y);
-          doc.text(b.eventDate, 95, y);
-          doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 125, y);
-          doc.text(b.paymentMode || 'N/A', 150, y);
-          doc.text(b.paymentStatus || 'Pending', 170, y);
-          doc.text(b.status.substring(0, 8), 190, y);
-          y += 8;
-        });
-        doc.save("booking_report.pdf");
-      }
-      toast.success(`Report downloaded as ${type.toUpperCase()}`);
     }
   };
 
@@ -8412,7 +8385,6 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'banners', label: 'Banners', icon: Image },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
-            { id: 'reports', label: 'Reports', icon: FileText },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
           ].map(tab => (
             <button
@@ -8525,148 +8497,6 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                 </div>
               )}
 
-              {activeTab === 'reports' && (
-                <div className="space-y-8">
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-gray-900">Booking Reports</h3>
-                      <div className="flex space-x-4">
-                        <button onClick={() => downloadReport('excel')} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-colors">
-                          <Download size={18} />
-                          <span>Excel</span>
-                        </button>
-                        <button onClick={() => downloadReport('pdf')} className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-colors">
-                          <Download size={18} />
-                          <span>PDF</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-                      <input 
-                        type="text" 
-                        placeholder="Name" 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.name}
-                        onChange={e => setReportFilters({...reportFilters, name: e.target.value})}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Mobile" 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.mobile}
-                        onChange={e => setReportFilters({...reportFilters, mobile: e.target.value})}
-                      />
-                      <input 
-                        type="date" 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.startDate}
-                        onChange={e => setReportFilters({...reportFilters, startDate: e.target.value})}
-                      />
-                      <input 
-                        type="date" 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.endDate}
-                        onChange={e => setReportFilters({...reportFilters, endDate: e.target.value})}
-                      />
-                      <select 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.paymentMode}
-                        onChange={e => setReportFilters({...reportFilters, paymentMode: e.target.value})}
-                      >
-                        <option value="">All Modes</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Online">Online</option>
-                      </select>
-                      <select 
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={reportFilters.paymentStatus}
-                        onChange={e => setReportFilters({...reportFilters, paymentStatus: e.target.value})}
-                      >
-                        <option value="">All Status</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Paid">Paid</option>
-                      </select>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-gray-100 pb-4">
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">S.No</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Venue/Service</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Booking Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {bookings
-                            .filter(b => {
-                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
-                              const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
-                              const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
-                              const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
-                              const bDate = new Date(b.eventDate);
-                              const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
-                              const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-                              return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
-                            })
-                            .map((b, index) => (
-                              <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="py-4 text-sm text-gray-500">{index + 1}</td>
-                                <td className="py-4">
-                                  <div className="font-bold text-gray-900">{b.partyName || b.visitorName}</div>
-                                  <div className="text-xs text-gray-500">{b.visitorMobile}</div>
-                                </td>
-                                <td className="py-4">
-                                  <div className="text-sm text-gray-900">{b.targetName}</div>
-                                  <div className="text-xs text-gray-500 uppercase">{b.targetType}</div>
-                                </td>
-                                <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">
-                                  {b.partyAddress || 'N/A'}
-                                </td>
-                                <td className="py-4 text-sm text-gray-600">
-                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
-                                </td>
-                                <td className="py-4 text-xs font-mono text-gray-500">
-                                  INV-{b.id.substring(0, 8).toUpperCase()}
-                                </td>
-                                <td className="py-4 font-bold text-gray-900">
-                                  ₹{b.updatedAmount || b.totalAmount}
-                                </td>
-                                <td className="py-4 text-sm text-gray-600">
-                                  {b.paymentMode || 'N/A'}
-                                </td>
-                                <td className="py-4">
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                    b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                                  }`}>
-                                    {b.paymentStatus || 'Pending'}
-                                  </span>
-                                </td>
-                                <td className="py-4">
-                                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                    b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
-                                    b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
-                                  }`}>
-                                    {b.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeTab === 'users' && (
                 <div className="space-y-6">
                   <div className="overflow-x-auto">
@@ -8766,16 +8596,20 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                           <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Plan Price (₹)</label>
                           <div className="flex items-center space-x-2">
                             <input 
+                              id={`plan-price-${plan.id}`}
                               type="number" 
-                              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900"
+                              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 outline-none"
                               defaultValue={plan.price}
-                              onBlur={(e) => {
-                                const newPrice = parseFloat(e.target.value);
-                                if (newPrice !== plan.price) updatePlanPrice(plan.id, newPrice);
-                              }}
                             />
                             <button 
-                              className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors"
+                              onClick={() => {
+                                const input = document.getElementById(`plan-price-${plan.id}`) as HTMLInputElement;
+                                if (input) {
+                                  const newPrice = parseFloat(input.value);
+                                  updatePlanPrice(plan.id, newPrice);
+                                }
+                              }}
+                              className="p-2 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-sm"
                               title="Update Price"
                             >
                               <Check size={18} />
