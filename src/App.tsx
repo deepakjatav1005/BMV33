@@ -59,6 +59,7 @@ import {
   Download,
   BarChart2,
   XCircle,
+  Info,
   Shirt,
   WashingMachine,
   Gem,
@@ -794,12 +795,47 @@ const ImageUpload = ({
 
     setIsUploading(true);
     try {
-      const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      // Client-side resizing
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      await new Promise((resolve) => (img.onload = resolve));
+
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 1200;
+      const MAX_HEIGHT = 1200;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+
+      const blob = await new Promise<Blob | null>((resolve) => 
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.8)
+      );
+
+      if (!blob) throw new Error('Failed to process image');
+
+      const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}.jpg`;
       const { data, error } = await supabase.storage
         .from('images')
-        .upload(filePath, file, {
+        .upload(filePath, blob, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/jpeg'
         });
 
       if (error) throw error;
@@ -910,78 +946,10 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                 <span>{t('home')}</span>
               </Link>
               
-              <div className="relative group">
-                <button 
-                  onMouseEnter={() => setIsExploreOpen(true)}
-                  className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 font-medium transition-colors py-2"
-                >
-                  <span>Explore</span>
-                  <ChevronDown size={16} className={cn("transition-transform", isExploreOpen ? "rotate-180" : "")} />
-                </button>
-                
-                <AnimatePresence>
-                  {isExploreOpen && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      onMouseLeave={() => setIsExploreOpen(false)}
-                      className="absolute top-full left-0 w-64 bg-white rounded-2xl shadow-2xl border border-orange-100 py-4 z-50"
-                    >
-                      <div className="grid grid-cols-1 gap-1 px-2">
-                        <Link to="/venues" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <Building2 size={16} />
-                          <span>Venues</span>
-                        </Link>
-                        <Link to="/services?type=Caterer" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <UtensilsCrossed size={16} />
-                          <span>Catering</span>
-                        </Link>
-                        <Link to="/services?type=DJ and Sounds" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <Music2 size={16} />
-                          <span>DJ & Music</span>
-                        </Link>
-                        <Link to="/services?type=Photo and Videographer" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <Camera size={16} />
-                          <span>Photography</span>
-                        </Link>
-                        <Link to="/services?type=Light Decorator" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <Lightbulb size={16} />
-                          <span>Lighting</span>
-                        </Link>
-                        <Link to="/services?type=Makeup Artist" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <Sparkles size={16} />
-                          <span>Makeup</span>
-                        </Link>
-                        <Link to="/services?type=Halbai" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <ChefHat size={16} />
-                          <span>Halbai</span>
-                        </Link>
-                        <Link to="/services?type=Pandit Ji Brahman" className="px-4 py-2 hover:bg-orange-50 rounded-xl text-sm font-bold text-gray-700 hover:text-orange-600 transition-colors flex items-center space-x-2">
-                          <PersonStanding size={16} />
-                          <span>Pandit Ji</span>
-                        </Link>
-                        <Link to="/services" className="px-4 py-2 mt-2 border-t border-gray-50 text-orange-600 text-xs font-black uppercase tracking-widest text-center hover:bg-orange-50 rounded-xl">
-                          View All Services
-                        </Link>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
-              <Link to="/venues" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
+              <Link to="/search" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
               
-              <button 
-                onClick={onRateApp}
-                className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 font-bold transition-all bg-orange-50 px-4 py-2 rounded-xl border border-orange-100"
-              >
-                <Star size={18} className="fill-orange-600" />
-                <span>{t('rateUs')}</span>
-              </button>
-
               <button 
                 onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
                 className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 font-bold transition-all bg-blue-50 px-4 py-2 rounded-xl border border-blue-100"
@@ -1044,79 +1012,70 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
     <AnimatePresence>
       {isMenuOpen && (
         <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="md:hidden bg-white border-b border-orange-100 overflow-hidden"
+          initial={{ opacity: 0, y: -50, scaleY: 0 }}
+          animate={{ opacity: 1, y: 0, scaleY: 1 }}
+          exit={{ opacity: 0, y: -50, scaleY: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="md:hidden bg-white border-b border-orange-100 overflow-hidden origin-top"
         >
-          <div className="px-4 py-4 space-y-4">
-            <Link to="/" className="flex items-center space-x-2 text-orange-600 font-bold bg-orange-50 px-4 py-2 rounded-xl" onClick={() => setIsMenuOpen(false)}>
-              <Home size={18} />
-              <span>Home</span>
-            </Link>
-            <Link to="/gallery" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Gallery</Link>
-            <Link to="/venues" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Search</Link>
-            <Link to="/about" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>About</Link>
-            
-            <div className="pt-4 border-t border-gray-100">
-              <p className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">Explore Categories</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Link to="/venues" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <Building2 size={14} />
-                  <span>Venues</span>
-                </Link>
-                <Link to="/services?type=Caterer" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <UtensilsCrossed size={14} />
-                  <span>Catering</span>
-                </Link>
-                <Link to="/services?type=DJ and Sounds" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <Music2 size={14} />
-                  <span>DJ & Music</span>
-                </Link>
-                <Link to="/services?type=Photo and Videographer" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <Camera size={14} />
-                  <span>Photography</span>
-                </Link>
-                <Link to="/services?type=Light Decorator" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <Lightbulb size={14} />
-                  <span>Lighting</span>
-                </Link>
-                <Link to="/services?type=Makeup Artist" className="flex items-center space-x-2 p-2 bg-gray-50 rounded-xl text-sm font-bold text-gray-700" onClick={() => setIsMenuOpen(false)}>
-                  <Sparkles size={14} />
-                  <span>Makeup</span>
-                </Link>
-              </div>
-            </div>
-            
-            <button 
-              onClick={() => { onRateApp(); setIsMenuOpen(false); }}
-              className="flex items-center space-x-2 text-orange-600 font-bold bg-orange-50 px-4 py-2 rounded-xl w-full"
-            >
-              <Star size={18} className="fill-orange-600" />
-              <span>Rate Us</span>
-            </button>
+          <div className="px-4 py-6 space-y-2">
+            {[
+              { to: "/", label: "Home", icon: <Home size={18} />, primary: true },
+              { to: "/about", label: "About", icon: <Info size={18} /> },
+              { to: "/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
+              { to: "/search", label: "Search", icon: <Search size={18} /> },
+            ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
+              <Link 
+                key={item.to}
+                to={item.to} 
+                className={cn(
+                  "flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all",
+                  item.primary ? "text-orange-600 font-bold bg-orange-50" : "text-gray-600 font-medium hover:bg-gray-50"
+                )} 
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            ))}
 
             {user ? (
-              <>
-                {(profile?.role === 'owner' || profile?.role === 'provider') && (
-                  <Link to="/dashboard?tab=booking-manager" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>
-                    Booking Manager {pendingCount > 0 && `(${pendingCount})`}
+              <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 px-4">Account</p>
+                {[
+                  ...(profile?.role === 'owner' || profile?.role === 'provider' ? [{ to: "/dashboard?tab=booking-manager", label: `Booking Manager ${pendingCount > 0 ? `(${pendingCount})` : ''}`, icon: <Calendar size={18} /> }] : []),
+                  { to: "/change-password", label: "Change Password", icon: <ShieldCheck size={18} /> },
+                  { to: profile?.role === 'admin' ? "/admin" : "/dashboard", label: profile?.role === 'admin' ? "Admin Panel" : "Dashboard", icon: <LayoutDashboard size={18} /> },
+                ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
+                  <Link 
+                    key={item.to}
+                    to={item.to} 
+                    className="flex items-center space-x-3 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-2xl transition-all" 
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
                   </Link>
-                )}
-                <Link to={profile?.role === 'admin' ? "/admin" : "/dashboard"} className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>
-                  {profile?.role === 'admin' ? "Admin Panel" : "Dashboard"}
-                </Link>
-                <Link to="/change-password" title="Change Password" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Change Password</Link>
-                {profile?.role === 'admin' && (
-                  <Link to="/admin" className="block text-red-600 font-bold" onClick={() => setIsMenuOpen(false)}>Admin Panel</Link>
-                )}
-                <button onClick={handleLogout} className="block text-red-600 font-medium">Logout</button>
-              </>
+                ))}
+                <button 
+                  onClick={handleLogout} 
+                  className="flex items-center space-x-3 px-4 py-3 text-red-600 font-bold hover:bg-red-50 rounded-2xl w-full transition-all"
+                >
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              </div>
             ) : (
-              <>
-                <Link to="/registration" className="block text-gray-600 font-medium" onClick={() => setIsMenuOpen(false)}>Registration</Link>
-                <Link to="/login" className="block text-orange-600 font-bold" onClick={() => setIsMenuOpen(false)}>Login</Link>
-              </>
+              <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
+                <Link to="/login" className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
+                  <LogIn size={18} />
+                  <span>Login</span>
+                </Link>
+                <Link to="/registration" className="flex items-center space-x-3 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
+                  <UserPlus size={18} />
+                  <span>Registration</span>
+                </Link>
+              </div>
             )}
           </div>
         </motion.div>
@@ -1268,91 +1227,60 @@ const Hero = () => {
   );
 };
 
-const CategorySection = ({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement> }) => {
+const CategorySection = () => {
   const categories = [
-    { name: 'Venues', icon: <Building2 />, color: 'bg-blue-50 text-blue-600', link: '/venues', desc: 'Wedding Halls & Resorts' },
-    { name: 'Catering', icon: <UtensilsCrossed />, color: 'bg-orange-50 text-orange-600', link: '/services?type=Caterer', desc: 'Delicious Food Stalls' },
-    { name: 'DJ & Music', icon: <Music2 />, color: 'bg-purple-50 text-purple-600', link: '/services?type=DJ and Sounds', desc: 'Sound & Lighting' },
-    { name: 'Tent House', icon: <Tent />, color: 'bg-green-50 text-green-600', link: '/services?type=Tent House', desc: 'Decor & Setup' },
-    { name: 'Photography', icon: <Camera />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Photo and Videographer', desc: 'Capture Memories' },
-    { name: 'Pandit Ji', icon: <PersonStanding />, color: 'bg-red-50 text-red-600', link: '/services?type=Pandit Ji Brahman', desc: 'Religious Services' },
-    { name: 'Firecrackers', icon: <Sparkles />, color: 'bg-orange-50 text-orange-600', link: '/services?type=SPARKS AND Firecrackers', desc: 'Sparks & Fire' },
-    { name: 'Mehendi', icon: <Palette />, color: 'bg-yellow-50 text-yellow-600', link: '/services?type=Mehendi Service', desc: 'Traditional Art' },
-    { name: 'Drone', icon: <Plane />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Drone Camera', desc: 'Aerial Shots' },
-    { name: 'Event Manager', icon: <Briefcase />, color: 'bg-indigo-50 text-indigo-600', link: '/services?type=Event Manager', desc: 'Expert Planning' },
-    { name: 'Light Decorator', icon: <Lightbulb />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Light Decorator', desc: 'Night Illumination' },
-    { name: 'Rentals', icon: <Gem />, color: 'bg-cyan-50 text-cyan-600', link: '/services?type=Event Cloth and Jwellary on Rent', desc: 'Jewelry & Clothes' },
-    { name: 'Fast Food', icon: <Pizza />, color: 'bg-red-50 text-red-600', link: '/services?type=Fast food stalls', desc: 'Quick Bites' },
-    { name: 'Laundry', icon: <WashingMachine />, color: 'bg-sky-50 text-sky-600', link: '/services?type=Loundry service', desc: 'Clean & Fresh' },
-    { name: 'Helper', icon: <HandHelping />, color: 'bg-emerald-50 text-emerald-600', link: '/services?type=Helper', desc: 'Event Support' },
-    { name: 'Makeup', icon: <Sparkles />, color: 'bg-pink-50 text-pink-600', link: '/services?type=Makeup Artist', desc: 'Beauty & Style' },
-    { name: 'Stage Decor', icon: <Layout />, color: 'bg-purple-50 text-purple-600', link: '/services?type=Stage Decorator', desc: 'Grand Setup' },
-    { name: 'Flower Decor', icon: <Flower2 />, color: 'bg-rose-50 text-rose-600', link: '/services?type=Flower Decorator', desc: 'Floral Magic' },
-    { name: 'Waiters', icon: <Users2 />, color: 'bg-blue-50 text-blue-600', link: '/services?type=Waiters', desc: 'Service Staff' },
-    { name: 'Dhol Bands', icon: <Music />, color: 'bg-orange-50 text-orange-600', link: '/services?type=Dhol Bands', desc: 'Traditional Music' },
-    { name: 'Halbai', icon: <ChefHat />, color: 'bg-amber-50 text-amber-600', link: '/services?type=Halbai', desc: 'Traditional Sweets' },
-    { name: 'Other', icon: <Plus />, color: 'bg-slate-50 text-slate-600', link: '/services?type=Other Related Services', desc: 'More Services' },
+    { name: 'Venues', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=400', link: '/venues' },
+    { name: 'Catering', image: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=400', link: '/services?type=Caterer' },
+    { name: 'DJ & Music', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400', link: '/services?type=DJ and Sounds' },
+    { name: 'Tent House', image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80&w=400', link: '/services?type=Tent House' },
+    { name: 'Photography', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=400', link: '/services?type=Photo and Videographer' },
+    { name: 'Makeup', image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Makeup Artist' },
+    { name: 'Decoration', image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=400', link: '/services?type=Light Decorator' },
+    { name: 'Event Manager', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80&w=400', link: '/services?type=Event Manager' },
+    { name: 'Pandit Ji', image: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&q=80&w=400', link: '/services?type=Pandit Ji Brahman' },
+    { name: 'Mehendi', image: 'https://images.unsplash.com/photo-1542642837-739074a911c0?auto=format&fit=crop&q=80&w=400', link: '/services?type=Mehendi Service' },
+    { name: 'Drone', image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Drone Camera' },
+    { name: 'Rentals', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&q=80&w=400', link: '/services?type=Event Cloth and Jwellary on Rent' },
+    { name: 'Halbai', image: 'https://images.unsplash.com/photo-1589676062352-b19035222f5f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Halbai' },
+    { name: 'Waiters', image: 'https://images.unsplash.com/photo-1590650153855-d9e808231d41?auto=format&fit=crop&q=80&w=400', link: '/services?type=Waiters' },
+    { name: 'Dhol Bands', image: 'https://images.unsplash.com/photo-1514525253344-f814d074358a?auto=format&fit=crop&q=80&w=400', link: '/services?type=Dhol Bands' },
+    { name: 'Flower Decor', image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=400', link: '/services?type=Flower Decorator' },
   ];
 
   return (
     <section className="py-24 bg-white overflow-hidden relative">
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-5">
-        <div className="absolute top-10 left-10 w-64 h-64 bg-orange-500 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-pink-500 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center mb-20">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="inline-block px-4 py-1.5 bg-orange-100 text-orange-600 rounded-full text-xs font-bold uppercase tracking-widest mb-4"
-          >
-            Our Services
-          </motion.div>
-          <motion.h2 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-4xl md:text-5xl font-black text-gray-900 mb-6"
-          >
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-6">
             Explore by <span className="text-orange-600">Category</span>
-          </motion.h2>
-          <div className="w-24 h-2 bg-orange-500 mx-auto rounded-full" />
+          </h2>
+          <p className="text-gray-500 text-lg max-w-2xl mx-auto">Discover everything you need for your event with our curated categories.</p>
         </div>
         
-        <div 
-          ref={scrollRef}
-          className="flex overflow-x-auto space-x-8 pb-10 scrollbar-hide snap-x"
-        >
-          {categories.map((cat, idx) => (
-            <motion.div
-              key={idx}
-              className="flex-shrink-0 w-40 snap-center"
-              whileHover={{ y: -10 }}
-            >
-              <Link 
-                to={cat.link}
-                className="flex flex-col items-center group"
+        <div className="relative">
+          <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
+            {[...categories, ...categories].map((cat, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ scale: 1.05, rotateY: 15 }}
+                className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
               >
-                <div className={cn(
-                  "w-24 h-24 rounded-[2.5rem] flex items-center justify-center mb-4 transition-all duration-500 shadow-lg group-hover:shadow-2xl group-hover:rounded-3xl relative overflow-hidden",
-                  cat.color
-                )}>
-                  <motion.div
-                    whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    {React.cloneElement(cat.icon as React.ReactElement<any>, { size: 40, strokeWidth: 2.5 })}
-                  </motion.div>
-                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
-                </div>
-                <span className="font-black text-gray-900 text-center text-sm group-hover:text-orange-600 transition-colors uppercase tracking-tight">{cat.name}</span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 text-center">{cat.desc}</span>
-              </Link>
-            </motion.div>
-          ))}
+                <Link to={cat.link} className="block w-full h-full">
+                  <img 
+                    src={cat.image} 
+                    alt={cat.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-widest drop-shadow-lg">{cat.name}</h3>
+                    <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -2344,7 +2272,7 @@ const ServiceInfoStickers = () => {
     {
       title: "Grand Weddings",
       description: "From royal palaces to intimate gardens, find your dream wedding venue.",
-      image: "https://illustrations.popsy.co/amber/wedding.svg",
+      image: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=600",
       color: "bg-pink-50",
       borderColor: "border-pink-200",
       textColor: "text-pink-600"
@@ -2352,7 +2280,7 @@ const ServiceInfoStickers = () => {
     {
       title: "Birthday Bashes",
       description: "Fun-filled venues and decorators for the most memorable birthday parties.",
-      image: "https://illustrations.popsy.co/amber/party.svg",
+      image: "https://images.unsplash.com/photo-1530103043960-ef38714abb15?auto=format&fit=crop&q=80&w=600",
       color: "bg-orange-50",
       borderColor: "border-orange-200",
       textColor: "text-orange-600"
@@ -2360,7 +2288,7 @@ const ServiceInfoStickers = () => {
     {
       title: "Corporate Events",
       description: "Professional spaces equipped with modern amenities for your business needs.",
-      image: "https://illustrations.popsy.co/amber/work-from-home.svg",
+      image: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=600",
       color: "bg-blue-50",
       borderColor: "border-blue-200",
       textColor: "text-blue-600"
@@ -2368,7 +2296,7 @@ const ServiceInfoStickers = () => {
     {
       title: "Catering Excellence",
       description: "Top-rated caterers serving delicious cuisines for every palate.",
-      image: "https://illustrations.popsy.co/amber/food.svg",
+      image: "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=600",
       color: "bg-green-50",
       borderColor: "border-green-200",
       textColor: "text-green-600"
@@ -2709,7 +2637,7 @@ const HomeView = ({ user }: { user: any }) => {
       </div>
 
       <ServiceTypePhotosScroll />
-      <CategorySection scrollRef={categoriesScrollRef} />
+      <CategorySection />
       <ServiceInfoStickers />
       
       <section className="py-16 bg-gray-50">
@@ -3957,6 +3885,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
   const filteredBookings = bookings.filter(b => {
     const matchesManual = b.isManual;
+    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
+    if (isPaid) return false;
     const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesManual && matchesStatus && matchesDate;
@@ -4006,6 +3936,11 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
+      if (paymentStatus === 'Paid') {
+        if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
+          return;
+        }
+      }
       const updatedBooking = {
         ...selectedBooking,
         extra_services: extraServices,
@@ -4014,10 +3949,28 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       };
       
-      generateInvoice(updatedBooking, expenditure, profile);
+      const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
+      
+      // Upload to Supabase Storage to get a public link
+      const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      let downloadUrl = '';
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+        downloadUrl = publicUrl;
+      }
+
       const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
       const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
-      const msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}. Please check your PDF invoice.`;
+      
+      let msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}.`;
+      if (downloadUrl) {
+        msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
+      }
+      
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
       await supabase.from('bookings').update({ 
@@ -4025,7 +3978,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         extra_services: extraServices,
         payment_mode: paymentMode,
         payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status,
+        invoice_url: downloadUrl
       }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
@@ -4308,7 +4262,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                       <input 
                         required
                         type="text" 
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
                         value={manualBooking.partyName}
                         onChange={(e) => setManualBooking({...manualBooking, partyName: e.target.value})}
                       />
@@ -4332,7 +4286,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                       <input 
                         required
                         type="text" 
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
                         value={manualBooking.partyAddress}
                         onChange={(e) => setManualBooking({...manualBooking, partyAddress: e.target.value})}
                       />
@@ -4381,7 +4335,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                       <input 
                         required
                         type="text" 
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
                         value={manualBooking.eventType}
                         onChange={(e) => setManualBooking({...manualBooking, eventType: e.target.value})}
                       />
@@ -4722,8 +4676,8 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(`Invoice No: INV-${booking.id.substring(0, 8).toUpperCase()}`, 140, 55);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 55);
-  doc.text(`Time: ${timestamp.split(' ')[1]}`, 140, 60);
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 60);
+  doc.text(`Time: ${timestamp.split(' ')[1]}`, 140, 65);
   
   // Customer Details (Bill To)
   doc.setFontSize(12);
@@ -4819,7 +4773,7 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setFont("helvetica", "bold");
   doc.text("www.bookmyvanue.in", 190, 276, { align: 'right' });
 
-  doc.save(`Invoice_${booking.visitorName}_${booking.id.substring(0, 8)}.pdf`);
+  return doc.output('blob');
 };
 
 const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
@@ -4832,7 +4786,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     startDate: '',
     endDate: '',
     paymentMode: '',
-    paymentStatus: ''
+    paymentStatus: '',
+    bookingType: ''
   });
 
   const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
@@ -4841,10 +4796,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
       const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
       const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+      const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
       const bDate = new Date(b.eventDate);
       const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
       const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-      return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
+      return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd && matchesType;
     });
 
     if (type === 'excel') {
@@ -4866,38 +4822,39 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
       XLSX.writeFile(workbook, "booking_report.xlsx");
     } else {
-      const doc = new jsPDF();
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
       doc.setFontSize(10);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
       
-      let y = 40;
-      doc.setFont("helvetica", "bold");
-      doc.text("S.No", 10, y);
-      doc.text("Customer", 22, y);
-      doc.text("Venue/Service", 55, y);
-      doc.text("Date", 95, y);
-      doc.text("Amount", 125, y);
-      doc.text("Mode", 150, y);
-      doc.text("Status", 170, y);
-      doc.text("B.Status", 190, y);
-      y += 10;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      const headers = [
+        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date & Time', 'Invoice No', 'Amount', 'Mode', 'P.Status', 'Type']
+      ];
       
-      filteredBookings.forEach((b, index) => {
-        if (y > 280) { doc.addPage(); y = 20; }
-        doc.text((index + 1).toString(), 10, y);
-        doc.text((b.partyName || b.visitorName || 'N/A').substring(0, 15), 22, y);
-        doc.text((b.targetName || 'N/A').substring(0, 15), 55, y);
-        doc.text(b.eventDate, 95, y);
-        doc.text(`Rs.${b.updatedAmount || b.totalAmount}`, 125, y);
-        doc.text(b.paymentMode || 'N/A', 150, y);
-        doc.text(b.paymentStatus || 'Pending', 170, y);
-        doc.text(b.status.substring(0, 8), 190, y);
-        y += 8;
+      const data = filteredBookings.map((b, index) => [
+        (index + 1).toString(),
+        b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
+        b.partyName || b.visitorName || 'N/A',
+        b.visitorMobile || 'N/A',
+        (b.partyAddress || 'N/A').substring(0, 20),
+        `${b.eventDate} ${b.startTime || ''}`,
+        `INV-${b.id.substring(0, 8).toUpperCase()}`,
+        `Rs.${b.updatedAmount || b.totalAmount}`,
+        b.paymentMode || 'N/A',
+        b.paymentStatus || 'Pending',
+        b.isManual ? 'Manual' : 'Order'
+      ]);
+
+      (doc as any).autoTable({
+        head: headers,
+        body: data,
+        startY: 40,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [234, 88, 12] } // Orange-600
       });
+      
       doc.save("booking_report.pdf");
     }
     toast.success(`Report downloaded as ${type.toUpperCase()}`);
@@ -5019,21 +4976,32 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
     fetchDashboardData();
 
-    const subscription = supabase
-      .channel(`dashboard_changes_${user.uid}`)
+    // Realtime subscriptions
+    const bookingChannel = supabase
+      .channel(`dashboard_bookings_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchDashboardData();
       })
+      .subscribe();
+
+    const venueChannel = supabase
+      .channel(`dashboard_venues_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => {
         fetchDashboardData();
       })
+      .subscribe();
+
+    const serviceChannel = supabase
+      .channel(`dashboard_services_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, () => {
         fetchDashboardData();
       })
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(bookingChannel);
+      supabase.removeChannel(venueChannel);
+      supabase.removeChannel(serviceChannel);
     };
   }, [user?.uid, profile?.role]);
 
@@ -5297,79 +5265,84 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                           <option value="Pending">Pending</option>
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Booking Type</label>
+                        <select 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                          value={reportFilters.bookingType}
+                          onChange={(e) => setReportFilters({...reportFilters, bookingType: e.target.value})}
+                        >
+                          <option value="">All Types</option>
+                          <option value="Order">Order</option>
+                          <option value="Manual">Manual</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-gray-100 pb-4">
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">S.No</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Venue/Service</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
-                            <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Booking Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {bookings.filter(b => {
-                            const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
-                            const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
-                            const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
-                            const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
-                            const bDate = new Date(b.eventDate);
-                            const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
-                            const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-                            return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd;
-                          }).map((b, index) => (
-                            <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="py-4 text-sm text-gray-500">{index + 1}</td>
-                              <td className="py-4">
-                                <div className="font-bold text-gray-900">{b.partyName || b.visitorName}</div>
-                                <div className="text-xs text-gray-500">{b.visitorMobile}</div>
-                              </td>
-                              <td className="py-4">
-                                <div className="text-sm text-gray-900">{b.targetName}</div>
-                                <div className="text-xs text-gray-500 uppercase">{b.targetType}</div>
-                              </td>
-                              <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">
-                                {b.partyAddress || 'N/A'}
-                              </td>
-                              <td className="py-4 text-sm text-gray-600">
-                                {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
-                              </td>
-                              <td className="py-4 text-xs font-mono text-gray-500">
-                                INV-{b.id.substring(0, 8).toUpperCase()}
-                              </td>
-                              <td className="py-4 font-bold text-gray-900">
-                                ₹{b.updatedAmount || b.totalAmount}
-                              </td>
-                              <td className="py-4 text-sm text-gray-600">
-                                {b.paymentMode || 'N/A'}
-                              </td>
-                              <td className="py-4">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                  b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                                }`}>
-                                  {b.paymentStatus || 'Pending'}
-                                </span>
-                              </td>
-                              <td className="py-4">
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                  b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
-                                  b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
-                                }`}>
-                                  {b.status}
-                                </span>
-                              </td>
+                    <div className="overflow-x-auto pb-4">
+                      <div className="min-w-[1200px]">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-gray-100 pb-4">
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">S.No</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Customer</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mobile</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">P.Status</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Type</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {bookings.filter(b => {
+                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
+                              const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+                              const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
+                              const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
+                              const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
+                              const bDate = new Date(b.eventDate);
+                              const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
+                              const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
+                              return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd && matchesType;
+                            }).map((b, index) => (
+                              <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="py-4 text-sm text-gray-500">{index + 1}</td>
+                                <td className="py-4">
+                                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                    b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
+                                    b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
+                                  }`}>
+                                    {b.status === 'confirmed' ? 'Accepted' : b.status}
+                                  </span>
+                                </td>
+                                <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName}</td>
+                                <td className="py-4 text-sm text-gray-600">{b.visitorMobile}</td>
+                                <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">{b.partyAddress || 'N/A'}</td>
+                                <td className="py-4 text-sm text-gray-600">
+                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
+                                </td>
+                                <td className="py-4 text-xs font-mono text-gray-500">
+                                  INV-{b.id.substring(0, 8).toUpperCase()}
+                                </td>
+                                <td className="py-4 font-bold text-gray-900">₹{b.updatedAmount || b.totalAmount}</td>
+                                <td className="py-4 text-sm text-gray-600">{b.paymentMode || 'N/A'}</td>
+                                <td className="py-4">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                                    b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                                  }`}>
+                                    {b.paymentStatus || 'Pending'}
+                                  </span>
+                                </td>
+                                <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5463,6 +5436,8 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
   const visitorBookings = bookings.filter(b => !b.isManual);
   
   const filteredBookings = visitorBookings.filter(b => {
+    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
+    if (isPaid) return false;
     const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesStatus && matchesDate;
@@ -5516,6 +5491,11 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
+      if (paymentStatus === 'Paid') {
+        if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
+          return;
+        }
+      }
       const updatedBooking = {
         ...selectedBooking,
         extra_services: extraServices,
@@ -5524,11 +5504,28 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       };
       
-      generateInvoice(updatedBooking, expenditure, profile);
+      const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
       
+      // Upload to Supabase Storage to get a public link
+      const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      let downloadUrl = '';
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+        downloadUrl = publicUrl;
+      }
+
       const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
       const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
-      const msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}. Please check your PDF invoice.`;
+      
+      let msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}.`;
+      if (downloadUrl) {
+        msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
+      }
+      
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
       await supabase.from('bookings').update({ 
@@ -5536,7 +5533,8 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
         extra_services: extraServices,
         payment_mode: paymentMode,
         payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status,
+        invoice_url: downloadUrl
       }).eq('id', selectedBooking.id);
       
       setIsInvoiceModalOpen(false);
@@ -6454,14 +6452,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     priceLevel: 'per day',
     images: [''],
     availableFor: [] as string[],
-    state: profile?.state || '',
-    district: profile?.district || '',
-    block: profile?.block || '',
   });
-
-  const selectedState = formData.state;
-  const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
-  const blocks = (selectedState && formData.district) ? (LOCATION_DATA[selectedState][formData.district] || []) : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6473,9 +6464,9 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: formData.state,
-        district: formData.district,
-        block: formData.block,
+        state: profile?.state || '',
+        district: profile?.district || '',
+        block: profile?.block || '',
         images: formData.images.filter(i => i !== ''),
         provider_id: user.uid,
         available_for: formData.availableFor,
@@ -6503,7 +6494,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
@@ -6535,6 +6526,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <option value="Helper">Helper</option>
               <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
               <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
+              <option value="Ghoda Bagghi">Ghoda Bagghi</option>
               <option value="Other Related Services">Other Related Services</option>
             </select>
           </div>
@@ -6544,7 +6536,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <input 
                 required
                 type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
                 value={formData.priceRange}
                 onChange={(e) => setFormData({...formData, priceRange: e.target.value})}
               />
@@ -6571,49 +6563,12 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
             <textarea 
               required
               rows={4}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
-              <select 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                value={formData.state}
-                onChange={(e) => setFormData({...formData, state: e.target.value, district: '', block: ''})}
-              >
-                <option value="">Select State</option>
-                {Object.keys(locations).map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
-              <select 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                value={formData.district}
-                onChange={(e) => setFormData({...formData, district: e.target.value, block: ''})}
-                disabled={!formData.state}
-              >
-                <option value="">Select District</option>
-                {districts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Block/Tehsil</label>
-              <select 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                value={formData.block}
-                onChange={(e) => setFormData({...formData, block: e.target.value})}
-                disabled={!formData.district}
-              >
-                <option value="">Select Block</option>
-                {blocks.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-          </div>
           <div className="md:col-span-2">
             <ImageUpload 
               label="Service Main Image" 
@@ -6755,6 +6710,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <option value="Helper">Helper</option>
               <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
               <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
+              <option value="Ghoda Bagghi">Ghoda Bagghi</option>
               <option value="Other Related Services">Other Related Services</option>
             </select>
           </div>
@@ -6764,7 +6720,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <input 
                 required
                 type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
                 value={formData.priceRange}
                 onChange={(e) => setFormData({...formData, priceRange: e.target.value})}
               />
@@ -6791,7 +6747,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
             <textarea 
               required
               rows={4}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
@@ -6907,7 +6863,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
@@ -6940,7 +6896,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.address}
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
@@ -6970,11 +6926,12 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             <textarea 
               required
               rows={4}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
           </div>
+
           <div className="md:col-span-2">
             <ImageUpload 
               label="Venue Main Image" 
@@ -6987,32 +6944,10 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             <input 
               type="text" 
               placeholder="AC, Parking, Catering, DJ, etc."
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.facilities.join(', ')}
               onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
             />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.availableFor.includes(option)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
-                      } else {
-                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
-                      }
-                    }}
-                  />
-                  <span className="text-sm font-medium text-gray-700">{option}</span>
-                </label>
-              ))}
-            </div>
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
@@ -7116,7 +7051,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.displayName}
               onChange={(e) => setFormData({...formData, displayName: e.target.value})}
             />
@@ -7126,7 +7061,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.fatherName}
               onChange={(e) => setFormData({...formData, fatherName: e.target.value})}
             />
@@ -7275,7 +7210,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
@@ -7298,7 +7233,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             <input 
               required
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.address}
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
@@ -7328,7 +7263,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             <textarea 
               required
               rows={4}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
@@ -7345,7 +7280,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             <input 
               type="text" 
               placeholder="AC, Parking, Catering, DJ, etc."
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.facilities.join(', ')}
               onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
             />
@@ -7387,16 +7322,16 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
 // --- Main App ---
 
 const SearchResultsView = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [services, setServices] = useState<ServiceProvider[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [selectedState, setSelectedState] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedBlock, setSelectedBlock] = useState('');
+  const [selectedState, setSelectedState] = useState(searchParams.get('state') || '');
+  const [selectedDistrict, setSelectedDistrict] = useState(searchParams.get('district') || '');
+  const [selectedBlock, setSelectedBlock] = useState(searchParams.get('block') || '');
 
-  const query = searchParams.get('q')?.toLowerCase() || '';
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
 
   const states = Object.keys(LOCATION_DATA || {});
   const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
@@ -7432,6 +7367,7 @@ const SearchResultsView = () => {
           createdAt: d.created_at
         } as Venue));
 
+        const query = searchTerm.toLowerCase();
         if (query) {
           vData = vData.filter(v => 
             v.name.toLowerCase().includes(query) || 
@@ -7464,6 +7400,7 @@ const SearchResultsView = () => {
           createdAt: d.created_at
         } as ServiceProvider));
 
+        const query = searchTerm.toLowerCase();
         if (query) {
           sData = sData.filter(s => 
             s.name.toLowerCase().includes(query) || 
@@ -7480,62 +7417,145 @@ const SearchResultsView = () => {
       setLoading(false);
     };
     fetchData();
-  }, [query, selectedState, selectedDistrict, selectedBlock]);
+  }, [searchTerm, selectedState, selectedDistrict, selectedBlock]);
+
+  const clearFilters = () => {
+    setSelectedState('');
+    setSelectedDistrict('');
+    setSelectedBlock('');
+    setSearchTerm('');
+    setSearchParams({});
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 mb-4">Search Results</h1>
-          <p className="text-gray-500">
-            Showing results for "{query}"
-          </p>
+      <div className="mb-16">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-3xl font-black text-gray-900">Explore Categories</h2>
+          <button 
+            onClick={clearFilters}
+            className="text-orange-600 font-bold hover:underline flex items-center"
+          >
+            Clear All Filters
+          </button>
         </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+          {[
+            { name: 'Venues', icon: <Building2 />, link: '/venues', color: 'bg-blue-50 text-blue-600' },
+            { name: 'Catering', icon: <UtensilsCrossed />, link: '/services?type=Caterer', color: 'bg-orange-50 text-orange-600' },
+            { name: 'DJ & Music', icon: <Music2 />, link: '/services?type=DJ and Sounds', color: 'bg-purple-50 text-purple-600' },
+            { name: 'Tent House', icon: <Tent />, link: '/services?type=Tent House', color: 'bg-green-50 text-green-600' },
+            { name: 'Photography', icon: <Camera />, link: '/services?type=Photo and Videographer', color: 'bg-pink-50 text-pink-600' },
+            { name: 'Makeup', icon: <Sparkles />, link: '/services?type=Makeup Artist', color: 'bg-rose-50 text-rose-600' },
+            { name: 'Decoration', icon: <Palette />, link: '/services?type=Light Decorator', color: 'bg-amber-50 text-amber-600' },
+            { name: 'Pandit Ji', icon: <User />, link: '/services?type=Pandit Ji Brahman', color: 'bg-red-50 text-red-600' },
+            { name: 'Mehendi', icon: <Palette />, link: '/services?type=Mehendi Service', color: 'bg-yellow-50 text-yellow-600' },
+            { name: 'Drone', icon: <Plane />, link: '/services?type=Drone Camera', color: 'bg-sky-50 text-sky-600' },
+            { name: 'Rentals', icon: <Gem />, link: '/services?type=Event Cloth and Jwellary on Rent', color: 'bg-cyan-50 text-cyan-600' },
+            { name: 'Halbai', icon: <ChefHat />, link: '/services?type=Halbai', color: 'bg-emerald-50 text-emerald-600' },
+            { name: 'Waiters', icon: <Users2 />, link: '/services?type=Waiters', color: 'bg-slate-50 text-slate-600' },
+            { name: 'Dhol Bands', icon: <Music />, link: '/services?type=Dhol Bands', color: 'bg-orange-50 text-orange-600' },
+            { name: 'Flower Decor', icon: <Flower2 />, link: '/services?type=Flower Decorator', color: 'bg-rose-50 text-rose-600' },
+          ].map((cat, idx) => (
+            <Link 
+              key={idx}
+              to={cat.link}
+              className={cn(
+                "flex flex-col items-center p-6 rounded-3xl transition-all hover:shadow-xl group",
+                cat.color
+              )}
+            >
+              <div className="mb-3 transform group-hover:scale-110 transition-transform">
+                {React.cloneElement(cat.icon as React.ReactElement<any>, { size: 32 })}
+              </div>
+              <span className="text-sm font-bold">{cat.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-orange-100 mb-16 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 blur-2xl" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-pink-50 rounded-full -ml-16 -mb-16 blur-2xl" />
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-3xl border border-gray-100">
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">State</label>
-            <select 
-              value={selectedState}
-              onChange={(e) => {
-                setSelectedState(e.target.value);
-                setSelectedDistrict('');
-                setSelectedBlock('');
-              }}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-            >
-              <option value="">All States</option>
-              {states.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">District</label>
-            <select 
-              value={selectedDistrict}
-              onChange={(e) => {
-                setSelectedDistrict(e.target.value);
-                setSelectedBlock('');
-              }}
-              disabled={!selectedState}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
-            >
-              <option value="">All Districts</option>
-              {districts.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Block</label>
-            <select 
-              value={selectedBlock}
-              onChange={(e) => setSelectedBlock(e.target.value)}
-              disabled={!selectedDistrict}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
-            >
-              <option value="">All Blocks</option>
-              {blocks.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+        <div className="relative z-10">
+          <div className="flex flex-col lg:flex-row gap-8 items-end">
+            <div className="flex-1 w-full">
+              <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">Search Keywords</label>
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={20} />
+                <input 
+                  type="text"
+                  placeholder="Search venues or services..."
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full lg:w-auto flex-[2]">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">State</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <select 
+                    value={selectedState}
+                    onChange={(e) => {
+                      setSelectedState(e.target.value);
+                      setSelectedDistrict('');
+                      setSelectedBlock('');
+                    }}
+                    className="w-full pl-10 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-orange-500 outline-none appearance-none"
+                  >
+                    <option value="">All States</option>
+                    {states.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">District</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <select 
+                    value={selectedDistrict}
+                    onChange={(e) => {
+                      setSelectedDistrict(e.target.value);
+                      setSelectedBlock('');
+                    }}
+                    disabled={!selectedState}
+                    className="w-full pl-10 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 appearance-none"
+                  >
+                    <option value="">All Districts</option>
+                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">Block</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <select 
+                    value={selectedBlock}
+                    onChange={(e) => setSelectedBlock(e.target.value)}
+                    disabled={!selectedDistrict}
+                    className="w-full pl-10 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 appearance-none"
+                  >
+                    <option value="">All Blocks</option>
+                    {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div className="mb-12">
+        <h1 className="text-4xl font-black text-gray-900 mb-4">Results</h1>
+        <p className="text-gray-500">
+          Found {venues.length} venues and {services.length} services
+        </p>
       </div>
 
       {loading ? (
@@ -7972,6 +7992,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'profile'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 10;
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -7995,6 +8016,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [newBanner, setNewBanner] = useState({ title: '', imageUrl: '' });
   const [isServicePhotoModalOpen, setIsServicePhotoModalOpen] = useState(false);
   const [newServicePhoto, setNewServicePhoto] = useState({ serviceType: 'Caterer' as ServiceType, imageUrl: '' });
+  const [editingNotification, setEditingNotification] = useState<AppNotification | null>(null);
 
   // Admin profile state
   const [adminProfile, setAdminProfile] = useState({
@@ -8053,6 +8075,16 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           extra_services: d.extra_services,
           createdAt: d.created_at
         } as Booking)));
+
+        const { data: sData } = await supabase.from('user_subscriptions').select('*');
+        if (sData) setSubscriptions(sData.map(d => ({
+          ...d,
+          userId: d.user_id,
+          planId: d.plan_id,
+          startDate: d.start_date,
+          endDate: d.end_date,
+          createdAt: d.created_at
+        }) as UserSubscription));
       }
 
       if (activeTab === 'dashboard' || activeTab === 'users') {
@@ -8128,7 +8160,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const deleteNotification = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this notification?')) return;
+    if (!window.confirm('Are you sure you want to delete this notification?')) return;
     const { error } = await supabase.from('notifications').delete().eq('id', id);
     if (!error) {
       toast.success('Notification deleted');
@@ -8139,7 +8171,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const deleteBanner = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
+    if (!window.confirm('Are you sure you want to delete this banner?')) return;
     const { error } = await supabase.from('banners').delete().eq('id', id);
     if (!error) {
       toast.success('Banner deleted');
@@ -8150,7 +8182,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const deleteServicePhoto = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this service photo?')) return;
+    if (!window.confirm('Are you sure you want to delete this service photo?')) return;
     const { error } = await supabase.from('service_type_photos').delete().eq('id', id);
     if (!error) {
       toast.success('Service photo deleted');
@@ -8227,11 +8259,23 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         'Created At': new Date(u.createdAt).toLocaleString()
       }));
       
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-      XLSX.writeFile(workbook, "registered_users_report.xlsx");
-      toast.success('User report downloaded');
+      if (type === 'excel') {
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+        XLSX.writeFile(workbook, "registered_users_report.xlsx");
+        toast.success('User report downloaded');
+      } else {
+        const doc = new jsPDF();
+        doc.text("Registered Users Report", 14, 15);
+        (doc as any).autoTable({
+          startY: 20,
+          head: [['Reg ID', 'Name', 'Mobile', 'Email', 'Role', 'Status']],
+          body: users.map(u => [u.registrationId, u.displayName, u.mobileNumber, u.email, u.role, u.status]),
+        });
+        doc.save("registered_users_report.pdf");
+        toast.success('User report downloaded');
+      }
     }
   };
 
@@ -8313,6 +8357,29 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       toast.error('Failed to upload service photos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNotification) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({
+          title: editingNotification.title,
+          message: editingNotification.message
+        })
+        .eq('id', editingNotification.id);
+        
+      if (error) throw error;
+      
+      toast.success('Notification updated');
+      setEditingNotification(null);
+      fetchData();
+    } catch (err) {
+      toast.error('Failed to update notification');
     }
   };
 
@@ -8469,29 +8536,50 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                   </div>
 
                   <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-xl font-bold text-gray-900 mb-6">Recent Activity</h3>
-                    <div className="space-y-4">
-                      {bookings.slice(0, 5).map(b => (
-                        <div key={b.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                          <div className="flex items-center space-x-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                              b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                            }`}>
-                              {b.visitorName?.charAt(0) || 'B'}
-                            </div>
-                            <div>
-                              <div className="font-bold text-gray-900">{b.visitorName}</div>
-                              <div className="text-xs text-gray-500">{b.targetName} | {format(new Date(b.createdAt), 'MMM dd, yyyy')}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-gray-900">₹{b.updatedAmount || b.totalAmount}</div>
-                            <div className={`text-xs font-bold uppercase ${
-                              b.paymentStatus === 'Paid' ? 'text-green-600' : 'text-yellow-600'
-                            }`}>{b.paymentStatus || b.status}</div>
-                          </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-6">Subscription Statistics</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-gray-700 border-b pb-2">Venue Owners</h4>
+                        <div className="flex justify-between items-center p-4 bg-green-50 rounded-2xl">
+                          <span className="font-bold text-green-700">Active Subscriptions</span>
+                          <span className="text-2xl font-black text-green-800">
+                            {users.filter(u => u.role === 'owner' && subscriptions.some(s => s.userId === u.uid && s.status === 'active')).length}
+                          </span>
                         </div>
-                      ))}
+                        <div className="flex justify-between items-center p-4 bg-red-50 rounded-2xl">
+                          <span className="font-bold text-red-700">Inactive/Unsubscribed</span>
+                          <span className="text-2xl font-black text-red-800">
+                            {users.filter(u => u.role === 'owner' && !subscriptions.some(s => s.userId === u.uid && s.status === 'active')).length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl">
+                          <span className="font-bold text-blue-700">Total Registered</span>
+                          <span className="text-2xl font-black text-blue-800">
+                            {users.filter(u => u.role === 'owner').length}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-gray-700 border-b pb-2">Service Providers</h4>
+                        <div className="flex justify-between items-center p-4 bg-green-50 rounded-2xl">
+                          <span className="font-bold text-green-700">Active Subscriptions</span>
+                          <span className="text-2xl font-black text-green-800">
+                            {users.filter(u => u.role === 'provider' && subscriptions.some(s => s.userId === u.uid && s.status === 'active')).length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-red-50 rounded-2xl">
+                          <span className="font-bold text-red-700">Inactive/Unsubscribed</span>
+                          <span className="text-2xl font-black text-red-800">
+                            {users.filter(u => u.role === 'provider' && !subscriptions.some(s => s.userId === u.uid && s.status === 'active')).length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl">
+                          <span className="font-bold text-blue-700">Total Registered</span>
+                          <span className="text-2xl font-black text-blue-800">
+                            {users.filter(u => u.role === 'provider').length}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -8644,12 +8732,20 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                           <p className="text-gray-600 text-sm">{n.message}</p>
                           <div className="mt-4 text-xs text-gray-400">{new Date(n.createdAt).toLocaleString()}</div>
                         </div>
-                        <button 
-                          onClick={() => deleteNotification(n.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={20} />
-                        </button>
+                        <div className="flex space-x-2">
+                          <button 
+                            onClick={() => setEditingNotification(n)}
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 size={20} />
+                          </button>
+                          <button 
+                            onClick={() => deleteNotification(n.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -8674,6 +8770,30 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                           <div className="flex space-x-4 pt-4">
                             <button type="button" onClick={() => setIsNotificationModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
                             <button type="submit" className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Add All</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+
+                  {editingNotification && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-3xl p-8 max-w-md w-full">
+                        <h3 className="text-2xl font-bold mb-6">Edit Notification</h3>
+                        <form onSubmit={handleEditNotification} className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold mb-1">Title</label>
+                            <input type="text" className="w-full px-4 py-3 bg-gray-50 border rounded-xl" 
+                              value={editingNotification.title} onChange={e => setEditingNotification({...editingNotification, title: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold mb-1">Message</label>
+                            <textarea required className="w-full px-4 py-3 bg-gray-50 border rounded-xl" rows={5}
+                              value={editingNotification.message} onChange={e => setEditingNotification({...editingNotification, message: e.target.value})} />
+                          </div>
+                          <div className="flex space-x-4 pt-4">
+                            <button type="button" onClick={() => setEditingNotification(null)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
+                            <button type="submit" className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Update</button>
                           </div>
                         </form>
                       </div>
@@ -8828,6 +8948,14 @@ const VenueListView = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  const [selectedState, setSelectedState] = useState(searchParams.get('state') || '');
+  const [selectedDistrict, setSelectedDistrict] = useState(searchParams.get('district') || '');
+  const [selectedBlock, setSelectedBlock] = useState(searchParams.get('block') || '');
+
+  const states = Object.keys(LOCATION_DATA || {});
+  const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
+  const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
 
   useEffect(() => {
     const fetchVenues = async () => {
@@ -8871,16 +8999,56 @@ const VenueListView = () => {
         );
       }
 
+      if (selectedState) data = data.filter(v => v.state === selectedState);
+      if (selectedDistrict) data = data.filter(v => v.district === selectedDistrict);
+      if (selectedBlock) data = data.filter(v => v.block === selectedBlock);
+
       setVenues(data);
       setLoading(false);
     };
     fetchVenues();
-  }, [searchParams]);
+  }, [searchParams, selectedState, selectedDistrict, selectedBlock]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Available Venues</h1>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
+          <select 
+            value={selectedState}
+            onChange={(e) => {
+              setSelectedState(e.target.value);
+              setSelectedDistrict('');
+              setSelectedBlock('');
+            }}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm"
+          >
+            <option value="">All States</option>
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select 
+            value={selectedDistrict}
+            onChange={(e) => {
+              setSelectedDistrict(e.target.value);
+              setSelectedBlock('');
+            }}
+            disabled={!selectedState}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 shadow-sm"
+          >
+            <option value="">All Districts</option>
+            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select 
+            value={selectedBlock}
+            onChange={(e) => setSelectedBlock(e.target.value)}
+            disabled={!selectedDistrict}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 shadow-sm"
+          >
+            <option value="">All Blocks</option>
+            {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
       </div>
       
       {loading ? (
@@ -8905,6 +9073,14 @@ const ServiceListView = ({ user }: { user: any }) => {
   const [services, setServices] = useState<ServiceProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  const [selectedState, setSelectedState] = useState(searchParams.get('state') || '');
+  const [selectedDistrict, setSelectedDistrict] = useState(searchParams.get('district') || '');
+  const [selectedBlock, setSelectedBlock] = useState(searchParams.get('block') || '');
+
+  const states = Object.keys(LOCATION_DATA || {});
+  const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
+  const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -8946,16 +9122,56 @@ const ServiceListView = ({ user }: { user: any }) => {
         );
       }
 
+      if (selectedState) data = data.filter(s => s.state === selectedState);
+      if (selectedDistrict) data = data.filter(s => s.district === selectedDistrict);
+      if (selectedBlock) data = data.filter(s => s.block === selectedBlock);
+
       setServices(data);
       setLoading(false);
     };
     fetchServices();
-  }, [searchParams]);
+  }, [searchParams, selectedState, selectedDistrict, selectedBlock]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Event Services</h1>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full md:w-auto">
+          <select 
+            value={selectedState}
+            onChange={(e) => {
+              setSelectedState(e.target.value);
+              setSelectedDistrict('');
+              setSelectedBlock('');
+            }}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm"
+          >
+            <option value="">All States</option>
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select 
+            value={selectedDistrict}
+            onChange={(e) => {
+              setSelectedDistrict(e.target.value);
+              setSelectedBlock('');
+            }}
+            disabled={!selectedState}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 shadow-sm"
+          >
+            <option value="">All Districts</option>
+            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select 
+            value={selectedBlock}
+            onChange={(e) => setSelectedBlock(e.target.value)}
+            disabled={!selectedDistrict}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50 shadow-sm"
+          >
+            <option value="">All Blocks</option>
+            {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {loading ? (

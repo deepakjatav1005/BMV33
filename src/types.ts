@@ -141,6 +141,7 @@ export type ServiceType =
   | 'Helper'
   | 'Pandit Ji Brahman'
   | 'SPARKS AND Firecrackers'
+  | 'Ghoda Bagghi'
   | 'Other Related Services';
 
 export interface ServiceProvider {
