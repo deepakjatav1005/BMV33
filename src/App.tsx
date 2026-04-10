@@ -2386,41 +2386,33 @@ const ServiceTypePhotosScroll = () => {
   if (photos.length === 0) return null;
 
   return (
-    <div className="bg-white py-8 overflow-hidden border-b border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-        <h2 className="text-xl font-bold text-gray-900 flex items-center">
-          <Sparkles className="mr-2 text-orange-600" size={20} />
-          Explore Services
+    <div className="bg-white py-16 overflow-hidden border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+        <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
+          <Sparkles className="mr-4 text-orange-600" size={32} />
+          Explore <span className="text-orange-600 ml-2">Services</span>
         </h2>
       </div>
-      <div className="relative flex overflow-hidden">
-        <div className="flex animate-marquee-ltr whitespace-nowrap">
-          {photos.map((p, idx) => (
+      <div className="relative">
+        <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
+          {[...photos, ...photos].map((p, idx) => (
             <motion.div 
               key={`${p.id}-${idx}`} 
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.05, rotateY: 15 }}
               onClick={() => navigate('/registration?role=provider')}
-              className="mx-4 w-64 h-40 rounded-2xl overflow-hidden shadow-lg cursor-pointer relative group flex-shrink-0"
+              className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
             >
-              <img src={p.imageUrl} alt={p.serviceType} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
-                <p className="text-white font-bold text-sm uppercase tracking-wider">{p.serviceType}</p>
-                <p className="text-orange-400 text-[10px] font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Register as Provider →</p>
-              </div>
-            </motion.div>
-          ))}
-          {/* Duplicate for seamless loop */}
-          {photos.map((p, idx) => (
-            <motion.div 
-              key={`${p.id}-${idx}-dup`} 
-              whileHover={{ scale: 1.05 }}
-              onClick={() => navigate('/registration?role=provider')}
-              className="mx-4 w-64 h-40 rounded-2xl overflow-hidden shadow-lg cursor-pointer relative group flex-shrink-0"
-            >
-              <img src={p.imageUrl} alt={p.serviceType} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
-                <p className="text-white font-bold text-sm uppercase tracking-wider">{p.serviceType}</p>
-                <p className="text-orange-400 text-[10px] font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Register as Provider →</p>
+              <img 
+                src={p.imageUrl} 
+                alt={p.serviceType} 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
+                <h3 className="text-xl font-black text-white uppercase tracking-widest drop-shadow-lg text-center px-4">{p.serviceType}</h3>
+                <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                <p className="text-orange-400 text-[10px] font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">Register Now →</p>
               </div>
             </motion.div>
           ))}
@@ -3799,6 +3791,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
   const [expenditure, setExpenditure] = useState(0);
@@ -3824,42 +3817,45 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
 
+  const fetchBookings = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('owner_id', user.uid)
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setBookings(data.map(d => ({
+        ...d,
+        userId: d.user_id,
+        ownerId: d.owner_id,
+        targetId: d.target_id,
+        targetType: d.target_type,
+        targetName: d.target_name,
+        eventDate: d.event_date,
+        endDate: d.end_date,
+        eventType: d.event_type,
+        partyName: d.party_name,
+        partyAddress: d.party_address,
+        visitorName: d.visitor_name,
+        visitorMobile: d.visitor_mobile,
+        status: d.status,
+        isManual: d.is_manual,
+        totalAmount: d.total_amount || 0,
+        updatedAmount: d.updated_amount,
+        paymentStatus: d.payment_status,
+        paymentMode: d.payment_mode,
+        is_invoice_generated: d.is_invoice_generated,
+        invoice_url: d.invoice_url,
+        createdAt: d.created_at
+      } as Booking)));
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const fetchBookings = async () => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('owner_id', user.uid)
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        setBookings(data.map(d => ({
-          ...d,
-          userId: d.user_id,
-          ownerId: d.owner_id,
-          targetId: d.target_id,
-          targetType: d.target_type,
-          targetName: d.target_name,
-          eventDate: d.event_date,
-          endDate: d.end_date,
-          eventType: d.event_type,
-          partyName: d.party_name,
-          partyAddress: d.party_address,
-          visitorName: d.visitor_name,
-          visitorMobile: d.visitor_mobile,
-          status: d.status,
-          isManual: d.is_manual,
-          totalAmount: d.total_amount || 0,
-          updatedAmount: d.updated_amount,
-          is_invoice_generated: d.is_invoice_generated,
-          createdAt: d.created_at
-        } as Booking)));
-      }
-      setLoading(false);
-    };
-
     fetchBookings();
 
     const channel = supabase
@@ -3936,17 +3932,12 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
-      if (paymentStatus === 'Paid') {
-        if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
-          return;
-        }
-      }
       const updatedBooking = {
         ...selectedBooking,
         extra_services: extraServices,
         paymentMode,
-        paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+        paymentStatus: 'Pending' as 'Pending',
+        status: selectedBooking.status
       };
       
       const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
@@ -3966,7 +3957,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
       const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
       
-      let msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}.`;
+      let msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: Pending.`;
       if (downloadUrl) {
         msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
       }
@@ -3977,10 +3968,18 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         is_invoice_generated: true,
         extra_services: extraServices,
         payment_mode: paymentMode,
-        payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status,
+        payment_status: 'Pending',
         invoice_url: downloadUrl
       }).eq('id', selectedBooking.id);
+      
+      // Update local state for immediate UI feedback
+      setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { 
+        ...b, 
+        is_invoice_generated: true, 
+        paymentStatus: 'Pending',
+        paymentMode: paymentMode,
+        invoice_url: downloadUrl
+      } : b));
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
@@ -3988,6 +3987,35 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       setExtraServices([]);
       setPaymentStatus('Pending');
       toast.success('Invoice generated and shared via WhatsApp');
+      
+      // Explicitly fetch to ensure sync
+      fetchBookings();
+    }
+  };
+
+  const handleUpdatePaymentStatus = async () => {
+    if (!selectedBooking) return;
+    
+    if (paymentStatus === 'Paid') {
+      if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
+        return;
+      }
+    }
+
+    try {
+      const { error } = await supabase.from('bookings').update({ 
+        payment_status: paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+      }).eq('id', selectedBooking.id);
+
+      if (error) throw error;
+
+      toast.success(`Payment status updated to ${paymentStatus}`);
+      setIsPaymentModalOpen(false);
+      setSelectedBooking(null);
+      fetchBookings();
+    } catch (err) {
+      toast.error('Failed to update payment status');
     }
   };
 
@@ -4135,7 +4163,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                   <div className="flex items-center space-x-2">
                     <span className={cn(
                       "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
-                      booking.status === 'confirmed' ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                      (booking.status === 'confirmed' || booking.status === 'paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
                       {booking.status}
                     </span>
@@ -4170,6 +4198,20 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                         >
                           <Download size={18} />
                         </button>
+                        {(booking.paymentStatus || booking.is_invoice_generated || booking.status === 'confirmed') && (
+                          <button 
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setPaymentStatus(booking.paymentStatus || 'Pending');
+                              setIsPaymentModalOpen(true);
+                            }}
+                            className="flex items-center space-x-2 px-3 py-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100"
+                            title="Update Payment Status"
+                          >
+                            <CreditCard size={18} />
+                            <span className="text-sm font-medium">Payment Status</span>
+                          </button>
+                        )}
                       </>
                     ) : null}
                   </div>
@@ -4444,7 +4486,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                 <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
                   <div className="flex space-x-4">
@@ -4458,23 +4500,6 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                         )}
                       >
                         {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Status</label>
-                  <div className="flex space-x-4">
-                    {['Pending', 'Paid'].map(status => (
-                      <button
-                        key={status}
-                        onClick={() => setPaymentStatus(status as any)}
-                        className={cn(
-                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
-                          paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        )}
-                      >
-                        {status}
                       </button>
                     ))}
                   </div>
@@ -4906,74 +4931,77 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     setSearchParams({ tab });
   };
 
+  const fetchDashboardData = async () => {
+    if (!user?.uid) return;
+    try {
+      const { data: bData } = await supabase
+        .from('bookings')
+        .select('*')
+        .or(`user_id.eq.${user.uid},owner_id.eq.${user.uid}`);
+      
+      if (bData) {
+        setBookings(bData.map(d => ({
+          ...d,
+          userId: d.user_id,
+          visitorName: d.visitor_name,
+          visitorMobile: d.visitor_mobile,
+          eventType: d.event_type,
+          targetId: d.target_id,
+          targetType: d.target_type,
+          targetName: d.target_name,
+          ownerId: d.owner_id,
+          eventDate: d.event_date,
+          totalAmount: d.total_amount,
+          updatedAmount: d.updated_amount,
+          paymentStatus: d.payment_status,
+          paymentMode: d.payment_mode,
+          is_invoice_generated: d.is_invoice_generated,
+          invoice_url: d.invoice_url,
+          createdAt: d.created_at
+        }) as Booking));
+      }
+
+      const { data: vData } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('owner_id', user.uid);
+      
+      if (vData) {
+        setVenues(vData.map(d => ({
+          ...d,
+          ownerId: d.owner_id,
+          venueType: d.venue_type,
+          pricePerDay: d.price_per_day,
+          reviewCount: d.review_count,
+          createdAt: d.created_at
+        }) as Venue));
+      }
+
+      const { data: sData } = await supabase
+        .from('service_providers')
+        .select('*')
+        .eq('provider_id', user.uid);
+      
+      if (sData) {
+        setServices(sData.map(d => ({
+          ...d,
+          providerId: d.provider_id,
+          serviceType: d.service_type,
+          priceRange: d.price_range,
+          priceLevel: d.price_level,
+          reviewCount: d.review_count,
+          createdAt: d.created_at
+        }) as ServiceProvider));
+      }
+    } catch (err) {
+      console.error('Dashboard data error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user?.uid) return;
-
-    const fetchDashboardData = async () => {
-      try {
-        const { data: bData } = await supabase
-          .from('bookings')
-          .select('*')
-          .or(`user_id.eq.${user.uid},owner_id.eq.${user.uid}`);
-        
-        if (bData) {
-          setBookings(bData.map(d => ({
-            ...d,
-            userId: d.user_id,
-            visitorName: d.visitor_name,
-            visitorMobile: d.visitor_mobile,
-            eventType: d.event_type,
-            targetId: d.target_id,
-            targetType: d.target_type,
-            targetName: d.target_name,
-            ownerId: d.owner_id,
-            eventDate: d.event_date,
-            totalAmount: d.total_amount,
-            updatedAmount: d.updated_amount,
-            is_invoice_generated: d.is_invoice_generated,
-            createdAt: d.created_at
-          }) as Booking));
-        }
-
-        const { data: vData } = await supabase
-          .from('venues')
-          .select('*')
-          .eq('owner_id', user.uid);
-        
-        if (vData) {
-          setVenues(vData.map(d => ({
-            ...d,
-            ownerId: d.owner_id,
-            venueType: d.venue_type,
-            pricePerDay: d.price_per_day,
-            reviewCount: d.review_count,
-            createdAt: d.created_at
-          }) as Venue));
-        }
-
-        const { data: sData } = await supabase
-          .from('service_providers')
-          .select('*')
-          .eq('provider_id', user.uid);
-        
-        if (sData) {
-          setServices(sData.map(d => ({
-            ...d,
-            providerId: d.provider_id,
-            serviceType: d.service_type,
-            priceRange: d.price_range,
-            priceLevel: d.price_level,
-            reviewCount: d.review_count,
-            createdAt: d.created_at
-          }) as ServiceProvider));
-        }
-      } catch (err) {
-        console.error('Dashboard data error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardData();
 
     // Realtime subscriptions
@@ -5009,14 +5037,14 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <BarChart2 size={20} />, roles: ['owner', 'provider', 'user'] },
-    { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} /> },
-    { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
-    { id: 'orders', label: 'Order Manage', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'booking-manager', label: 'Booking Manager', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
+    { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
+    { id: 'orders', label: 'Order Manage', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} /> },
     { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
-    { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
+    { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
   ];
 
   const filteredMenu = menuItems.filter(item => {
@@ -5039,14 +5067,37 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         {/* Sidebar */}
         <div className="w-full lg:w-64 flex-shrink-0">
           <div className="bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden sticky top-24">
-            <div className="p-6 bg-orange-600 text-white">
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-6 bg-orange-600 text-white"
+            >
               <h2 className="font-bold text-lg">Dashboard</h2>
               <p className="text-xs opacity-80">Welcome, {profile?.displayName}</p>
-            </div>
-            <nav className="p-4 space-y-2">
+            </motion.div>
+            <motion.nav 
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.05
+                  }
+                }
+              }}
+              className="p-4 space-y-2"
+            >
               {filteredMenu.map(item => (
-                <button
+                <motion.button
                   key={item.id}
+                  variants={{
+                    hidden: { opacity: 0, x: -20 },
+                    visible: { opacity: 1, x: 0 }
+                  }}
+                  whileHover={{ scale: 1.02, x: 5 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => handleTabChange(item.id)}
                   className={cn(
                     "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all",
@@ -5057,9 +5108,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                 >
                   {item.icon}
                   <span>{item.label}</span>
-                </button>
+                </motion.button>
               ))}
-            </nav>
+            </motion.nav>
           </div>
         </div>
 
@@ -5174,7 +5225,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                 <VenueManageView user={user} venues={venues} />
               )}
               {activeTab === 'orders' && (
-                <OrderManageView user={user} profile={profile} bookings={bookings} />
+                <OrderManageView user={user} profile={profile} bookings={bookings} onUpdate={fetchDashboardData} />
               )}
               {activeTab === 'booking-manager' && (
                 <BookingManagerView user={user} profile={profile} />
@@ -5429,7 +5480,7 @@ const VenueManageView = ({ user, venues }: { user: any, venues: Venue[] }) => {
   );
 };
 
-const OrderManageView = ({ user, profile, bookings }: { user: any, profile: UserProfile | null, bookings: Booking[] }) => {
+const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
 
@@ -5446,6 +5497,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
   const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [expenditure, setExpenditure] = useState(0);
@@ -5491,17 +5543,12 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
 
   const confirmInvoice = async () => {
     if (selectedBooking) {
-      if (paymentStatus === 'Paid') {
-        if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
-          return;
-        }
-      }
       const updatedBooking = {
         ...selectedBooking,
         extra_services: extraServices,
         paymentMode,
-        paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+        paymentStatus: 'Pending' as 'Pending',
+        status: selectedBooking.status
       };
       
       const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
@@ -5521,7 +5568,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
       const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
       const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
       
-      let msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: ${paymentStatus}.`;
+      let msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: Pending.`;
       if (downloadUrl) {
         msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
       }
@@ -5532,10 +5579,12 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
         is_invoice_generated: true,
         extra_services: extraServices,
         payment_mode: paymentMode,
-        payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status,
+        payment_status: 'Pending',
+        status: selectedBooking.status,
         invoice_url: downloadUrl
       }).eq('id', selectedBooking.id);
+      
+      if (onUpdate) onUpdate();
       
       setIsInvoiceModalOpen(false);
       setSelectedBooking(null);
@@ -5543,6 +5592,33 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
       setExtraServices([]);
       setPaymentStatus('Pending');
       toast.success('Invoice generated and shared via WhatsApp');
+    }
+  };
+
+  const handleUpdatePaymentStatus = async () => {
+    if (!selectedBooking) return;
+    
+    if (paymentStatus === 'Paid') {
+      if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
+        return;
+      }
+    }
+
+    try {
+      const { error } = await supabase.from('bookings').update({ 
+        payment_status: paymentStatus,
+        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+      }).eq('id', selectedBooking.id);
+
+      if (error) throw error;
+
+      if (onUpdate) onUpdate();
+      
+      toast.success(`Payment status updated to ${paymentStatus}`);
+      setIsPaymentModalOpen(false);
+      setSelectedBooking(null);
+    } catch (err) {
+      toast.error('Failed to update payment status');
     }
   };
 
@@ -5728,6 +5804,19 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                     <Download size={16} />
                     <span>Invoice</span>
                   </button>
+                  {(b.paymentStatus || b.is_invoice_generated || b.status === 'confirmed') && (
+                    <button 
+                      onClick={() => {
+                        setSelectedBooking(b);
+                        setPaymentStatus(b.paymentStatus || 'Pending');
+                        setIsPaymentModalOpen(true);
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 flex items-center space-x-2"
+                    >
+                      <CreditCard size={16} />
+                      <span>Payment Status</span>
+                    </button>
+                  )}
                 </>
               )}
               
@@ -5747,6 +5836,44 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
         {sortedBookings.length === 0 && <p className="text-gray-500 text-center py-10">No matching orders found.</p>}
       </div>
 
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-2xl font-bold mb-6">Update Payment Status</h3>
+            <div className="space-y-6">
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
+                <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
+                <div className="text-sm text-gray-500">{selectedBooking?.visitorName}</div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-3 text-gray-700">Payment Status</label>
+                <div className="flex space-x-4">
+                  {['Pending', 'Paid'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setPaymentStatus(status as any)}
+                      className={cn(
+                        "flex-1 py-3 px-4 rounded-xl font-bold border transition-all",
+                        paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
+                <button onClick={handleUpdatePaymentStatus} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200">Update Status</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isInvoiceModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -5759,7 +5886,7 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                 <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
                   <div className="flex space-x-4">
@@ -5773,23 +5900,6 @@ const OrderManageView = ({ user, profile, bookings }: { user: any, profile: User
                         )}
                       >
                         {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Status</label>
-                  <div className="flex space-x-4">
-                    {['Pending', 'Paid'].map(status => (
-                      <button
-                        key={status}
-                        onClick={() => setPaymentStatus(status as any)}
-                        className={cn(
-                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
-                          paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        )}
-                      >
-                        {status}
                       </button>
                     ))}
                   </div>
@@ -8072,6 +8182,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           paymentMode: d.payment_mode,
           paymentStatus: d.payment_status,
           is_invoice_generated: d.is_invoice_generated,
+          invoice_url: d.invoice_url,
           extra_services: d.extra_services,
           createdAt: d.created_at
         } as Booking)));

@@ -196,6 +196,7 @@ export interface Booking {
   paymentStatus?: 'Pending' | 'Paid';
   isManual?: boolean;
   is_invoice_generated?: boolean;
+  invoice_url?: string;
   extra_services?: { name: string; amount: number }[];
   createdAt: any;
 }
