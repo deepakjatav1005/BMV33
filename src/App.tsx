@@ -347,7 +347,8 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
                   >
                     <Star 
                       size={36} 
-                      className={star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'} 
+                      fill={star <= rating ? "currentColor" : "none"}
+                      className={star <= rating ? 'text-yellow-500' : 'text-gray-300'} 
                     />
                   </button>
                 ))}
@@ -962,7 +963,12 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
               <Link to="/search" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
-              {user && <Link to="/dashboard?tab=orders" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">My Bookings</Link>}
+              {user && (
+                <Link to="/dashboard?tab=orders" className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 font-bold transition-all bg-orange-50/50 px-4 py-2 rounded-xl border border-orange-100 hover:bg-orange-50">
+                  <Calendar size={18} />
+                  <span>My Bookings</span>
+                </Link>
+              )}
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
               
               <button 
@@ -980,11 +986,18 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               )}
               {user && (
                 <div className="flex items-center space-x-4">
-                  {(profile?.role === 'owner' || profile?.role === 'provider') && (
-                    <Link to="/dashboard?tab=booking-manager" className="relative p-2 text-gray-600 hover:text-orange-600 transition-colors">
-                      <Bell size={24} />
+                  <button 
+                    onClick={onRateApp}
+                    className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-xl transition-all group"
+                    title="Rate App"
+                  >
+                    <Star size={20} className="group-hover:scale-110 transition-transform" fill="currentColor" />
+                  </button>
+                  {(profile?.role === 'owner' || profile?.role === 'provider' || profile?.role === 'admin') && (
+                    <Link to="/dashboard?tab=booking-manager" className="relative p-2 text-orange-600 hover:bg-orange-50 rounded-xl transition-all group" title="Booking Manager">
+                      <Bell size={24} className="group-hover:scale-110 transition-transform" />
                       {pendingCount > 0 && (
-                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white">
+                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white animate-pulse">
                           {pendingCount}
                         </span>
                       )}
@@ -1027,28 +1040,28 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
     <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, height: 0, y: -20 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-white border-b border-orange-100 overflow-hidden"
           >
           <div className="px-4 py-6 space-y-2">
             {[
               { to: "/", label: "Home", icon: <Home size={18} />, primary: true },
-              { to: "/about", label: "About", icon: <Info size={18} /> },
               { to: "/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
               { to: "/search", label: "Search", icon: <Search size={18} /> },
+              { to: "/about", label: "About", icon: <Info size={18} /> },
               ...(user ? [{ to: "/dashboard?tab=orders", label: "My Bookings", icon: <Calendar size={18} /> }] : []),
-            ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
+              ...(user && (profile?.role === 'owner' || profile?.role === 'provider' || profile?.role === 'admin') ? [{ to: "/dashboard?tab=booking-manager", label: "Booking Manager", icon: <Bell size={18} /> }] : []),
+            ].map((item) => (
               <Link 
                 key={item.to}
                 to={item.to} 
+                onClick={() => setIsMenuOpen(false)}
                 className={cn(
                   "flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all",
                   item.primary ? "text-orange-600 font-bold bg-orange-50" : "text-gray-600 font-medium hover:bg-gray-50"
-                )} 
-                onClick={() => setIsMenuOpen(false)}
+                )}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -2482,6 +2495,80 @@ const TermsView = () => {
   );
 };
 
+const AppFeedbackList = () => {
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeedbacks = async () => {
+      const { data, error } = await supabase
+        .from('app_feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (!error && data) {
+        setFeedbacks(data);
+      }
+      setLoading(false);
+    };
+
+    fetchFeedbacks();
+
+    const channel = supabase
+      .channel('app_feedback_home')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_feedback' }, fetchFeedbacks)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  if (loading) return null;
+  if (feedbacks.length === 0) return null;
+
+  return (
+    <section className="py-20 bg-white overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-black text-gray-900 mb-4">What Our Users Say</h2>
+          <p className="text-gray-500">Latest feedback from our community</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {feedbacks.map((f, i) => (
+            <motion.div 
+              key={f.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="flex items-center space-x-1 text-yellow-500 mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={18} fill={i < f.rating ? "currentColor" : "none"} className={i < f.rating ? "" : "text-gray-300"} />
+                ))}
+              </div>
+              <p className="text-gray-700 italic mb-6 leading-relaxed">"{f.comment}"</p>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-orange-600 text-white rounded-full flex items-center justify-center font-bold">
+                  {f.user_name?.charAt(0) || 'U'}
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900">{f.user_name}</h4>
+                  <p className="text-xs text-gray-400">{new Date(f.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const HomeView = ({ user }: { user: any }) => {
   const { t } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.6);
@@ -2800,7 +2887,7 @@ const TestimonialsSection = () => {
             >
               <div className="flex items-center space-x-1 text-yellow-500 mb-6">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={16} className={i < fb.rating ? 'fill-yellow-500' : 'text-gray-200'} />
+                  <Star key={i} size={16} fill={i < fb.rating ? "currentColor" : "none"} className={i < fb.rating ? "text-yellow-500" : "text-gray-200"} />
                 ))}
               </div>
               <p className="text-gray-600 italic leading-relaxed mb-8">"{fb.comment}"</p>
@@ -4012,6 +4099,12 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   const handleUpdatePaymentStatus = async () => {
     if (!selectedBooking) return;
     
+    if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
+      toast.error('This booking is already marked as PAID and cannot be updated.');
+      setIsPaymentModalOpen(false);
+      return;
+    }
+
     if (paymentStatus === 'Paid') {
       if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
         return;
@@ -4186,9 +4279,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                     {booking.status === 'confirmed' || booking.status === 'paid' ? (
                       <>
                         <button 
-                          disabled={booking.is_invoice_generated || booking.status === 'paid'}
+                          disabled={booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid'}
                           onClick={() => {
-                            if (booking.is_invoice_generated || booking.status === 'paid') {
+                            if (booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') {
                               toast.error('Amount cannot be updated after invoice generation or payment');
                               return;
                             }
@@ -4198,9 +4291,9 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                           }}
                           className={cn(
                             "p-2 rounded-xl transition-all",
-                            (booking.is_invoice_generated || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                            (booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
                           )}
-                          title={(booking.is_invoice_generated || booking.status === 'paid') ? "Amount locked after invoice or payment" : "Update Amount"}
+                          title={(booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "Amount locked after invoice or payment" : "Update Amount"}
                         >
                           <Edit2 size={18} />
                         </button>
@@ -4216,13 +4309,21 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                         </button>
                         {(booking.paymentStatus || booking.is_invoice_generated || booking.status === 'confirmed') && (
                           <button 
+                            disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
                             onClick={() => {
+                              if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
+                                toast.error('Payment status is already marked as PAID');
+                                return;
+                              }
                               setSelectedBooking(booking);
                               setPaymentStatus(booking.paymentStatus || 'Pending');
                               setIsPaymentModalOpen(true);
                             }}
-                            className="flex items-center space-x-2 px-3 py-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100"
-                            title="Update Payment Status"
+                            className={cn(
+                              "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
+                              (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
+                            )}
+                            title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
                           >
                             <CreditCard size={18} />
                             <span className="text-sm font-medium">Payment Status</span>
@@ -4943,6 +5044,13 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   }, [searchParams]);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as any);
@@ -5103,13 +5211,16 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           </div>
 
           <AnimatePresence>
-            {(isMobileMenuOpen || window.innerWidth >= 1024) && (
+            {(isMobileMenuOpen || isDesktop) && (
               <motion.div 
-                initial={window.innerWidth < 1024 ? { opacity: 0, height: 0, y: -20 } : false}
+                initial={!isDesktop ? { opacity: 0, height: 0, y: -20 } : false}
                 animate={{ opacity: 1, height: 'auto', y: 0 }}
-                exit={{ opacity: 0, height: 0, y: -20 }}
+                exit={!isDesktop ? { opacity: 0, height: 0, y: -20 } : undefined}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden sticky top-24 lg:block"
+                className={cn(
+                  "bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden sticky top-24 lg:block",
+                  !isDesktop && !isMobileMenuOpen && "hidden"
+                )}
               >
                 <motion.div 
                   initial={{ opacity: 0, y: -20 }}
@@ -5644,6 +5755,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const handleUpdatePaymentStatus = async () => {
     if (!selectedBooking) return;
     
+    if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
+      toast.error('This booking is already marked as PAID and cannot be updated.');
+      setIsPaymentModalOpen(false);
+      return;
+    }
+
     if (paymentStatus === 'Paid') {
       if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
         return;
@@ -5825,9 +5942,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
               {(b.status === 'confirmed' || b.status === 'paid') && b.ownerId === user?.uid && (
                 <>
                   <button 
-                    disabled={b.is_invoice_generated || b.status === 'paid'}
+                    disabled={b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid'}
                     onClick={() => {
-                      if (b.is_invoice_generated || b.status === 'paid') {
+                      if (b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid') {
                         toast.error('Amount cannot be updated after invoice generation or payment');
                         return;
                       }
@@ -5837,7 +5954,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     }}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      (b.is_invoice_generated || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                      (b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
                     )}
                   >
                     <Edit2 size={16} />
@@ -5852,12 +5969,20 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   </button>
                   {(b.paymentStatus || b.is_invoice_generated || b.status === 'confirmed') && (
                     <button 
+                      disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
                       onClick={() => {
+                        if (b.paymentStatus === 'Paid' || b.status === 'paid') {
+                          toast.error('Payment status is already marked as PAID');
+                          return;
+                        }
                         setSelectedBooking(b);
                         setPaymentStatus(b.paymentStatus || 'Pending');
                         setIsPaymentModalOpen(true);
                       }}
-                      className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 flex items-center space-x-2"
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
+                        (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
+                      )}
                     >
                       <CreditCard size={16} />
                       <span>Payment Status</span>
@@ -6488,10 +6613,14 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <div className="md:col-span-2">
                   <ImageUpload 
                     label="Upload Photos (Multiple)" 
-                    onUpload={(url) => setNewItem({...newItem, images: [...(newItem.images || []), url]})}
+                    onUpload={(url) => {
+                      if (url) {
+                        setNewItem({...newItem, images: [...(newItem.images || []), url]});
+                      }
+                    }}
                   />
                   <div className="grid grid-cols-4 gap-2 mt-2">
-                    {newItem.images?.map((img, i) => (
+                    {newItem.images?.filter(img => img !== '').map((img, i) => (
                       <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
                         <img src={img} className="w-full h-full object-cover" />
                         <button 
@@ -6606,6 +6735,9 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     description: '',
     priceRange: '',
     priceLevel: 'per day',
+    state: profile?.state || '',
+    district: profile?.district || '',
+    block: profile?.block || '',
     images: [''],
     availableFor: [] as string[],
   });
@@ -6620,10 +6752,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: profile?.state || '',
-        district: profile?.district || '',
-        block: profile?.block || '',
-        city: profile?.district || '',
+        state: formData.state || profile?.state || '',
+        district: formData.district || profile?.district || '',
+        block: formData.block || profile?.block || '',
+        city: formData.district || profile?.district || '',
         images: formData.images.filter(i => i !== ''),
         provider_id: user.uid,
         available_for: formData.availableFor,
@@ -6779,7 +6911,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
       if (!id) return;
       const { data, error } = await supabase.from('service_providers').select('*').eq('id', id).single();
       if (!error && data) {
-        if (data.provider_id !== user.uid) {
+        if (data.provider_id !== user.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
           navigate('/dashboard');
           return;
@@ -6962,7 +7094,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
       if (!id) return;
       const { data, error } = await supabase.from('venues').select('*').eq('id', id).single();
       if (!error && data) {
-        if (data.owner_id !== user.uid) {
+        if (data.owner_id !== user.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
           navigate('/dashboard');
           return;
@@ -7319,7 +7451,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     name: '',
     description: '',
     address: '',
-    pincode: '',
+    pincode: profile?.pincode || '',
+    state: profile?.state || '',
+    district: profile?.district || '',
+    block: profile?.block || '',
     venueType: 'Marriage Garden',
     capacity: 0,
     pricePerDay: 0,
@@ -7336,11 +7471,11 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        state: profile?.state || formData.address.split(',').pop()?.trim() || '',
-        district: profile?.district || '',
-        block: profile?.block || '',
-        pincode: profile?.pincode || '',
-        city: profile?.district || '',
+        state: formData.state || profile?.state || '',
+        district: formData.district || profile?.district || '',
+        block: formData.block || profile?.block || '',
+        pincode: formData.pincode || profile?.pincode || '',
+        city: formData.district || profile?.district || '',
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
