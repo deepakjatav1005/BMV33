@@ -64,7 +64,7 @@ export interface Review {
   id: string;
   userId: string;
   userName: string;
-  mobileNumber?: string;
+  visitorMobile?: string;
   rating: number;
   comment: string;
   createdAt: any;

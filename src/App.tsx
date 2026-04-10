@@ -293,14 +293,16 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('app_feedback').insert([{
+      const feedbackData = {
         user_id: user?.uid || 'visitor',
         user_name: user?.displayName || visitorName,
         visitor_mobile: user?.mobileNumber || visitorMobile,
         rating,
         comment,
         created_at: new Date().toISOString()
-      }]);
+      };
+      console.log('Submitting app feedback:', feedbackData);
+      const { error } = await supabase.from('app_feedback').insert([feedbackData]);
       if (error) throw error;
       toast.success('Thank you for your feedback!');
       setComment('');
@@ -440,6 +442,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
           targetType: d.target_type,
           userId: d.user_id,
           userName: d.user_name,
+          visitorMobile: d.visitor_mobile,
           createdAt: d.created_at
         }) as Review));
       }
@@ -860,7 +863,18 @@ const ImageUpload = ({
       <div className="flex items-center space-x-4">
         <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group">
           {currentImage ? (
-            <img src={currentImage} alt="Preview" className="w-full h-full object-cover" />
+            <div className="relative w-full h-full group">
+              <img src={currentImage} alt="Preview" className="w-full h-full object-cover" />
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onUpload('');
+                }}
+                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={12} />
+              </button>
+            </div>
           ) : (
             <ImageIcon className="text-gray-300" size={32} />
           )}
@@ -948,6 +962,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
               <Link to="/search" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
+              {user && <Link to="/dashboard?tab=orders" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">My Bookings</Link>}
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
               
               <button 
@@ -1010,20 +1025,21 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
 
         {/* Mobile Menu */}
     <AnimatePresence>
-      {isMenuOpen && (
-        <motion.div 
-          initial={{ opacity: 0, y: -50, scaleY: 0 }}
-          animate={{ opacity: 1, y: 0, scaleY: 1 }}
-          exit={{ opacity: 0, y: -50, scaleY: 0 }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="md:hidden bg-white border-b border-orange-100 overflow-hidden origin-top"
-        >
+        {isMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0, y: -20 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="md:hidden bg-white border-b border-orange-100 overflow-hidden"
+          >
           <div className="px-4 py-6 space-y-2">
             {[
               { to: "/", label: "Home", icon: <Home size={18} />, primary: true },
               { to: "/about", label: "About", icon: <Info size={18} /> },
               { to: "/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
               { to: "/search", label: "Search", icon: <Search size={18} /> },
+              ...(user ? [{ to: "/dashboard?tab=orders", label: "My Bookings", icon: <Calendar size={18} /> }] : []),
             ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
               <Link 
                 key={item.to}
@@ -1750,7 +1766,7 @@ const RegistrationView = () => {
       }
       
       // We'll use a dummy UID for this custom auth system or just a random one
-      const uid = 'custom_' + Date.now();
+      const uid = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       
       const profileData: any = {
         uid,
@@ -1764,8 +1780,8 @@ const RegistrationView = () => {
         state: formData.state,
         district: formData.district,
         block: formData.block,
-        pincode: formData.pincode
-        // password is omitted to avoid schema cache issues; mobile_number is used as default password
+        pincode: formData.pincode,
+        status: 'active'
       };
 
       console.log('Attempting registration with data:', profileData);
@@ -2410,9 +2426,9 @@ const ServiceTypePhotosScroll = () => {
               />
               <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-                <h3 className="text-xl font-black text-white uppercase tracking-widest drop-shadow-lg text-center px-4">{p.serviceType}</h3>
-                <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
-                <p className="text-orange-400 text-[10px] font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-tighter">Register Now →</p>
+                <div className="bg-white/90 backdrop-blur-sm px-6 py-2 rounded-full shadow-lg">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">{p.serviceType}</h3>
+                </div>
               </div>
             </motion.div>
           ))}
@@ -4926,9 +4942,12 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     }
   }, [searchParams]);
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as any);
     setSearchParams({ tab });
+    setIsMobileMenuOpen(false);
   };
 
   const fetchDashboardData = async () => {
@@ -5045,7 +5064,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
     { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
-  ];
+  ].sort((a, b) => {
+    if (a.id === 'overview') return -1;
+    if (b.id === 'overview') return 1;
+    return a.label.localeCompare(b.label);
+  });
 
   const filteredMenu = menuItems.filter(item => {
     if (profile?.role === 'admin') {
@@ -5066,52 +5089,75 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar */}
         <div className="w-full lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden sticky top-24">
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-6 bg-orange-600 text-white"
+          <div className="lg:hidden mb-4">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="w-full bg-orange-600 text-white p-4 rounded-2xl font-bold flex items-center justify-between shadow-lg"
             >
-              <h2 className="font-bold text-lg">Dashboard</h2>
-              <p className="text-xs opacity-80">Welcome, {profile?.displayName}</p>
-            </motion.div>
-            <motion.nav 
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: {
-                  opacity: 1,
-                  transition: {
-                    staggerChildren: 0.05
-                  }
-                }
-              }}
-              className="p-4 space-y-2"
-            >
-              {filteredMenu.map(item => (
-                <motion.button
-                  key={item.id}
-                  variants={{
-                    hidden: { opacity: 0, x: -20 },
-                    visible: { opacity: 1, x: 0 }
-                  }}
-                  whileHover={{ scale: 1.02, x: 5 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleTabChange(item.id)}
-                  className={cn(
-                    "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all",
-                    activeTab === item.id 
-                      ? "bg-orange-50 text-orange-600 shadow-sm" 
-                      : "text-gray-500 hover:bg-gray-50"
-                  )}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </motion.button>
-              ))}
-            </motion.nav>
+              <div className="flex items-center space-x-2">
+                <Menu size={20} />
+                <span>Dashboard Menu</span>
+              </div>
+              <ChevronDown className={cn("transition-transform", isMobileMenuOpen && "rotate-180")} />
+            </button>
           </div>
+
+          <AnimatePresence>
+            {(isMobileMenuOpen || window.innerWidth >= 1024) && (
+              <motion.div 
+                initial={window.innerWidth < 1024 ? { opacity: 0, height: 0, y: -20 } : false}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden sticky top-24 lg:block"
+              >
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-6 bg-orange-600 text-white"
+                >
+                  <h2 className="font-bold text-lg">Dashboard</h2>
+                  <p className="text-xs opacity-80">Welcome, {profile?.displayName}</p>
+                </motion.div>
+                <motion.nav 
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                      opacity: 1,
+                      transition: {
+                        staggerChildren: 0.05
+                      }
+                    }
+                  }}
+                  className="p-4 space-y-2"
+                >
+                  {filteredMenu.map(item => (
+                    <motion.button
+                      key={item.id}
+                      variants={{
+                        hidden: { opacity: 0, x: -20 },
+                        visible: { opacity: 1, x: 0 }
+                      }}
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleTabChange(item.id)}
+                      className={cn(
+                        "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold transition-all",
+                        activeTab === item.id 
+                          ? "bg-orange-50 text-orange-600 shadow-sm" 
+                          : "text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </motion.button>
+                  ))}
+                </motion.nav>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Content Area */}
@@ -6577,6 +6623,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         state: profile?.state || '',
         district: profile?.district || '',
         block: profile?.block || '',
+        city: profile?.district || '',
         images: formData.images.filter(i => i !== ''),
         provider_id: user.uid,
         available_for: formData.availableFor,
@@ -7289,10 +7336,11 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        state: profile?.state || '',
+        state: profile?.state || formData.address.split(',').pop()?.trim() || '',
         district: profile?.district || '',
         block: profile?.block || '',
         pincode: profile?.pincode || '',
+        city: profile?.district || '',
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
@@ -7549,36 +7597,33 @@ const SearchResultsView = () => {
             Clear All Filters
           </button>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+        <div className="flex flex-wrap gap-3">
           {[
-            { name: 'Venues', icon: <Building2 />, link: '/venues', color: 'bg-blue-50 text-blue-600' },
-            { name: 'Catering', icon: <UtensilsCrossed />, link: '/services?type=Caterer', color: 'bg-orange-50 text-orange-600' },
-            { name: 'DJ & Music', icon: <Music2 />, link: '/services?type=DJ and Sounds', color: 'bg-purple-50 text-purple-600' },
-            { name: 'Tent House', icon: <Tent />, link: '/services?type=Tent House', color: 'bg-green-50 text-green-600' },
-            { name: 'Photography', icon: <Camera />, link: '/services?type=Photo and Videographer', color: 'bg-pink-50 text-pink-600' },
-            { name: 'Makeup', icon: <Sparkles />, link: '/services?type=Makeup Artist', color: 'bg-rose-50 text-rose-600' },
-            { name: 'Decoration', icon: <Palette />, link: '/services?type=Light Decorator', color: 'bg-amber-50 text-amber-600' },
-            { name: 'Pandit Ji', icon: <User />, link: '/services?type=Pandit Ji Brahman', color: 'bg-red-50 text-red-600' },
-            { name: 'Mehendi', icon: <Palette />, link: '/services?type=Mehendi Service', color: 'bg-yellow-50 text-yellow-600' },
-            { name: 'Drone', icon: <Plane />, link: '/services?type=Drone Camera', color: 'bg-sky-50 text-sky-600' },
-            { name: 'Rentals', icon: <Gem />, link: '/services?type=Event Cloth and Jwellary on Rent', color: 'bg-cyan-50 text-cyan-600' },
-            { name: 'Halbai', icon: <ChefHat />, link: '/services?type=Halbai', color: 'bg-emerald-50 text-emerald-600' },
-            { name: 'Waiters', icon: <Users2 />, link: '/services?type=Waiters', color: 'bg-slate-50 text-slate-600' },
-            { name: 'Dhol Bands', icon: <Music />, link: '/services?type=Dhol Bands', color: 'bg-orange-50 text-orange-600' },
-            { name: 'Flower Decor', icon: <Flower2 />, link: '/services?type=Flower Decorator', color: 'bg-rose-50 text-rose-600' },
+            { name: 'Venues', link: '/venues', color: 'bg-blue-50 text-blue-600' },
+            { name: 'Catering', link: '/services?type=Caterer', color: 'bg-orange-50 text-orange-600' },
+            { name: 'DJ & Music', link: '/services?type=DJ and Sounds', color: 'bg-purple-50 text-purple-600' },
+            { name: 'Tent House', link: '/services?type=Tent House', color: 'bg-green-50 text-green-600' },
+            { name: 'Photography', link: '/services?type=Photo and Videographer', color: 'bg-pink-50 text-pink-600' },
+            { name: 'Makeup', link: '/services?type=Makeup Artist', color: 'bg-rose-50 text-rose-600' },
+            { name: 'Decoration', link: '/services?type=Light Decorator', color: 'bg-amber-50 text-amber-600' },
+            { name: 'Pandit Ji', link: '/services?type=Pandit Ji Brahman', color: 'bg-red-50 text-red-600' },
+            { name: 'Mehendi', link: '/services?type=Mehendi Service', color: 'bg-yellow-50 text-yellow-600' },
+            { name: 'Drone', link: '/services?type=Drone Camera', color: 'bg-sky-50 text-sky-600' },
+            { name: 'Rentals', link: '/services?type=Event Cloth and Jwellary on Rent', color: 'bg-cyan-50 text-cyan-600' },
+            { name: 'Halbai', link: '/services?type=Halbai', color: 'bg-emerald-50 text-emerald-600' },
+            { name: 'Waiters', link: '/services?type=Waiters', color: 'bg-slate-50 text-slate-600' },
+            { name: 'Dhol Bands', link: '/services?type=Dhol Bands', color: 'bg-orange-50 text-orange-600' },
+            { name: 'Flower Decor', link: '/services?type=Flower Decorator', color: 'bg-rose-50 text-rose-600' },
           ].map((cat, idx) => (
             <Link 
               key={idx}
               to={cat.link}
               className={cn(
-                "flex flex-col items-center p-6 rounded-3xl transition-all hover:shadow-xl group",
+                "px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 shadow-sm",
                 cat.color
               )}
             >
-              <div className="mb-3 transform group-hover:scale-110 transition-transform">
-                {React.cloneElement(cat.icon as React.ReactElement<any>, { size: 32 })}
-              </div>
-              <span className="text-sm font-bold">{cat.name}</span>
+              <span className="text-sm">{cat.name}</span>
             </Link>
           ))}
         </div>
