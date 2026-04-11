@@ -19,6 +19,7 @@ import {
 import { 
   Bell,
   Search, 
+  RefreshCw,
   MapPin, 
   Calendar, 
   Users, 
@@ -900,13 +901,18 @@ const ImageUpload = ({
             <div className="relative w-full h-full group">
               <img src={currentImage} alt="Preview" className="w-full h-full object-cover" />
               <button 
+                type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  onUpload('');
+                  e.stopPropagation();
+                  if (window.confirm('Are you sure you want to remove this photo?')) {
+                    onUpload('');
+                  }
                 }}
-                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
+                title="Remove Photo"
               >
-                <X size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           ) : (
@@ -2805,7 +2811,9 @@ const HomeView = ({ user }: { user: any }) => {
       </section>
 
       {/* Testimonials Section */}
-      <TestimonialsSection />
+      <div id="testimonials">
+        <TestimonialsSection />
+      </div>
     </div>
   );
 };
@@ -2889,20 +2897,27 @@ const TestimonialsSection = () => {
           <h2 className="text-4xl font-black text-gray-900 tracking-tight mb-4">What Our Users Say</h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-8">Real stories from real people who planned their perfect events with us.</p>
           
-          {/* App Rating Summary */}
-          <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3 mb-2">
-              <span className="text-4xl font-black text-gray-900">{appRating}</span>
-              <div className="flex items-center text-yellow-500">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} />
-                ))}
-              </div>
-            </div>
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-              Overall App Rating ({totalFeedback} Reviews)
-            </p>
+      {/* App Rating Summary */}
+      <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+        <div className="flex items-center space-x-3 mb-2">
+          <span className="text-4xl font-black text-gray-900">{appRating || '0.0'}</span>
+          <div className="flex items-center text-yellow-500">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} className={i < Math.round(appRating) ? "text-yellow-500" : "text-gray-200"} />
+            ))}
           </div>
+        </div>
+        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+          Overall App Rating ({totalFeedback} Reviews)
+        </p>
+        <button 
+          onClick={fetchFeedbacks}
+          className="mt-4 text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center space-x-1"
+        >
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          <span>Refresh Reviews</span>
+        </button>
+      </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -4136,18 +4151,23 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     }
 
     try {
+      console.log('Updating payment status for booking:', selectedBooking.id, 'to:', paymentStatus);
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Payment update error:', error);
+        throw error;
+      }
 
       toast.success(`Payment status updated to ${paymentStatus}`);
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
       fetchBookings();
     } catch (err) {
+      console.error('Payment status update failed:', err);
       toast.error('Failed to update payment status');
     }
   };
@@ -5242,7 +5262,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const filteredMenu = menuItems.filter(item => {
     if (profile?.role === 'admin') {
-      return item.id === 'profile';
+      return true; // Admins can see everything
     }
     return !item.roles || item.roles.includes(profile?.role || '');
   });
@@ -5270,6 +5290,31 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               </div>
               <ChevronDown className={cn("transition-transform", isMobileMenuOpen && "rotate-180")} />
             </button>
+          </div>
+
+          <div className="lg:hidden mb-6 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex space-x-2 min-w-max">
+              {filteredMenu.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    handleTabChange(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={cn(
+                    "px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all",
+                    activeTab === item.id 
+                      ? "bg-orange-600 text-white shadow-md" 
+                      : "bg-white text-gray-500 border border-gray-100"
+                  )}
+                >
+                  <div className="flex items-center space-x-2">
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           <AnimatePresence>
@@ -5304,7 +5349,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       }
                     }
                   }}
-                  className="p-4 space-y-2"
+                  className="p-4 space-y-2 max-h-[60vh] overflow-y-auto lg:max-h-none"
                 >
                   {filteredMenu.map(item => (
                     <motion.button
@@ -5824,12 +5869,16 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     }
 
     try {
+      console.log('Updating payment status for booking:', selectedBooking.id, 'to:', paymentStatus);
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Payment update error:', error);
+        throw error;
+      }
 
       if (onUpdate) onUpdate();
       
@@ -5837,6 +5886,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
     } catch (err) {
+      console.error('Payment status update failed:', err);
       toast.error('Failed to update payment status');
     }
   };
