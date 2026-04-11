@@ -271,6 +271,7 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
   const [visitorName, setVisitorName] = useState('');
   const [visitorMobile, setVisitorMobile] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,12 +305,28 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
       console.log('Submitting app feedback:', feedbackData);
       const { error } = await supabase.from('app_feedback').insert([feedbackData]);
       if (error) throw error;
-      toast.success('Thank you for your feedback!');
+      
+      toast.success('Thank you for your feedback!', {
+        duration: 5000,
+        icon: '🌟',
+        style: {
+          borderRadius: '10px',
+          background: '#333',
+          color: '#fff',
+        },
+      });
+      
       setComment('');
       setVisitorName('');
       setVisitorMobile('');
       setRating(5);
-      onClose();
+      setIsSuccess(true);
+      
+      // Close after 3 seconds of showing success message
+      setTimeout(() => {
+        setIsSuccess(false);
+        onClose();
+      }, 3000);
     } catch (err) {
       toast.error('Failed to submit feedback');
     } finally {
@@ -326,15 +343,30 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden"
       >
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">Rate Our App</h3>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <X size={24} />
-            </button>
+        {isSuccess ? (
+          <div className="p-12 text-center">
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", damping: 12 }}
+              className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"
+            >
+              <Check size={40} strokeWidth={3} />
+            </motion.div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h3>
+            <p className="text-gray-600">Your feedback has been successfully recorded. We appreciate your support!</p>
           </div>
+        ) : (
+          <div className="p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Rate Our App</h3>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <X size={24} />
+              </button>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* ... existing form fields ... */}
             <div className="flex flex-col items-center py-4 bg-orange-50 rounded-2xl">
               <span className="text-sm font-bold text-orange-600 mb-3 uppercase tracking-wider">Your Experience</span>
               <div className="flex items-center space-x-2">
@@ -407,6 +439,7 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
             </button>
           </form>
         </div>
+        )}
       </motion.div>
     </div>
   );
@@ -1334,7 +1367,9 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
           <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{venue.name}</h3>
           <div className="flex items-center space-x-1 bg-orange-50 px-2 py-0.5 rounded-lg">
             <Star size={12} className="text-yellow-500 fill-yellow-500" />
-            <span className="text-[10px] font-bold text-orange-700">{venue.rating > 0 ? venue.rating : 'New'}</span>
+            <span className="text-[10px] font-bold text-orange-700">
+              {venue.rating > 0 ? `${venue.rating} (${venue.reviewCount || 0})` : 'New'}
+            </span>
           </div>
         </div>
         <div className="flex items-center text-gray-500 text-sm mb-3">
@@ -1379,7 +1414,9 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
             <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{service.name}</h3>
             <div className="flex items-center space-x-1 bg-purple-50 px-2 py-0.5 rounded-lg">
               <Star size={12} className="text-yellow-500 fill-yellow-500" />
-              <span className="text-[10px] font-bold text-purple-700">{service.rating > 0 ? service.rating : 'New'}</span>
+              <span className="text-[10px] font-bold text-purple-700">
+                {service.rating > 0 ? `${service.rating} (${service.reviewCount || 0})` : 'New'}
+              </span>
             </div>
           </div>
           <div className="flex items-center text-gray-500 text-sm mb-3">
@@ -2495,79 +2532,6 @@ const TermsView = () => {
   );
 };
 
-const AppFeedbackList = () => {
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchFeedbacks = async () => {
-      const { data, error } = await supabase
-        .from('app_feedback')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (!error && data) {
-        setFeedbacks(data);
-      }
-      setLoading(false);
-    };
-
-    fetchFeedbacks();
-
-    const channel = supabase
-      .channel('app_feedback_home')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_feedback' }, fetchFeedbacks)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  if (loading) return null;
-  if (feedbacks.length === 0) return null;
-
-  return (
-    <section className="py-20 bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-black text-gray-900 mb-4">What Our Users Say</h2>
-          <p className="text-gray-500">Latest feedback from our community</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {feedbacks.map((f, i) => (
-            <motion.div 
-              key={f.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              viewport={{ once: true }}
-              className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 shadow-sm hover:shadow-md transition-all"
-            >
-              <div className="flex items-center space-x-1 text-yellow-500 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={18} fill={i < f.rating ? "currentColor" : "none"} className={i < f.rating ? "" : "text-gray-300"} />
-                ))}
-              </div>
-              <p className="text-gray-700 italic mb-6 leading-relaxed">"{f.comment}"</p>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-orange-600 text-white rounded-full flex items-center justify-center font-bold">
-                  {f.user_name?.charAt(0) || 'U'}
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-900">{f.user_name}</h4>
-                  <p className="text-xs text-gray-400">{new Date(f.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
 
 const HomeView = ({ user }: { user: any }) => {
   const { t } = useTranslation();
@@ -2594,23 +2558,25 @@ const HomeView = ({ user }: { user: any }) => {
     const fetchHomeData = async () => {
       setLoading(true);
       try {
-        const { data: vData } = await supabase.from('venues').select('*').gte('rating', 4).limit(3);
+        const { data: vData } = await supabase.from('venues').select('*').order('rating', { ascending: false }).limit(6);
         if (vData) setFeaturedVenues(vData.map(d => ({ 
           ...d, 
           ownerId: d.owner_id, 
           venueType: d.venue_type, 
           pricePerDay: d.price_per_day, 
-          reviewCount: d.review_count,
+          rating: d.rating || 0,
+          reviewCount: d.review_count || 0,
           createdAt: d.created_at 
         }) as Venue));
 
-        const { data: sData } = await supabase.from('service_providers').select('*').gte('rating', 4).limit(4);
+        const { data: sData } = await supabase.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
         if (sData) setFeaturedServices(sData.map(d => ({ 
           ...d, 
           providerId: d.provider_id, 
           serviceType: d.service_type, 
           priceRange: d.price_range, 
-          reviewCount: d.review_count,
+          rating: d.rating || 0,
+          reviewCount: d.review_count || 0,
           createdAt: d.created_at 
         }) as ServiceProvider));
 
@@ -2628,6 +2594,20 @@ const HomeView = ({ user }: { user: any }) => {
 
     fetchHomeData();
 
+    const venueChannel = supabase
+      .channel('home_venues')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => {
+        fetchHomeData();
+      })
+      .subscribe();
+
+    const providerChannel = supabase
+      .channel('home_providers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, () => {
+        fetchHomeData();
+      })
+      .subscribe();
+
     const channel = supabase
       .channel('home_notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
@@ -2636,6 +2616,8 @@ const HomeView = ({ user }: { user: any }) => {
       .subscribe();
 
     return () => {
+      supabase.removeChannel(venueChannel);
+      supabase.removeChannel(providerChannel);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -2828,11 +2810,15 @@ const HomeView = ({ user }: { user: any }) => {
   );
 };
 
+// --- Testimonials Section Component ---
 const TestimonialsSection = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [appRating, setAppRating] = useState(0);
+  const [totalFeedback, setTotalFeedback] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchFeedbacks = async () => {
+  const fetchFeedbacks = async () => {
+    try {
       const { data, error } = await supabase
         .from('app_feedback')
         .select('*')
@@ -2848,9 +2834,26 @@ const TestimonialsSection = () => {
           comment: d.comment,
           createdAt: d.created_at
         })));
-      }
-    };
 
+        // Calculate average rating
+        const { data: allData } = await supabase.from('app_feedback').select('rating');
+        if (allData && allData.length > 0) {
+          const sum = allData.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+          setAppRating(parseFloat((sum / allData.length).toFixed(1)));
+          setTotalFeedback(allData.length);
+        } else {
+          setAppRating(0);
+          setTotalFeedback(0);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching testimonials:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchFeedbacks();
 
     const channel = supabase
@@ -2865,14 +2868,41 @@ const TestimonialsSection = () => {
     };
   }, []);
 
-  if (feedbacks.length === 0) return null;
+  if (loading) return null;
+  
+  // If no feedbacks, show a placeholder or nothing
+  if (feedbacks.length === 0) {
+    return (
+      <section className="py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h2 className="text-4xl font-black text-gray-900 mb-4">What Our Users Say</h2>
+          <p className="text-gray-500">No reviews yet. Be the first to rate us!</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-24 bg-gray-50 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-black text-gray-900 tracking-tight mb-4">What Our Users Say</h2>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto">Real stories from real people who planned their perfect events with us.</p>
+          <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-8">Real stories from real people who planned their perfect events with us.</p>
+          
+          {/* App Rating Summary */}
+          <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-4xl font-black text-gray-900">{appRating}</span>
+              <div className="flex items-center text-yellow-500">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} />
+                ))}
+              </div>
+            </div>
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+              Overall App Rating ({totalFeedback} Reviews)
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -4105,12 +4135,6 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       return;
     }
 
-    if (paymentStatus === 'Paid') {
-      if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
-        return;
-      }
-    }
-
     try {
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
@@ -4688,6 +4712,44 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                   <button onClick={() => setIsInvoiceModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
                   <button onClick={confirmInvoice} className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200">Generate & Send</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-2xl font-bold mb-6">Update Payment Status</h3>
+            <div className="space-y-6">
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
+                <div className="font-bold text-gray-900">{selectedBooking?.partyName || selectedBooking?.visitorName}</div>
+                <div className="text-sm text-gray-500">{selectedBooking?.targetName}</div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-3 text-gray-700">Payment Status</label>
+                <div className="flex space-x-4">
+                  {['Pending', 'Paid'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setPaymentStatus(status as any)}
+                      className={cn(
+                        "flex-1 py-3 px-4 rounded-xl font-bold border transition-all",
+                        paymentStatus === status ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
+                <button onClick={handleUpdatePaymentStatus} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200">Update Status</button>
               </div>
             </div>
           </div>
@@ -5761,12 +5823,6 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       return;
     }
 
-    if (paymentStatus === 'Paid') {
-      if (!window.confirm('Are you sure you want to mark this transaction as PAID? Once confirmed, it will be moved to the Reports section.')) {
-        return;
-      }
-    }
-
     try {
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
@@ -6819,6 +6875,38 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <option value="Other Related Services">Other Related Services</option>
             </select>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.district}
+                onChange={(e) => setFormData({...formData, district: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.block}
+                onChange={(e) => setFormData({...formData, block: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.state}
+                onChange={(e) => setFormData({...formData, state: e.target.value})}
+              />
+            </div>
+          </div>
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Price Range (e.g. ₹10k - ₹50k)</label>
@@ -6940,17 +7028,18 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: profile?.state || formData.state,
-        district: profile?.district || formData.district,
-        block: profile?.block || formData.block,
+        state: formData.state,
+        district: formData.district,
+        block: formData.block,
         images: formData.images,
         available_for: formData.availableFor
       }).eq('id', id);
       if (error) throw error;
       toast.success('Service updated successfully!');
       navigate('/dashboard');
-    } catch (err) {
-      toast.error('Failed to update service');
+    } catch (err: any) {
+      console.error('Edit Service Error:', err);
+      toast.error(`Failed to update service: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -7029,6 +7118,38 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
                 <option value="as per plate">as per plate</option>
                 <option value="as per work">as per work</option>
               </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.district}
+                onChange={(e) => setFormData({...formData, district: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.block}
+                onChange={(e) => setFormData({...formData, block: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.state}
+                onChange={(e) => setFormData({...formData, state: e.target.value})}
+              />
             </div>
           </div>
           <div className="md:col-span-2">
@@ -7121,9 +7242,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        state: profile?.state || formData.state,
-        district: profile?.district || formData.district,
-        block: profile?.block || formData.block,
+        state: formData.state,
+        district: formData.district,
+        block: formData.block,
         pincode: formData.pincode,
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
@@ -7134,8 +7255,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
       if (error) throw error;
       toast.success('Venue updated successfully!');
       navigate('/dashboard');
-    } catch (err) {
-      toast.error('Failed to update venue');
+    } catch (err: any) {
+      console.error('Edit Venue Error:', err);
+      toast.error(`Failed to update venue: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -7190,14 +7312,46 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.district}
+                onChange={(e) => setFormData({...formData, district: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.block}
+                onChange={(e) => setFormData({...formData, block: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.state}
+                onChange={(e) => setFormData({...formData, state: e.target.value})}
+              />
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Capacity (Guests)</label>
             <input 
               required
               type="number" 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.capacity}
-              onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value)})}
+              value={formData.capacity || ''}
+              onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value) || 0})}
             />
           </div>
           <div>
@@ -7206,8 +7360,8 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               required
               type="number" 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.pricePerDay}
-              onChange={(e) => setFormData({...formData, pricePerDay: parseInt(e.target.value)})}
+              value={formData.pricePerDay || ''}
+              onChange={(e) => setFormData({...formData, pricePerDay: parseInt(e.target.value) || 0})}
             />
           </div>
           <div className="md:col-span-2">
@@ -7447,6 +7601,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
 
 const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | null }) => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -7465,6 +7620,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const { error } = await supabase.from('venues').insert([{
         name: formData.name,
@@ -7488,8 +7644,11 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
       if (error) throw error;
       toast.success('Venue added successfully!');
       navigate('/dashboard');
-    } catch (err) {
-      toast.error('Failed to add venue');
+    } catch (err: any) {
+      console.error('Add Venue Error:', err);
+      toast.error(`Failed to add venue: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -7531,14 +7690,56 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.district}
+                onChange={(e) => setFormData({...formData, district: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.block}
+                onChange={(e) => setFormData({...formData, block: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                value={formData.state}
+                onChange={(e) => setFormData({...formData, state: e.target.value})}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Pincode</label>
+            <input 
+              required
+              type="text" 
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              value={formData.pincode}
+              onChange={(e) => setFormData({...formData, pincode: e.target.value})}
+            />
+          </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Capacity (Guests)</label>
             <input 
               required
               type="number" 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.capacity}
-              onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value)})}
+              value={formData.capacity || ''}
+              onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value) || 0})}
             />
           </div>
           <div>
@@ -7547,8 +7748,8 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               required
               type="number" 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-              value={formData.pricePerDay}
-              onChange={(e) => setFormData({...formData, pricePerDay: parseInt(e.target.value)})}
+              value={formData.pricePerDay || ''}
+              onChange={(e) => setFormData({...formData, pricePerDay: parseInt(e.target.value) || 0})}
             />
           </div>
           <div className="md:col-span-2">
@@ -7603,9 +7804,13 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         </div>
         <button 
           type="submit"
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg"
+          disabled={loading}
+          className={cn(
+            "w-full bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg",
+            loading ? "opacity-70 cursor-not-allowed" : "hover:bg-orange-700"
+          )}
         >
-          List Venue
+          {loading ? 'Adding Venue...' : 'List Venue'}
         </button>
       </form>
     </div>
@@ -8111,7 +8316,7 @@ export default function App() {
     initAndSeed();
   }, []);
 
-  const [appRating, setAppRating] = useState(4.9);
+  const [appRating, setAppRating] = useState(0);
   const [totalFeedback, setTotalFeedback] = useState(0);
 
   useEffect(() => {
@@ -8120,11 +8325,16 @@ export default function App() {
         .from('app_feedback')
         .select('rating');
       
-      if (!error && data && data.length > 0) {
-        const sum = data.reduce((acc, curr) => acc + (curr.rating || 0), 0);
-        const avg = sum / data.length;
-        setAppRating(parseFloat(avg.toFixed(1)));
-        setTotalFeedback(data.length);
+      if (!error && data) {
+        if (data.length > 0) {
+          const sum = data.reduce((acc, curr) => acc + (curr.rating || 0), 0);
+          const avg = sum / data.length;
+          setAppRating(parseFloat(avg.toFixed(1)));
+          setTotalFeedback(data.length);
+        } else {
+          setAppRating(0);
+          setTotalFeedback(0);
+        }
       }
     };
     fetchAppRating();
