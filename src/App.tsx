@@ -90,6 +90,58 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
 import { format } from 'date-fns';
 
+// --- Components ---
+const ConfirmModal = ({ 
+  isOpen, 
+  title, 
+  message, 
+  onConfirm, 
+  onCancel, 
+  confirmText = 'Confirm', 
+  cancelText = 'Cancel', 
+  isDanger = false 
+}: { 
+  isOpen: boolean, 
+  title: string, 
+  message: string, 
+  onConfirm: () => void, 
+  onCancel: () => void, 
+  confirmText?: string, 
+  cancelText?: string, 
+  isDanger?: boolean 
+}) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8"
+      >
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">{title}</h3>
+        <p className="text-gray-600 mb-8">{message}</p>
+        <div className="flex space-x-4">
+          <button 
+            onClick={onCancel}
+            className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+          >
+            {cancelText}
+          </button>
+          <button 
+            onClick={onConfirm}
+            className={cn(
+              "flex-1 py-3 rounded-xl font-bold text-white transition-all shadow-lg",
+              isDanger ? "bg-red-600 hover:bg-red-700 shadow-red-200" : "bg-orange-600 hover:bg-orange-700 shadow-orange-200"
+            )}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 import { supabase } from './supabase';
 import { locations } from './data/locations';
 import { cn } from './lib/utils';
@@ -322,12 +374,13 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
       setVisitorMobile('');
       setRating(5);
       setIsSuccess(true);
+      console.log('App feedback submitted successfully');
       
-      // Close after 3 seconds of showing success message
+      // Close after 5 seconds of showing success message
       setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 3000);
+      }, 5000);
     } catch (err) {
       toast.error('Failed to submit feedback');
     } finally {
@@ -355,7 +408,13 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
               <Check size={40} strokeWidth={3} />
             </motion.div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h3>
-            <p className="text-gray-600">Your feedback has been successfully recorded. We appreciate your support!</p>
+            <p className="text-gray-600 mb-8">Your feedback has been successfully recorded. We appreciate your support!</p>
+            <button 
+              onClick={onClose}
+              className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition-all"
+            >
+              Close
+            </button>
           </div>
         ) : (
           <div className="p-8">
@@ -460,6 +519,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
   const [visitorMobile, setVisitorMobile] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -559,9 +619,14 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
       setVisitorName('');
       setVisitorMobile('');
       setRating(5);
-      setShowForm(false);
+      setIsSuccess(true);
       toast.success('Review submitted successfully!');
       onReviewAdded();
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        setShowForm(false);
+      }, 3000);
     } catch (err) {
       console.error('Review error:', err);
       toast.error('Failed to submit review');
@@ -589,7 +654,25 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
           animate={{ opacity: 1, y: 0 }}
           className="bg-orange-50 p-6 rounded-3xl border border-orange-100"
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {isSuccess ? (
+            <div className="py-12 text-center">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check size={32} />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">Thank You!</h4>
+              <p className="text-gray-600 mb-6">Your review has been submitted successfully.</p>
+              <button 
+                onClick={() => {
+                  setIsSuccess(false);
+                  setShowForm(false);
+                }}
+                className="px-8 py-2 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center space-x-4 mb-4">
               <span className="text-sm font-bold text-gray-700">Your Rating:</span>
               <div className="flex items-center space-x-1">
@@ -665,8 +748,9 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
               </button>
             </div>
           </form>
-        </motion.div>
-      )}
+        )}
+      </motion.div>
+    )}
 
       <div className="space-y-6">
         {reviews.length > 0 ? (
@@ -905,9 +989,7 @@ const ImageUpload = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (window.confirm('Are you sure you want to remove this photo?')) {
-                    onUpload('');
-                  }
+                  onUpload('');
                 }}
                 className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors z-10"
                 title="Remove Photo"
@@ -2589,8 +2671,21 @@ const HomeView = ({ user }: { user: any }) => {
         const { data: bData } = await supabase.from('banners').select('*').eq('is_active', true);
         if (bData) setBanners(bData.map(d => ({ id: d.id, title: d.title, imageUrl: d.image_url, link: d.link, isActive: d.is_active, createdAt: d.created_at }) as AppBanner));
 
-        const { data: nData } = await supabase.from('notifications').select('*').eq('is_active', true).order('created_at', { ascending: false });
-        if (nData) setNotifications(nData.map(d => ({ id: d.id, title: d.title, message: d.message, createdAt: d.created_at }) as AppNotification));
+        let { data: nData, error: nError } = await supabase.from('notifications').select('*').eq('is_active', true).order('created_at', { ascending: false });
+        
+        // Fallback if is_active column is missing
+        if (nError && nError.message.includes('is_active')) {
+          console.warn('is_active column missing in notifications, falling back');
+          const { data: fallbackData, error: fallbackError } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+          nData = fallbackData;
+          nError = fallbackError;
+        }
+
+        if (nError) console.error('Notifications fetch error:', nError);
+        if (nData) {
+          console.log('Fetched notifications:', nData.length);
+          setNotifications(nData.map(d => ({ id: d.id, title: d.title, message: d.message, createdAt: d.created_at }) as AppNotification));
+        }
       } catch (err) {
         console.error('Home data error:', err);
       } finally {
@@ -2630,9 +2725,9 @@ const HomeView = ({ user }: { user: any }) => {
 
   return (
     <div className="pb-20 pt-16">
-      {/* Notifications Bar */}
+      {/* Notifications Bar - Sticky below header */}
       {notifications.length > 0 && (
-        <div className="bg-orange-600 text-white py-2 overflow-hidden relative">
+        <div className="sticky top-[64px] z-40 bg-orange-600 text-white py-2 overflow-hidden shadow-md">
           <div className="flex animate-marquee-ltr whitespace-nowrap">
             {notifications.map(n => (
               <span key={n.id} className="mx-10 font-medium flex items-center">
@@ -2827,13 +2922,20 @@ const TestimonialsSection = () => {
 
   const fetchFeedbacks = async () => {
     try {
+      console.log('Fetching app feedback...');
       const { data, error } = await supabase
         .from('app_feedback')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
       
-      if (!error && data) {
+      if (error) {
+        console.error('Supabase error fetching feedback:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Fetched app feedback count:', data.length);
         setFeedbacks(data.map(d => ({
           id: d.id,
           userId: d.user_id,
@@ -2844,8 +2946,10 @@ const TestimonialsSection = () => {
         })));
 
         // Calculate average rating
-        const { data: allData } = await supabase.from('app_feedback').select('rating');
-        if (allData && allData.length > 0) {
+        const { data: allData, error: allErr } = await supabase.from('app_feedback').select('rating');
+        if (allErr) {
+          console.error('Error fetching all ratings:', allErr);
+        } else if (allData && allData.length > 0) {
           const sum = allData.reduce((acc, curr) => acc + (curr.rating || 0), 0);
           setAppRating(parseFloat((sum / allData.length).toFixed(1)));
           setTotalFeedback(allData.length);
@@ -3080,6 +3184,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         venueType: data.venue_type,
         pricePerDay: data.price_per_day,
         reviewCount: data.review_count,
+        availableFor: data.available_for,
         createdAt: data.created_at
       } as Venue);
 
@@ -3155,7 +3260,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       });
 
       if (hasConflict) {
-        const proceed = window.confirm('This time slot is already booked for this venue. Do you still want to send a booking query?');
+        const proceed = true;
         if (!proceed) {
           setBookingStatus('idle');
           return;
@@ -3276,6 +3381,20 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
             <div className="prose max-w-none text-gray-600 leading-relaxed">
               <h3 className="text-xl font-bold text-gray-900 mb-4">About this Venue</h3>
               <p>{venue.description}</p>
+            </div>
+
+            <div className="mt-10">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Available For</h3>
+              <div className="flex flex-wrap gap-2">
+                {venue.availableFor?.map((item, idx) => (
+                  <span key={idx} className="bg-orange-50 text-orange-700 px-4 py-2 rounded-xl text-sm font-bold border border-orange-100">
+                    {item}
+                  </span>
+                ))}
+                {(!venue.availableFor || venue.availableFor.length === 0) && (
+                  <span className="text-gray-400 italic text-sm">No specific event types listed</span>
+                )}
+              </div>
             </div>
 
             <div className="mt-10">
@@ -3529,6 +3648,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         serviceType: data.service_type,
         priceRange: data.price_range,
         reviewCount: data.review_count,
+        availableFor: data.available_for,
         createdAt: data.created_at
       } as ServiceProvider);
 
@@ -3608,7 +3728,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       });
 
       if (hasConflict) {
-        const proceed = window.confirm('This time slot is already booked for this service. Do you still want to send a booking query?');
+        const proceed = true;
         if (!proceed) {
           setBookingStatus('idle');
           return;
@@ -3728,6 +3848,20 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       <div className="max-w-7xl mx-auto px-4 mt-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-12">
+            <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900">Available For</h3>
+              <div className="flex flex-wrap gap-3">
+                {service.availableFor?.map((item, idx) => (
+                  <span key={idx} className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold border border-purple-100">
+                    {item}
+                  </span>
+                ))}
+                {(!service.availableFor || service.availableFor.length === 0) && (
+                  <span className="text-gray-400 italic text-sm">No specific event types listed</span>
+                )}
+              </div>
+            </section>
+
             <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
               <h3 className="text-2xl font-bold mb-6 text-gray-900">About this Service</h3>
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{service.description}</p>
@@ -4151,14 +4285,15 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     }
 
     try {
-      console.log('Updating payment status for booking:', selectedBooking.id, 'to:', paymentStatus);
+      console.log('Updating payment status for booking (Dashboard):', selectedBooking.id, 'to:', paymentStatus);
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
       if (error) {
-        console.error('Payment update error:', error);
+        console.error('Payment update error (Dashboard):', error);
+        toast.error(`Error: ${error.message}`);
         throw error;
       }
 
@@ -4167,7 +4302,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       setSelectedBooking(null);
       fetchBookings();
     } catch (err) {
-      console.error('Payment status update failed:', err);
+      console.error('Payment status update failed (Dashboard):', err);
       toast.error('Failed to update payment status');
     }
   };
@@ -5869,14 +6004,15 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     }
 
     try {
-      console.log('Updating payment status for booking:', selectedBooking.id, 'to:', paymentStatus);
+      console.log('Updating payment status for booking (PaymentModal):', selectedBooking.id, 'to:', paymentStatus);
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
       if (error) {
-        console.error('Payment update error:', error);
+        console.error('Payment update error (PaymentModal):', error);
+        toast.error(`Error: ${error.message}`);
         throw error;
       }
 
@@ -5886,7 +6022,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
     } catch (err) {
-      console.error('Payment status update failed:', err);
+      console.error('Payment status update failed (PaymentModal):', err);
       toast.error('Failed to update payment status');
     }
   };
@@ -6868,7 +7004,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         rating: 0,
         review_count: 0
       }]);
-      if (error) throw error;
+      if (error) {
+        console.error('Add Service Supabase Error:', error);
+        throw error;
+      }
       toast.success('Service added successfully!');
       navigate('/dashboard?tab=services');
     } catch (err: any) {
@@ -7691,7 +7830,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         rating: 0,
         review_count: 0
       }]);
-      if (error) throw error;
+      if (error) {
+        console.error('Add Venue Supabase Error:', error);
+        throw error;
+      }
       toast.success('Venue added successfully!');
       navigate('/dashboard');
     } catch (err: any) {
@@ -8566,6 +8708,18 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [newBanner, setNewBanner] = useState({ title: '', imageUrl: '' });
   const [isServicePhotoModalOpen, setIsServicePhotoModalOpen] = useState(false);
   const [newServicePhoto, setNewServicePhoto] = useState({ serviceType: 'Caterer' as ServiceType, imageUrl: '' });
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDanger?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   const [editingNotification, setEditingNotification] = useState<AppNotification | null>(null);
 
   // Admin profile state
@@ -8711,36 +8865,64 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const deleteNotification = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this notification?')) return;
-    const { error } = await supabase.from('notifications').delete().eq('id', id);
-    if (!error) {
-      toast.success('Notification deleted');
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } else {
-      toast.error('Failed to delete notification');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Notification',
+      message: 'Are you sure you want to delete this notification?',
+      isDanger: true,
+      onConfirm: async () => {
+        const { error } = await supabase.from('notifications').delete().eq('id', id);
+        if (!error) {
+          toast.success('Notification deleted');
+          setNotifications(prev => prev.filter(n => n.id !== id));
+        } else {
+          toast.error('Failed to delete notification');
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const deleteBanner = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this banner?')) return;
-    const { error } = await supabase.from('banners').delete().eq('id', id);
-    if (!error) {
-      toast.success('Banner deleted');
-      setBanners(prev => prev.filter(b => b.id !== id));
-    } else {
-      toast.error('Failed to delete banner');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Banner',
+      message: 'Are you sure you want to delete this banner?',
+      isDanger: true,
+      onConfirm: async () => {
+        console.log('Deleting banner:', id);
+        const { error } = await supabase.from('banners').delete().eq('id', id);
+        if (!error) {
+          toast.success('Banner deleted');
+          setBanners(prev => prev.filter(b => b.id !== id));
+        } else {
+          console.error('Delete banner error:', error);
+          toast.error(`Failed to delete banner: ${error.message}`);
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const deleteServicePhoto = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this service photo?')) return;
-    const { error } = await supabase.from('service_type_photos').delete().eq('id', id);
-    if (!error) {
-      toast.success('Service photo deleted');
-      setServicePhotos(prev => prev.filter(p => p.id !== id));
-    } else {
-      toast.error('Failed to delete service photo');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Service Photo',
+      message: 'Are you sure you want to delete this service photo?',
+      isDanger: true,
+      onConfirm: async () => {
+        console.log('Deleting service photo:', id);
+        const { error } = await supabase.from('service_type_photos').delete().eq('id', id);
+        if (!error) {
+          toast.success('Service photo deleted');
+          setServicePhotos(prev => prev.filter(p => p.id !== id));
+        } else {
+          console.error('Delete service photo error:', error);
+          toast.error(`Failed to delete service photo: ${error.message}`);
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const toggleUserStatus = async (uid: string, currentStatus: string) => {
@@ -9491,6 +9673,14 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           )}
         </div>
       </div>
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        isDanger={confirmConfig.isDanger}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };
