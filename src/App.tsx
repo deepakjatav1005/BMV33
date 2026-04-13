@@ -352,12 +352,19 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
         user_name: user?.displayName || visitorName,
         visitor_mobile: user?.mobileNumber || visitorMobile,
         rating,
-        comment,
-        created_at: new Date().toISOString()
+        comment
       };
       console.log('Submitting app feedback:', feedbackData);
       const { error } = await supabase.from('app_feedback').insert([feedbackData]);
-      if (error) throw error;
+      if (error) {
+        console.error('App Feedback Error:', error);
+        if (error.message.includes('column "visitor_mobile" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Database schema error: visitor_mobile column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        } else {
+          toast.error(`Failed to submit feedback: ${error.message}`);
+        }
+        throw error;
+      }
       
       toast.success('Thank you for your feedback!', {
         duration: 5000,
@@ -588,12 +595,19 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
         user_name: user?.displayName || visitorName,
         visitor_mobile: user?.mobileNumber || visitorMobile,
         rating,
-        comment,
-        created_at: new Date().toISOString()
+        comment
       };
 
       const { error: rError } = await supabase.from('reviews').insert([reviewData]);
-      if (rError) throw rError;
+      if (rError) {
+        console.error('Add Review Error:', rError);
+        if (rError.message.includes('column "visitor_mobile" does not exist') || rError.message.includes('column "target_type" does not exist') || rError.message.includes('schema cache')) {
+          toast.error('Database schema error: missing columns in reviews or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        } else {
+          toast.error(`Failed to submit review: ${rError.message}`);
+        }
+        throw rError;
+      }
       
       // Update average rating and review count on target document
       // Fetch all reviews for this target to get accurate average
@@ -4091,7 +4105,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     eventType: '',
     targetId: '',
     targetName: '',
-    paymentMode: 'Cash'
+    paymentMode: 'Cash',
+    totalAmount: 0
   });
   const [venues, setVenues] = useState<Venue[]>([]);
   const [services, setServices] = useState<ServiceProvider[]>([]);
@@ -4122,6 +4137,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         partyAddress: d.party_address,
         visitorName: d.visitor_name,
         visitorMobile: d.visitor_mobile,
+        startTime: d.start_time,
+        endTime: d.end_time,
         status: d.status,
         isManual: d.is_manual,
         totalAmount: d.total_amount || 0,
@@ -4276,7 +4293,10 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
   };
 
   const handleUpdatePaymentStatus = async () => {
-    if (!selectedBooking) return;
+    if (!selectedBooking) {
+      console.error('No booking selected for payment update');
+      return;
+    }
     
     if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
       toast.error('This booking is already marked as PAID and cannot be updated.');
@@ -4284,16 +4304,26 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       return;
     }
 
+    setLoading(true);
     try {
-      console.log('Updating payment status for booking (Dashboard):', selectedBooking.id, 'to:', paymentStatus);
+      console.log('Attempting to update payment status:', {
+        bookingId: selectedBooking.id,
+        newPaymentStatus: paymentStatus,
+        currentStatus: selectedBooking.status
+      });
+
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
       if (error) {
-        console.error('Payment update error (Dashboard):', error);
-        toast.error(`Error: ${error.message}`);
+        console.error('Supabase Payment Update Error:', error);
+        if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        } else {
+          toast.error(`Error: ${error.message}`);
+        }
         throw error;
       }
 
@@ -4301,9 +4331,11 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
       fetchBookings();
-    } catch (err) {
-      console.error('Payment status update failed (Dashboard):', err);
-      toast.error('Failed to update payment status');
+    } catch (err: any) {
+      console.error('Payment status update failed:', err);
+      toast.error(`Failed to update payment status: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -4319,6 +4351,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       return;
     }
 
+    setLoading(true);
     try {
       const { error } = await supabase.from('bookings').insert([{
         user_id: user.uid,
@@ -4327,7 +4360,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         target_type: venues.find(v => v.id === manualBooking.targetId) ? 'venue' : 'service',
         target_name: manualBooking.targetName,
         event_date: manualBooking.eventDate,
-        end_date: manualBooking.endDate,
+        end_date: manualBooking.endDate || null,
         start_time: manualBooking.startTime,
         end_time: manualBooking.endTime,
         event_type: manualBooking.eventType,
@@ -4336,12 +4369,22 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         visitor_mobile: manualBooking.mobileNumber,
         status: 'confirmed',
         is_manual: true,
-        payment_mode: manualBooking.paymentMode
+        payment_mode: manualBooking.paymentMode,
+        total_amount: manualBooking.totalAmount
       }]);
       if (error) throw error;
       setIsManualModalOpen(false);
-      const msg = `New Manual Booking for ${manualBooking.targetName} on ${manualBooking.eventDate} (${manualBooking.startTime} - ${manualBooking.endTime}) has been created for you. Thank you!`;
-      sendWhatsAppAlert(manualBooking.mobileNumber, msg);
+      const whatsappMsg = `*Booking Confirmation - BOOK MY VANUE*%0A%0A` +
+        `Hello ${manualBooking.partyName}, your booking for *${manualBooking.targetName}* has been confirmed!%0A%0A` +
+        `*Booking Details:*%0A` +
+        `*Date:* ${manualBooking.eventDate}${manualBooking.endDate ? ' to ' + manualBooking.endDate : ''}%0A` +
+        `*Time:* ${manualBooking.startTime} - ${manualBooking.endTime}%0A` +
+        `*Event:* ${manualBooking.eventType}%0A` +
+        `*Amount:* ₹${manualBooking.totalAmount}%0A` +
+        `*Payment Mode:* ${manualBooking.paymentMode}%0A%0A` +
+        `Thank you for choosing our service!`;
+      
+      sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
       toast.success('Manual booking added successfully');
       setManualBooking({
         partyName: '',
@@ -4354,11 +4397,20 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         eventType: '',
         targetId: '',
         targetName: '',
-        paymentMode: 'Cash'
+        paymentMode: 'Cash',
+        totalAmount: 0
       });
       setManualCallSatisfied(false);
-    } catch (err) {
-      toast.error('Failed to add manual booking');
+      fetchBookings();
+    } catch (err: any) {
+      console.error('Manual Booking Error:', err);
+      if (err.message?.includes('column "start_time" does not exist')) {
+        toast.error('Database schema error: start_time column missing. Please run the FIX_DISTRICT_COLUMN.sql script.');
+      } else {
+        toast.error(`Failed to add manual booking: ${err.message || 'Unknown error'}`);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -4678,7 +4730,17 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                         onChange={(e) => setManualBooking({...manualBooking, eventType: e.target.value})}
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount (₹)</label>
+                      <input 
+                        required
+                        type="number" 
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                        value={manualBooking.totalAmount || ''}
+                        onChange={(e) => setManualBooking({...manualBooking, totalAmount: parseInt(e.target.value) || 0})}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">Payment Mode</label>
                       <div className="flex space-x-4">
                         <label className="flex items-center space-x-2 cursor-pointer">
@@ -5887,9 +5949,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   
   const filteredBookings = visitorBookings.filter(b => {
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
-    if (isPaid) return false;
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || b.status === statusFilter || (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
+    
+    // If status filter is 'all', show everything. 
+    // If it's a specific status, match it.
+    if (statusFilter === 'all') return matchesDate;
     return matchesStatus && matchesDate;
   });
 
@@ -5995,7 +6060,10 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   };
 
   const handleUpdatePaymentStatus = async () => {
-    if (!selectedBooking) return;
+    if (!selectedBooking) {
+      console.error('No booking selected for payment update (OrderManage)');
+      return;
+    }
     
     if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
       toast.error('This booking is already marked as PAID and cannot be updated.');
@@ -6004,15 +6072,24 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     }
 
     try {
-      console.log('Updating payment status for booking (PaymentModal):', selectedBooking.id, 'to:', paymentStatus);
+      console.log('Attempting to update payment status (OrderManage):', {
+        bookingId: selectedBooking.id,
+        newPaymentStatus: paymentStatus,
+        currentStatus: selectedBooking.status
+      });
+
       const { error } = await supabase.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
       if (error) {
-        console.error('Payment update error (PaymentModal):', error);
-        toast.error(`Error: ${error.message}`);
+        console.error('Supabase Payment Update Error (OrderManage):', error);
+        if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        } else {
+          toast.error(`Error: ${error.message}`);
+        }
         throw error;
       }
 
@@ -6021,9 +6098,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       toast.success(`Payment status updated to ${paymentStatus}`);
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
-    } catch (err) {
-      console.error('Payment status update failed (PaymentModal):', err);
-      toast.error('Failed to update payment status');
+    } catch (err: any) {
+      console.error('Payment status update failed (OrderManage):', err);
+      toast.error(`Failed to update payment status: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -6062,13 +6139,22 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           // 3. On success, update database
           try {
             const { error } = await supabase.from('bookings').update({ 
-              status: 'paid'
+              status: 'paid',
+              payment_status: 'Paid'
             }).eq('id', booking.id);
             
-            if (error) throw error;
+            if (error) {
+              console.error('Razorpay Payment Update Error:', error);
+              if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
+                toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+              } else {
+                toast.error(`Failed to update payment status: ${error.message}`);
+              }
+              throw error;
+            }
             toast.success(`Payment successful for ${booking.targetName}`);
-          } catch (err) {
-            toast.error('Failed to update payment status');
+          } catch (err: any) {
+            console.error('Razorpay handler error:', err);
           }
         },
         prefill: {
@@ -6977,9 +7063,6 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     description: '',
     priceRange: '',
     priceLevel: 'per day',
-    state: profile?.state || '',
-    district: profile?.district || '',
-    block: profile?.block || '',
     images: [''],
     availableFor: [] as string[],
   });
@@ -6994,18 +7077,18 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: formData.state || profile?.state || '',
-        district: formData.district || profile?.district || '',
-        block: formData.block || profile?.block || '',
-        city: formData.district || profile?.district || '',
         images: formData.images.filter(i => i !== ''),
         provider_id: user.uid,
-        available_for: formData.availableFor,
         rating: 0,
         review_count: 0
       }]);
       if (error) {
         console.error('Add Service Supabase Error:', error);
+        if (error.message.includes('column "district" does not exist')) {
+          toast.error('Database schema error: district column missing. Please run the FIX_DISTRICT_COLUMN.sql script.');
+        } else {
+          toast.error(`Failed to add service: ${error.message}`);
+        }
         throw error;
       }
       toast.success('Service added successfully!');
@@ -7020,7 +7103,16 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Register Your Service</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Register Your Service</h1>
+        <button 
+          onClick={() => navigate('/dashboard?tab=services')}
+          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+          title="Close"
+        >
+          <X size={28} />
+        </button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -7063,38 +7155,6 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <option value="Ghoda Bagghi">Ghoda Bagghi</option>
               <option value="Other Related Services">Other Related Services</option>
             </select>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.district}
-                onChange={(e) => setFormData({...formData, district: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.block}
-                onChange={(e) => setFormData({...formData, block: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.state}
-                onChange={(e) => setFormData({...formData, state: e.target.value})}
-              />
-            </div>
           </div>
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -7141,28 +7201,6 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               currentImage={formData.images[0]}
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.availableFor.includes(option)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
-                      } else {
-                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
-                      }
-                    }}
-                  />
-                  <span className="text-sm font-medium text-gray-700">{option}</span>
-                </label>
-              ))}
-            </div>
           </div>
         </div>
         <button 
@@ -7217,9 +7255,6 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
-        state: formData.state,
-        district: formData.district,
-        block: formData.block,
         images: formData.images,
         available_for: formData.availableFor
       }).eq('id', id);
@@ -7307,38 +7342,6 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
                 <option value="as per plate">as per plate</option>
                 <option value="as per work">as per work</option>
               </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.district}
-                onChange={(e) => setFormData({...formData, district: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.block}
-                onChange={(e) => setFormData({...formData, block: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.state}
-                onChange={(e) => setFormData({...formData, state: e.target.value})}
-              />
             </div>
           </div>
           <div className="md:col-span-2">
@@ -7431,9 +7434,6 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        state: formData.state,
-        district: formData.district,
-        block: formData.block,
         pincode: formData.pincode,
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
@@ -7500,38 +7500,6 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               value={formData.address}
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.district}
-                onChange={(e) => setFormData({...formData, district: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.block}
-                onChange={(e) => setFormData({...formData, block: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.state}
-                onChange={(e) => setFormData({...formData, state: e.target.value})}
-              />
-            </div>
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Capacity (Guests)</label>
@@ -7796,9 +7764,6 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     description: '',
     address: '',
     pincode: profile?.pincode || '',
-    state: profile?.state || '',
-    district: profile?.district || '',
-    block: profile?.block || '',
     venueType: 'Marriage Garden',
     capacity: 0,
     pricePerDay: 0,
@@ -7816,22 +7781,22 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
-        state: formData.state || profile?.state || '',
-        district: formData.district || profile?.district || '',
-        block: formData.block || profile?.block || '',
         pincode: formData.pincode || profile?.pincode || '',
-        city: formData.district || profile?.district || '',
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
         facilities: formData.facilities.filter(a => a !== ''),
-        available_for: formData.availableFor,
         owner_id: user.uid,
         rating: 0,
         review_count: 0
       }]);
       if (error) {
         console.error('Add Venue Supabase Error:', error);
+        if (error.message.includes('column "district" does not exist')) {
+          toast.error('Database schema error: district column missing. Please run the FIX_DISTRICT_COLUMN.sql script.');
+        } else {
+          toast.error(`Failed to add venue: ${error.message}`);
+        }
         throw error;
       }
       toast.success('Venue added successfully!');
@@ -7846,7 +7811,16 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Add Your Venue</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Add Your Venue</h1>
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+          title="Close"
+        >
+          <X size={28} />
+        </button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -7881,38 +7855,6 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               value={formData.address}
               onChange={(e) => setFormData({...formData, address: e.target.value})}
             />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">District</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.district}
-                onChange={(e) => setFormData({...formData, district: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Block</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.block}
-                onChange={(e) => setFormData({...formData, block: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
-              <input 
-                required
-                type="text" 
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-                value={formData.state}
-                onChange={(e) => setFormData({...formData, state: e.target.value})}
-              />
-            </div>
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Pincode</label>
@@ -7970,28 +7912,6 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               value={formData.facilities.join(', ')}
               onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
             />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.availableFor.includes(option)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setFormData({...formData, availableFor: [...formData.availableFor, option]});
-                      } else {
-                        setFormData({...formData, availableFor: formData.availableFor.filter(o => o !== option)});
-                      }
-                    }}
-                  />
-                  <span className="text-sm font-medium text-gray-700">{option}</span>
-                </label>
-              ))}
-            </div>
           </div>
         </div>
         <button 
@@ -8839,29 +8759,36 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const resetAllRatings = async () => {
-    if (!confirm('Are you sure you want to reset all ratings and review counts? This will set them to 0 for all venues and services and delete all existing reviews.')) return;
-    
-    setLoading(true);
-    try {
-      // Update all venues
-      const { error: vError } = await supabase.from('venues').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
-      // Update all service providers
-      const { error: sError } = await supabase.from('service_providers').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
-      // Delete all reviews
-      const { error: rError } = await supabase.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      if (vError || sError || rError) {
-        console.error('Reset error:', { vError, sError, rError });
-        throw new Error('Failed to reset some data');
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Reset All Ratings',
+      message: 'Are you sure you want to reset all ratings and review counts? This will set them to 0 for all venues and services and delete all existing reviews.',
+      isDanger: true,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          // Update all venues
+          const { error: vError } = await supabase.from('venues').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+          // Update all service providers
+          const { error: sError } = await supabase.from('service_providers').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+          // Delete all reviews
+          const { error: rError } = await supabase.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          
+          if (vError || sError || rError) {
+            console.error('Reset error:', { vError, sError, rError });
+            throw new Error('Failed to reset some data');
+          }
+          
+          toast.success('All ratings and reviews have been reset');
+        } catch (err) {
+          console.error('Reset error:', err);
+          toast.error('Failed to reset ratings');
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
       }
-      
-      toast.success('All ratings and reviews have been reset');
-    } catch (err) {
-      console.error('Reset error:', err);
-      toast.error('Failed to reset ratings');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const deleteNotification = async (id: string) => {
@@ -8939,14 +8866,22 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const deleteUser = async (uid: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    const { error } = await supabase.from('users').delete().eq('uid', uid);
-    if (!error) {
-      toast.success('User deleted');
-      setUsers(prev => prev.filter(u => u.uid !== uid));
-    } else {
-      toast.error('Failed to delete user');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete User',
+      message: 'Are you sure you want to delete this user?',
+      isDanger: true,
+      onConfirm: async () => {
+        const { error } = await supabase.from('users').delete().eq('uid', uid);
+        if (!error) {
+          toast.success('User deleted');
+          setUsers(prev => prev.filter(u => u.uid !== uid));
+        } else {
+          toast.error('Failed to delete user');
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const updatePlanPrice = async (id: string, newPrice: number) => {
@@ -9028,7 +8963,15 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       }));
       
       const { error } = await supabase.from('notifications').insert(inserts);
-      if (error) throw error;
+      if (error) {
+        console.error('Add Notification Error:', error);
+        if (error.message.includes('column "is_active" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Database schema error: is_active column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        } else {
+          toast.error(`Failed to add notifications: ${error.message}`);
+        }
+        throw error;
+      }
       
       toast.success(`${messages.length} notification(s) added`);
       setIsNotificationModalOpen(false);
