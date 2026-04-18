@@ -142,8 +142,13 @@ const ConfirmModal = ({
   );
 };
 
-import { supabase } from './supabase';
+// --- Location Data ---
 import { locations } from './data/locations';
+const LOCATION_DATA = locations;
+
+// Mock database to remove backend connection as requested
+import { dataService as db, isSupabaseConnected } from './services/dataService';
+
 import { cn } from './lib/utils';
 
 // --- Translation Data ---
@@ -224,9 +229,6 @@ const LanguageContext = React.createContext({
 
 const useTranslation = () => React.useContext(LanguageContext);
 
-// --- Location Data ---
-const LOCATION_DATA = locations;
-
 import { CNZLogo } from './components/CNZLogo';
 import { PoweredByCNZ } from './components/PoweredByCNZ';
 import { UserProfile, Venue, ServiceProvider, Booking, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
@@ -261,7 +263,7 @@ export function handleDatabaseError(error: unknown, operationType: OperationType
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: undefined, // We'll get this from supabase if needed
+      userId: undefined, // We'll get this from db if needed
       email: null,
       emailVerified: false,
       isAnonymous: false,
@@ -355,7 +357,7 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
         comment
       };
       console.log('Submitting app feedback:', feedbackData);
-      const { error } = await supabase.from('app_feedback').insert([feedbackData]);
+      const { error } = await db.from('app_feedback').insert([feedbackData]);
       if (error) {
         console.error('App Feedback Error:', error);
         if (error.message.includes('column "visitor_mobile" does not exist') || error.message.includes('schema cache')) {
@@ -530,7 +532,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
 
   useEffect(() => {
     const fetchReviews = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('reviews')
         .select('*')
         .eq('target_id', targetId)
@@ -552,7 +554,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
 
     fetchReviews();
 
-    const subscription = supabase
+    const subscription = db
       .channel(`reviews_${targetId}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -598,7 +600,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
         comment
       };
 
-      const { error: rError } = await supabase.from('reviews').insert([reviewData]);
+      const { error: rError } = await db.from('reviews').insert([reviewData]);
       if (rError) {
         console.error('Add Review Error:', rError);
         if (rError.message.includes('column "visitor_mobile" does not exist') || rError.message.includes('column "target_type" does not exist') || rError.message.includes('schema cache')) {
@@ -611,7 +613,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
       
       // Update average rating and review count on target document
       // Fetch all reviews for this target to get accurate average
-      const { data: allR } = await supabase
+      const { data: allR } = await db
         .from('reviews')
         .select('rating')
         .eq('target_id', targetId);
@@ -619,7 +621,7 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
       const allRatings = allR || [];
       const newAvg = allRatings.reduce((acc, r) => acc + r.rating, 0) / allRatings.length;
       
-      const { error: tError } = await supabase
+      const { error: tError } = await db
         .from(targetType === 'venue' ? 'venues' : 'service_providers')
         .update({
           rating: Number(newAvg.toFixed(1)),
@@ -810,45 +812,61 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
 const VideoUpload = ({ 
   onUpload, 
   label = "Upload Video", 
-  currentVideo = "" 
+  currentVideo = "",
+  multiple = false
 }: { 
   onUpload: (url: string) => void, 
   label?: string,
-  currentVideo?: string
+  currentVideo?: string,
+  multiple?: boolean
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (!file.type.startsWith('video/')) {
-      toast.error('Please upload a video file');
-      return;
-    }
+    setIsUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (!file.type.startsWith('video/')) {
+            toast.error(`File ${file.name} is not a video`);
+            continue;
+          }
 
-    // Check duration
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.onloadedmetadata = function() {
-      window.URL.revokeObjectURL(video.src);
-      if (video.duration > 120) {
-        toast.error('Video duration should be less than 2 minutes');
-        return;
+          // Check duration
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = function() {
+              window.URL.revokeObjectURL(video.src);
+              if (video.duration > 300) { // Limit to 5 mins maybe? Previous was 120s
+                toast.error(`Video ${file.name} is too long (max 5 mins)`);
+                reject('duration');
+              } else {
+                resolve();
+              }
+            };
+            video.onerror = () => reject('metadata');
+            video.src = URL.createObjectURL(file);
+          }).then(() => uploadFile(file)).catch((err) => {
+            if (err === 'metadata') toast.error(`Could not load video metadata for ${file.name}`);
+          });
       }
-      
-      // Proceed with upload
-      uploadFile(file);
-    };
-    video.src = URL.createObjectURL(file);
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const uploadFile = async (file: File) => {
-    setIsUploading(true);
     try {
       const filePath = `uploads/videos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const { data, error } = await supabase.storage
-        .from('images') // Reusing images bucket as it's likely the only one
+      const { error } = await db.storage
+        .from('images') 
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -856,17 +874,15 @@ const VideoUpload = ({
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = db.storage
         .from('images')
         .getPublicUrl(filePath);
 
       onUpload(publicUrl);
-      toast.success('Video uploaded successfully');
+      toast.success(`Video ${file.name} uploaded`);
     } catch (err: any) {
       console.error('Upload error:', err);
       toast.error(err.message || 'Failed to upload video');
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -890,15 +906,17 @@ const VideoUpload = ({
           <Upload size={16} />
           <span>{isUploading ? 'Uploading...' : 'Select Video'}</span>
           <input 
+            ref={fileInputRef}
             type="file" 
             className="hidden" 
             accept="video/*" 
+            multiple={multiple}
             onChange={handleFileChange}
             disabled={isUploading}
           />
         </label>
       </div>
-      <p className="text-[10px] text-gray-400 italic">Max duration: 2 minutes</p>
+      <p className="text-[10px] text-gray-400 italic">Max duration: 5 minutes. Suggested: High quality 1080p.</p>
     </div>
   );
 };
@@ -906,30 +924,44 @@ const VideoUpload = ({
 const ImageUpload = ({ 
   onUpload, 
   label = "Upload Image", 
-  currentImage = "" 
+  currentImage = "",
+  multiple = false
 }: { 
   onUpload: (url: string) => void, 
   label?: string,
-  currentImage?: string
+  currentImage?: string,
+  multiple?: boolean
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Please upload a JPEG, PNG or WEBP image');
-      return;
-    }
-
-    // Increased limit since we are using Supabase now, not base64 in Firestore
-    if (file.size > 5 * 1024 * 1024) { 
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          toast.error(`File ${file.name} is not a valid image`);
+          continue;
+        }
+
+        if (file.size > 10 * 1024 * 1024) { 
+          toast.error(`File ${file.name} is too large (max 10MB)`);
+          continue;
+        }
+
+        await processAndUpload(file);
+      }
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const processAndUpload = async (file: File) => {
     try {
       // Client-side resizing
       const img = document.createElement('img');
@@ -966,7 +998,7 @@ const ImageUpload = ({
       if (!blob) throw new Error('Failed to process image');
 
       const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}.jpg`;
-      const { data, error } = await supabase.storage
+      const { error } = await db.storage
         .from('images')
         .upload(filePath, blob, {
           cacheControl: '3600',
@@ -976,17 +1008,14 @@ const ImageUpload = ({
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = db.storage
         .from('images')
         .getPublicUrl(filePath);
 
       onUpload(publicUrl);
-      toast.success('Image uploaded successfully');
     } catch (err: any) {
-      console.error('Upload error:', err);
-      toast.error(err.message || 'Failed to upload image');
-    } finally {
-      setIsUploading(false);
+      console.error('Upload Error:', err);
+      toast.error(`Failed to upload ${file.name}`);
     }
   };
 
@@ -997,7 +1026,7 @@ const ImageUpload = ({
         <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group">
           {currentImage ? (
             <div className="relative w-full h-full group">
-              <img src={currentImage} alt="Preview" className="w-full h-full object-cover" />
+              <img src={currentImage} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               <button 
                 type="button"
                 onClick={(e) => {
@@ -1024,15 +1053,17 @@ const ImageUpload = ({
           <Upload size={16} />
           <span>{isUploading ? 'Uploading...' : 'Select File'}</span>
           <input 
+            ref={fileInputRef}
             type="file" 
             className="hidden" 
-            accept="image/jpeg,image/png" 
+            accept="image/*" 
+            multiple={multiple}
             onChange={handleFileChange}
             disabled={isUploading}
           />
         </label>
       </div>
-      <p className="text-[10px] text-gray-400 italic">Supported formats: JPEG, PNG (Max 1MB)</p>
+      <p className="text-[10px] text-gray-400 italic">Supported formats: JPEG, PNG, WEBP (Max 10MB). Suggested dimensions: 1200x1200px (1:1 ratio).</p>
     </div>
   );
 };
@@ -1047,7 +1078,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
   useEffect(() => {
     if (user && profile && (profile.role === 'owner' || profile.role === 'provider')) {
       const fetchPending = async () => {
-        const { count, error } = await supabase
+        const { count, error } = await db
           .from('bookings')
           .select('*', { count: 'exact', head: true })
           .eq('owner_id', user.uid)
@@ -1058,7 +1089,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
 
       fetchPending();
 
-      const subscription = supabase
+      const subscription = db
         .channel(`pending_bookings_${user.uid}`)
         .on('postgres_changes', { 
           event: '*', 
@@ -1075,7 +1106,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
   }, [user, profile]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await db.auth.signOut();
     onLogout();
     navigate('/');
   };
@@ -1141,7 +1172,12 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                   <Link to={profile?.role === 'admin' ? "/admin" : "/dashboard"} className="flex items-center space-x-3 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 hover:bg-orange-100 transition-all group">
                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-orange-200">
                       {profile?.photoURL ? (
-                        <img src={profile.photoURL} alt={profile.displayName} className="w-full h-full object-cover" />
+                        <img 
+                          src={profile.photoURL} 
+                          alt={profile.displayName} 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
                       ) : (
                         <div className="w-full h-full bg-orange-200 flex items-center justify-center text-orange-600 font-bold text-xs">
                           {profile?.displayName?.charAt(0)}
@@ -1459,9 +1495,10 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
     <Link to={`/venues/${venue.id}`}>
       <div className="relative h-56">
         <img 
-          src={venue.images[0] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
+          src={venue.images?.[0] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
           alt={venue.name} 
           className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
         />
       </div>
       <div className="p-5">
@@ -1506,9 +1543,10 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
       <Link to={`/services/${service.id}`}>
         <div className="relative h-48">
           <img 
-            src={service.images[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
+            src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
             alt={service.name} 
             className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
           />
         </div>
         <div className="p-5">
@@ -1648,7 +1686,7 @@ const ChangePasswordView = ({ user, profile, onUpdateProfile }: { user: any, pro
     setLoading(true);
     try {
       // Verify current password
-      const { data: userData, error: fetchError } = await supabase
+      const { data: userData, error: fetchError } = await db
         .from('users')
         .select('password, mobile_number')
         .eq('uid', user.uid)
@@ -1665,7 +1703,7 @@ const ChangePasswordView = ({ user, profile, onUpdateProfile }: { user: any, pro
       }
 
       // Update password
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('users')
         .update({ password: formData.newPassword })
         .eq('uid', user.uid);
@@ -1761,7 +1799,7 @@ const ForgotPasswordView = () => {
     setLoading(true);
     try {
       // Check if it's admin first
-      const { data: adminSettings } = await supabase
+      const { data: adminSettings } = await db
         .from('admin_settings')
         .select('*');
       
@@ -1777,7 +1815,7 @@ const ForgotPasswordView = () => {
         return;
       }
 
-      const { data: users, error } = await supabase
+      const { data: users, error } = await db
         .from('users')
         .select('registration_id, password, display_name')
         .eq('mobile_number', mobileNumber)
@@ -1884,7 +1922,7 @@ const RegistrationView = () => {
       }
 
       // Check for duplicate mobile number
-      const { data: existingUser, error: checkError } = await supabase
+      const { data: existingUser, error: checkError } = await db
         .from('users')
         .select('uid')
         .eq('mobile_number', formData.mobileNumber)
@@ -1900,7 +1938,7 @@ const RegistrationView = () => {
       }
 
       // Fetch current count for the specific role to generate ID
-      const { count, error: countError } = await supabase
+      const { count, error: countError } = await db
         .from('users')
         .select('*', { count: 'exact', head: true })
         .eq('role', formData.role);
@@ -1942,7 +1980,7 @@ const RegistrationView = () => {
         profileData.venue_type = formData.venueType;
       }
 
-      const { error } = await supabase.from('users').insert([profileData]);
+      const { error } = await db.from('users').insert([profileData]);
       if (error) {
         console.error('Registration Error:', error);
         throw error;
@@ -2129,7 +2167,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 
     // Admin Login Check
     if (regId.toLowerCase() === 'admin@eventmanager.com') {
-      const { data: adminSettings } = await supabase
+      const { data: adminSettings } = await db
         .from('admin_settings')
         .select('value')
         .eq('key', 'admin_password')
@@ -2158,7 +2196,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 
     try {
       // Case-insensitive registration ID check
-      const { data: users, error } = await supabase
+      const { data: users, error } = await db
         .from('users')
         .select('*')
         .eq('registration_id', regId.toUpperCase());
@@ -2286,7 +2324,7 @@ const GalleryView = () => {
 
   useEffect(() => {
     const fetchImages = async () => {
-      const { data, error } = await supabase.from('venues').select('images');
+      const { data, error } = await db.from('venues').select('images');
       if (!error && data) {
         let vImages = data.flatMap(d => d.images || []);
         // Limit to 100 latest
@@ -2341,7 +2379,7 @@ const GalleryView = () => {
                 whileHover={{ scale: 1.02 }}
                 className="aspect-square rounded-2xl overflow-hidden shadow-lg"
               >
-                <img src={img} alt="Gallery" className="w-full h-full object-cover" />
+                <img src={img} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               </motion.div>
             ))}
           </div>
@@ -2528,7 +2566,7 @@ const ServiceTypePhotosScroll = () => {
 
   useEffect(() => {
     const fetchPhotos = async () => {
-      const { data } = await supabase.from('service_type_photos').select('*').order('created_at', { ascending: false });
+      const { data } = await db.from('service_type_photos').select('*').order('created_at', { ascending: false });
       if (data) setServicePhotos(data.map(d => ({
         id: d.id,
         serviceType: d.service_type,
@@ -2539,7 +2577,7 @@ const ServiceTypePhotosScroll = () => {
 
     fetchPhotos();
 
-    const channel = supabase
+    const channel = db
       .channel('service_type_photos_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_type_photos' }, () => {
         fetchPhotos();
@@ -2547,7 +2585,7 @@ const ServiceTypePhotosScroll = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, []);
 
@@ -2660,7 +2698,7 @@ const HomeView = ({ user }: { user: any }) => {
     const fetchHomeData = async () => {
       setLoading(true);
       try {
-        const { data: vData } = await supabase.from('venues').select('*').order('rating', { ascending: false }).limit(6);
+        const { data: vData } = await db.from('venues').select('*').order('rating', { ascending: false }).limit(6);
         if (vData) setFeaturedVenues(vData.map(d => ({ 
           ...d, 
           ownerId: d.owner_id, 
@@ -2671,7 +2709,7 @@ const HomeView = ({ user }: { user: any }) => {
           createdAt: d.created_at 
         }) as Venue));
 
-        const { data: sData } = await supabase.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
+        const { data: sData } = await db.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
         if (sData) setFeaturedServices(sData.map(d => ({ 
           ...d, 
           providerId: d.provider_id, 
@@ -2682,15 +2720,15 @@ const HomeView = ({ user }: { user: any }) => {
           createdAt: d.created_at 
         }) as ServiceProvider));
 
-        const { data: bData } = await supabase.from('banners').select('*').eq('is_active', true);
+        const { data: bData } = await db.from('banners').select('*').eq('is_active', true);
         if (bData) setBanners(bData.map(d => ({ id: d.id, title: d.title, imageUrl: d.image_url, link: d.link, isActive: d.is_active, createdAt: d.created_at }) as AppBanner));
 
-        let { data: nData, error: nError } = await supabase.from('notifications').select('*').eq('is_active', true).order('created_at', { ascending: false });
+        let { data: nData, error: nError } = await db.from('notifications').select('*').eq('is_active', true).order('created_at', { ascending: false });
         
         // Fallback if is_active column is missing
         if (nError && nError.message.includes('is_active')) {
           console.warn('is_active column missing in notifications, falling back');
-          const { data: fallbackData, error: fallbackError } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+          const { data: fallbackData, error: fallbackError } = await db.from('notifications').select('*').order('created_at', { ascending: false });
           nData = fallbackData;
           nError = fallbackError;
         }
@@ -2709,21 +2747,21 @@ const HomeView = ({ user }: { user: any }) => {
 
     fetchHomeData();
 
-    const venueChannel = supabase
+    const venueChannel = db
       .channel('home_venues')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => {
         fetchHomeData();
       })
       .subscribe();
 
-    const providerChannel = supabase
+    const providerChannel = db
       .channel('home_providers')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, () => {
         fetchHomeData();
       })
       .subscribe();
 
-    const channel = supabase
+    const channel = db
       .channel('home_notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
         fetchHomeData();
@@ -2731,9 +2769,9 @@ const HomeView = ({ user }: { user: any }) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(venueChannel);
-      supabase.removeChannel(providerChannel);
-      supabase.removeChannel(channel);
+      db.removeChannel(venueChannel);
+      db.removeChannel(providerChannel);
+      db.removeChannel(channel);
     };
   }, []);
 
@@ -2937,14 +2975,14 @@ const TestimonialsSection = () => {
   const fetchFeedbacks = async () => {
     try {
       console.log('Fetching app feedback...');
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('app_feedback')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
       
       if (error) {
-        console.error('Supabase error fetching feedback:', error);
+        console.error('Database error fetching feedback:', error);
         return;
       }
 
@@ -2960,7 +2998,7 @@ const TestimonialsSection = () => {
         })));
 
         // Calculate average rating
-        const { data: allData, error: allErr } = await supabase.from('app_feedback').select('rating');
+        const { data: allData, error: allErr } = await db.from('app_feedback').select('rating');
         if (allErr) {
           console.error('Error fetching all ratings:', allErr);
         } else if (allData && allData.length > 0) {
@@ -2982,7 +3020,7 @@ const TestimonialsSection = () => {
   useEffect(() => {
     fetchFeedbacks();
 
-    const channel = supabase
+    const channel = db
       .channel('app_feedback_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_feedback' }, () => {
         fetchFeedbacks();
@@ -2990,7 +3028,7 @@ const TestimonialsSection = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, []);
 
@@ -3015,56 +3053,70 @@ const TestimonialsSection = () => {
           <h2 className="text-4xl font-black text-gray-900 tracking-tight mb-4">What Our Users Say</h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-8">Real stories from real people who planned their perfect events with us.</p>
           
-      {/* App Rating Summary */}
-      <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-        <div className="flex items-center space-x-3 mb-2">
-          <span className="text-4xl font-black text-gray-900">{appRating || '0.0'}</span>
-          <div className="flex items-center text-yellow-500">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} className={i < Math.round(appRating) ? "text-yellow-500" : "text-gray-200"} />
-            ))}
-          </div>
-        </div>
-        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-          Overall App Rating ({totalFeedback} Reviews)
-        </p>
-        <button 
-          onClick={fetchFeedbacks}
-          className="mt-4 text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center space-x-1"
-        >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          <span>Refresh Reviews</span>
-        </button>
-      </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {feedbacks.map((fb, idx) => (
-            <motion.div 
-              key={fb.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              viewport={{ once: true }}
-              className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 relative group hover:shadow-xl transition-all"
-            >
-              <div className="flex items-center space-x-1 text-yellow-500 mb-6">
+          <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <div className="flex items-center space-x-3 mb-2">
+              <span className="text-4xl font-black text-gray-900">{appRating || '0.0'}</span>
+              <div className="flex items-center text-yellow-500">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={16} fill={i < fb.rating ? "currentColor" : "none"} className={i < fb.rating ? "text-yellow-500" : "text-gray-200"} />
+                  <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} className={i < Math.round(appRating) ? "text-yellow-500" : "text-gray-200"} />
                 ))}
               </div>
-              <p className="text-gray-600 italic leading-relaxed mb-8">"{fb.comment}"</p>
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl">
-                  {fb.userName?.charAt(0) || 'U'}
+            </div>
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+              Overall App Rating ({totalFeedback} Reviews)
+            </p>
+          </div>
+        </div>
+
+        {/* Horizontal Scrolling Marquee */}
+        <div className="relative group overflow-hidden">
+          <div className="flex w-full">
+            <motion.div 
+              animate={{ x: [-100 * feedbacks.length, 0] }}
+              transition={{ 
+                duration: Math.max(feedbacks.length * 4, 30), 
+                repeat: Infinity, 
+                ease: "linear" 
+              }}
+              className="flex space-x-8 whitespace-nowrap py-4"
+            >
+              {[...feedbacks, ...feedbacks].map((fb, idx) => (
+                <div key={`${fb.id}-${idx}`} className="inline-block w-[350px] md:w-[450px] bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-xl transition-all whitespace-normal">
+                  <div className="flex items-center space-x-1 text-yellow-500 mb-6">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={16} fill={i < fb.rating ? "currentColor" : "none"} className={i < fb.rating ? "text-yellow-500" : "text-gray-200"} />
+                    ))}
+                  </div>
+                  <p className="text-gray-600 italic leading-relaxed mb-8 line-clamp-3">"{fb.comment}"</p>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl shadow-inner uppercase">
+                      {fb.userName?.charAt(0) || 'U'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">{fb.userName}</h4>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Verified User</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-900">{fb.userName}</h4>
-                  <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">Verified User</p>
-                </div>
-              </div>
+              ))}
             </motion.div>
-          ))}
+          </div>
+          {/* Fading Edges */}
+          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-gray-50 to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-gray-50 to-transparent z-10 pointer-events-none" />
+        </div>
+
+        <div className="mt-16 text-center">
+          <button 
+            onClick={() => {
+              const rateBtn = document.querySelector('[title="Rate App"]') as HTMLButtonElement;
+              if (rateBtn) rateBtn.click();
+            }}
+            className="inline-flex items-center space-x-2 bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-xl shadow-orange-200 grow-animation hover:scale-105"
+          >
+            <span>Rate Our Platform</span>
+            <ChevronRight size={20} />
+          </button>
         </div>
       </div>
     </section>
@@ -3077,7 +3129,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
 
   useEffect(() => {
     const fetchBookings = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('bookings')
         .select('event_date')
         .eq('target_id', targetId)
@@ -3090,7 +3142,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
 
     fetchBookings();
 
-    const channel = supabase
+    const channel = db
       .channel(`availability_${targetId}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -3101,7 +3153,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, [targetId]);
 
@@ -3185,7 +3237,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
   const fetchVenue = async () => {
     if (!id) return;
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('venues')
       .select('*')
       .eq('id', id)
@@ -3199,11 +3251,12 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         pricePerDay: data.price_per_day,
         reviewCount: data.review_count,
         availableFor: data.available_for,
+        catalogue: data.catalogue || [],
         createdAt: data.created_at
       } as Venue);
 
       // Fetch owner profile
-      const { data: userData } = await supabase
+      const { data: userData } = await db
         .from('users')
         .select('*')
         .eq('uid', data.owner_id)
@@ -3216,7 +3269,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
   useEffect(() => {
     fetchVenue();
 
-    const subscription = supabase
+    const subscription = db
       .channel(`venue_${id}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -3241,7 +3294,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     setBookingStatus('loading');
     try {
       // Check for existing pending booking from this visitor for this venue
-      const { data: existingPending, error: pendingError } = await supabase
+      const { data: existingPending, error: pendingError } = await db
         .from('bookings')
         .select('id')
         .eq('target_id', venue?.id)
@@ -3257,7 +3310,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       }
 
       // Check for existing booking on this date and overlapping time slot
-      const { data: existingBookings, error: conflictError } = await supabase
+      const { data: existingBookings, error: conflictError } = await db
         .from('bookings')
         .select('id, start_time, end_time')
         .eq('target_id', venue?.id)
@@ -3281,7 +3334,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         }
       }
 
-      const { error } = await supabase.from('bookings').insert([{
+      const { error } = await db.from('bookings').insert([{
         user_id: user?.uid || 'visitor',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
@@ -3302,7 +3355,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
       // Send WhatsApp Alert to Owner
       try {
-        const { data: ownerProfile } = await supabase.from('users').select('mobile_number').eq('uid', venue?.ownerId).single();
+        const { data: ownerProfile } = await db.from('users').select('mobile_number').eq('uid', venue?.ownerId).single();
         if (ownerProfile?.mobile_number) {
           const alertMsg = `New Booking Query for ${venue?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nEvent: ${eventType}\nDate: ${bookingDate}\nMessage: ${message || 'No message'}`;
           sendWhatsAppAlert(ownerProfile.mobile_number, alertMsg);
@@ -3373,10 +3426,25 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         <div className="lg:col-span-2 space-y-8">
           {/* Gallery */}
           <div className="grid grid-cols-2 gap-4 h-[400px]">
-            <img src={venue.images[0]} alt={venue.name} className="w-full h-full object-cover rounded-3xl col-span-2 md:col-span-1" />
+            <img 
+              src={venue.images?.[0]} 
+              alt={venue.name} 
+              className="w-full h-full object-cover rounded-3xl col-span-2 md:col-span-1" 
+              referrerPolicy="no-referrer"
+            />
             <div className="hidden md:grid grid-rows-2 gap-4">
-              <img src={venue.images[1] || venue.images[0]} alt={venue.name} className="w-full h-full object-cover rounded-3xl" />
-              <img src={venue.images[2] || venue.images[0]} alt={venue.name} className="w-full h-full object-cover rounded-3xl" />
+              <img 
+                src={venue.images?.[1] || venue.images?.[0]} 
+                alt={venue.name} 
+                className="w-full h-full object-cover rounded-3xl" 
+                referrerPolicy="no-referrer"
+              />
+              <img 
+                src={venue.images?.[2] || venue.images?.[0]} 
+                alt={venue.name} 
+                className="w-full h-full object-cover rounded-3xl" 
+                referrerPolicy="no-referrer"
+              />
             </div>
           </div>
 
@@ -3398,14 +3466,14 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
             </div>
 
             <div className="mt-10">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Available For</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Available For & Levels</h3>
               <div className="flex flex-wrap gap-2">
-                {venue.availableFor?.map((item, idx) => (
+                {[...(venue.availableFor || []), ...(venue.catalogue?.map(c => c.level) || [])].filter((v, i, a) => a.indexOf(v) === i).map((item, idx) => (
                   <span key={idx} className="bg-orange-50 text-orange-700 px-4 py-2 rounded-xl text-sm font-bold border border-orange-100">
                     {item}
                   </span>
                 ))}
-                {(!venue.availableFor || venue.availableFor.length === 0) && (
+                {(!venue.availableFor || venue.availableFor.length === 0) && (!venue.catalogue || venue.catalogue.length === 0) && (
                   <span className="text-gray-400 italic text-sm">No specific event types listed</span>
                 )}
               </div>
@@ -3649,7 +3717,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
   const fetchService = async () => {
     if (!id) return;
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('service_providers')
       .select('*')
       .eq('id', id)
@@ -3663,11 +3731,12 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         priceRange: data.price_range,
         reviewCount: data.review_count,
         availableFor: data.available_for,
+        catalogue: data.catalogue || [],
         createdAt: data.created_at
       } as ServiceProvider);
 
       // Fetch provider profile
-      const { data: userData } = await supabase
+      const { data: userData } = await db
         .from('users')
         .select('*')
         .eq('uid', data.provider_id)
@@ -3680,7 +3749,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   useEffect(() => {
     fetchService();
 
-    const subscription = supabase
+    const subscription = db
       .channel(`service_${id}`)
       .on('postgres_changes', { 
         event: '*', 
@@ -3709,7 +3778,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
     setBookingStatus('loading');
     try {
       // Check for existing pending booking from this visitor for this service
-      const { data: existingPending, error: pendingError } = await supabase
+      const { data: existingPending, error: pendingError } = await db
         .from('bookings')
         .select('id')
         .eq('target_id', service?.id)
@@ -3725,7 +3794,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       }
 
       // Check for existing booking on this date and overlapping time slot
-      const { data: existingBookings, error: conflictError } = await supabase
+      const { data: existingBookings, error: conflictError } = await db
         .from('bookings')
         .select('id, start_time, end_time')
         .eq('target_id', service?.id)
@@ -3749,7 +3818,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         }
       }
 
-      const { error } = await supabase.from('bookings').insert([{
+      const { error } = await db.from('bookings').insert([{
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
         target_type: 'service',
@@ -3770,7 +3839,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
       // Send WhatsApp Alert to Provider
       try {
-        const { data: providerProfile } = await supabase.from('users').select('mobile_number').eq('uid', service?.providerId).single();
+        const { data: providerProfile } = await db.from('users').select('mobile_number').eq('uid', service?.providerId).single();
         if (providerProfile?.mobile_number) {
           const alertMsg = `New Service Query for ${service?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nDate: ${date}\nMessage: ${message || 'No message'}`;
           sendWhatsAppAlert(providerProfile.mobile_number, alertMsg);
@@ -3844,9 +3913,10 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
       <div className="h-[400px] relative mt-8 max-w-7xl mx-auto px-4">
         <img 
-          src={service.images[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
+          src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
           alt={service.name} 
           className="w-full h-full object-cover rounded-3xl"
+          referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-3xl" />
         <div className="absolute bottom-8 left-8 right-8">
@@ -3863,14 +3933,14 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-12">
             <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-2xl font-bold mb-6 text-gray-900">Available For</h3>
+              <h3 className="text-2xl font-bold mb-6 text-gray-900">Available For & Portfolio</h3>
               <div className="flex flex-wrap gap-3">
-                {service.availableFor?.map((item, idx) => (
+                {[...(service.availableFor || []), ...(service.catalogue?.map(c => c.level) || [])].filter((v, i, a) => a.indexOf(v) === i).map((item, idx) => (
                   <span key={idx} className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold border border-purple-100">
                     {item}
                   </span>
                 ))}
-                {(!service.availableFor || service.availableFor.length === 0) && (
+                {(!service.availableFor || service.availableFor.length === 0) && (!service.catalogue || service.catalogue.length === 0) && (
                   <span className="text-gray-400 italic text-sm">No specific event types listed</span>
                 )}
               </div>
@@ -4077,9 +4147,23 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   );
 };
 
-const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile | null }) => {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+const BookingManagerView = ({ 
+  user, 
+  profile, 
+  bookings: parentBookings, 
+  venues: parentVenues, 
+  services: parentServices, 
+  onUpdate 
+}: { 
+  user: any, 
+  profile: UserProfile | null, 
+  bookings?: Booking[], 
+  venues?: Venue[], 
+  services?: ServiceProvider[], 
+  onUpdate?: () => void 
+}) => {
+  const [bookings, setBookings] = useState<Booking[]>(parentBookings || []);
+  const [loading, setLoading] = useState(!parentBookings);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -4108,15 +4192,31 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     paymentMode: 'Cash',
     totalAmount: 0
   });
-  const [venues, setVenues] = useState<Venue[]>([]);
-  const [services, setServices] = useState<ServiceProvider[]>([]);
+  const [venues, setVenues] = useState<Venue[]>(parentVenues || []);
+  const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
 
+  useEffect(() => {
+    if (parentBookings) setBookings(parentBookings);
+  }, [parentBookings]);
+
+  useEffect(() => {
+    if (parentVenues) setVenues(parentVenues);
+  }, [parentVenues]);
+
+  useEffect(() => {
+    if (parentServices) setServices(parentServices);
+  }, [parentServices]);
+
   const fetchBookings = async () => {
     if (!user) return;
-    const { data, error } = await supabase
+    if (onUpdate) {
+      onUpdate();
+      return;
+    }
+    const { data, error } = await db
       .from('bookings')
       .select('*')
       .eq('owner_id', user.uid)
@@ -4157,7 +4257,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
     if (!user) return;
     fetchBookings();
 
-    const channel = supabase
+    const channel = db
       .channel(`booking_manager_changes_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchBookings();
@@ -4165,24 +4265,27 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       .subscribe();
 
     const fetchMyItems = async () => {
-      const { data: vData } = await supabase.from('venues').select('*').eq('owner_id', user.uid);
+      const { data: vData } = await db.from('venues').select('*').eq('owner_id', user.uid);
       if (vData) setVenues(vData.map(d => ({ id: d.id, ...d } as any)));
       
-      const { data: sData } = await supabase.from('service_providers').select('*').eq('provider_id', user.uid);
+      const { data: sData } = await db.from('service_providers').select('*').eq('provider_id', user.uid);
       if (sData) setServices(sData.map(d => ({ id: d.id, ...d } as any)));
     };
 
     fetchMyItems();
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, [user]);
 
   const filteredBookings = bookings.filter(b => {
     const matchesManual = b.isManual;
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
-    if (isPaid) return false;
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'pending' && b.status === 'pending') ||
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid')) ||
+                         (statusFilter === 'cancelled' && b.status === 'cancelled') ||
+                         (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesManual && matchesStatus && matchesDate;
   });
@@ -4200,7 +4303,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       return;
     }
     try {
-      const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
+      const { error } = await db.from('bookings').update({ status }).eq('id', id);
       if (error) throw error;
       
       const booking = bookings.find(b => b.id === id);
@@ -4212,6 +4315,8 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       toast.success(`Booking ${status} successfully`);
       setIsAcceptModalOpen(false);
       setIsCallSatisfied(false);
+      if (onUpdate) onUpdate();
+      fetchBookings();
     } catch (err) {
       toast.error('Failed to update booking status');
     }
@@ -4219,11 +4324,13 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
   const handleUpdateAmount = async () => {
     if (!selectedBooking) return;
-    const { error } = await supabase.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
+    const { error } = await db.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
     if (!error) {
       toast.success('Booking amount updated');
       setIsAmountModalOpen(false);
       setSelectedBooking(null);
+      if (onUpdate) onUpdate();
+      fetchBookings();
     } else {
       toast.error('Failed to update amount');
     }
@@ -4243,13 +4350,13 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       
       // Upload to Supabase Storage to get a public link
       const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await db.storage
         .from('images')
         .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
 
       let downloadUrl = '';
       if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(fileName);
         downloadUrl = publicUrl;
       }
 
@@ -4263,13 +4370,15 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
       
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
-      await supabase.from('bookings').update({ 
+      await db.from('bookings').update({ 
         is_invoice_generated: true,
         extra_services: extraServices,
         payment_mode: paymentMode,
         payment_status: 'Pending',
         invoice_url: downloadUrl
       }).eq('id', selectedBooking.id);
+      
+      if (onUpdate) onUpdate();
       
       // Update local state for immediate UI feedback
       setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { 
@@ -4312,25 +4421,19 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         currentStatus: selectedBooking.status
       });
 
-      const { error } = await supabase.from('bookings').update({ 
+      const { error } = await db.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
-      if (error) {
-        console.error('Supabase Payment Update Error:', error);
-        if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
-        } else {
-          toast.error(`Error: ${error.message}`);
-        }
-        throw error;
-      }
-
-      toast.success(`Payment status updated to ${paymentStatus}`);
+      if (error) throw error;
+      
+      if (onUpdate) onUpdate();
+      fetchBookings();
+      
+      toast.success(`Payment status updated to ${paymentStatus}${paymentStatus === 'Paid' ? ' and marked as Completed' : ''}`);
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
-      fetchBookings();
     } catch (err: any) {
       console.error('Payment status update failed:', err);
       toast.error(`Failed to update payment status: ${err.message || 'Unknown error'}`);
@@ -4353,7 +4456,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('bookings').insert([{
+      const { error } = await db.from('bookings').insert([{
         user_id: user.uid,
         owner_id: user.uid,
         target_id: manualBooking.targetId,
@@ -4401,6 +4504,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
         totalAmount: 0
       });
       setManualCallSatisfied(false);
+      if (onUpdate) onUpdate();
       fetchBookings();
     } catch (err: any) {
       console.error('Manual Booking Error:', err);
@@ -4433,6 +4537,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
             <option value="pending">Pending</option>
             <option value="confirmed">Approved</option>
             <option value="cancelled">Rejected</option>
+            <option value="paid">Paid</option>
           </select>
           <input 
             type="date" 
@@ -4505,7 +4610,7 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                       "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
                       (booking.status === 'confirmed' || booking.status === 'paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
-                      {booking.status}
+                      {booking.status === 'paid' ? 'Completed' : booking.status}
                     </span>
                     {booking.status === 'confirmed' || booking.status === 'paid' ? (
                       <>
@@ -4539,26 +4644,51 @@ const BookingManagerView = ({ user, profile }: { user: any, profile: UserProfile
                           <Download size={18} />
                         </button>
                         {(booking.paymentStatus || booking.is_invoice_generated || booking.status === 'confirmed') && (
-                          <button 
-                            disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
-                            onClick={() => {
-                              if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
-                                toast.error('Payment status is already marked as PAID');
-                                return;
-                              }
-                              setSelectedBooking(booking);
-                              setPaymentStatus(booking.paymentStatus || 'Pending');
-                              setIsPaymentModalOpen(true);
-                            }}
-                            className={cn(
-                              "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
-                              (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
-                            )}
-                            title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
-                          >
-                            <CreditCard size={18} />
-                            <span className="text-sm font-medium">Payment Status</span>
-                          </button>
+                          <div className="flex space-x-2">
+                            <button 
+                              disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
+                              onClick={() => {
+                                if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
+                                  toast.error('Payment status is already marked as PAID');
+                                  return;
+                                }
+                                setSelectedBooking(booking);
+                                setPaymentStatus(booking.paymentStatus || 'Pending');
+                                setIsPaymentModalOpen(true);
+                              }}
+                              className={cn(
+                                "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
+                                (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
+                              )}
+                              title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
+                            >
+                              <CreditCard size={18} />
+                              <span className="text-sm font-medium">Payment Status</span>
+                            </button>
+                            <button 
+                              onClick={() => {
+                                try {
+                                  const pdfBlob = generateInvoice(booking, 0, profile);
+                                  const url = URL.createObjectURL(pdfBlob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  URL.revokeObjectURL(url);
+                                  toast.success('Invoice downloaded successfully');
+                                } catch (err) {
+                                  console.error('Download error:', err);
+                                  toast.error('Failed to generate invoice');
+                                }
+                              }}
+                              className="p-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-xl transition-all border border-orange-100"
+                              title="Download PDF Invoice"
+                            >
+                              <Download size={18} />
+                            </button>
+                          </div>
                         )}
                       </>
                     ) : null}
@@ -5291,7 +5421,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     const checkSubscription = async () => {
       if (!profile || profile.role === 'user' || profile.role === 'admin') return;
       
-      const { data: sub } = await supabase
+      const { data: sub } = await db
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', user.uid)
@@ -5340,7 +5470,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   const fetchDashboardData = async () => {
     if (!user?.uid) return;
     try {
-      const { data: bData } = await supabase
+      const { data: bData } = await db
         .from('bookings')
         .select('*')
         .or(`user_id.eq.${user.uid},owner_id.eq.${user.uid}`);
@@ -5349,25 +5479,32 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         setBookings(bData.map(d => ({
           ...d,
           userId: d.user_id,
-          visitorName: d.visitor_name,
-          visitorMobile: d.visitor_mobile,
-          eventType: d.event_type,
+          ownerId: d.owner_id,
           targetId: d.target_id,
           targetType: d.target_type,
           targetName: d.target_name,
-          ownerId: d.owner_id,
           eventDate: d.event_date,
-          totalAmount: d.total_amount,
+          endDate: d.end_date,
+          startTime: d.start_time,
+          endTime: d.end_time,
+          status: d.status,
+          totalAmount: d.total_amount || 0,
           updatedAmount: d.updated_amount,
-          paymentStatus: d.payment_status,
+          eventType: d.event_type,
+          partyName: d.party_name,
+          partyAddress: d.party_address,
+          visitorName: d.visitor_name,
+          visitorMobile: d.visitor_mobile,
+          paymentStatus: d.payment_status ? (d.payment_status.charAt(0).toUpperCase() + d.payment_status.slice(1)) : 'Pending',
           paymentMode: d.payment_mode,
+          isManual: d.is_manual,
           is_invoice_generated: d.is_invoice_generated,
           invoice_url: d.invoice_url,
           createdAt: d.created_at
         }) as Booking));
       }
 
-      const { data: vData } = await supabase
+      const { data: vData } = await db
         .from('venues')
         .select('*')
         .eq('owner_id', user.uid);
@@ -5378,12 +5515,14 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           ownerId: d.owner_id,
           venueType: d.venue_type,
           pricePerDay: d.price_per_day,
+          availableFor: d.available_for || [],
+          catalogue: d.catalogue || [],
           reviewCount: d.review_count,
           createdAt: d.created_at
         }) as Venue));
       }
 
-      const { data: sData } = await supabase
+      const { data: sData } = await db
         .from('service_providers')
         .select('*')
         .eq('provider_id', user.uid);
@@ -5395,6 +5534,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           serviceType: d.service_type,
           priceRange: d.price_range,
           priceLevel: d.price_level,
+          availableFor: d.available_for || [],
+          catalogue: d.catalogue || [],
           reviewCount: d.review_count,
           createdAt: d.created_at
         }) as ServiceProvider));
@@ -5411,21 +5552,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     fetchDashboardData();
 
     // Realtime subscriptions
-    const bookingChannel = supabase
+    const bookingChannel = db
       .channel(`dashboard_bookings_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchDashboardData();
       })
       .subscribe();
 
-    const venueChannel = supabase
+    const venueChannel = db
       .channel(`dashboard_venues_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => {
         fetchDashboardData();
       })
       .subscribe();
 
-    const serviceChannel = supabase
+    const serviceChannel = db
       .channel(`dashboard_services_${user.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, () => {
         fetchDashboardData();
@@ -5433,9 +5574,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       .subscribe();
 
     return () => {
-      supabase.removeChannel(bookingChannel);
-      supabase.removeChannel(venueChannel);
-      supabase.removeChannel(serviceChannel);
+      db.removeChannel(bookingChannel);
+      db.removeChannel(venueChannel);
+      db.removeChannel(serviceChannel);
     };
   }, [user?.uid, profile?.role]);
 
@@ -5464,12 +5605,12 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     return !item.roles || item.roles.includes(profile?.role || '');
   });
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: bookings.length,
     pending: bookings.filter(b => b.status === 'pending' || b.paymentStatus === 'Pending').length,
     approved: bookings.filter(b => b.status === 'confirmed').length,
     paid: bookings.filter(b => b.status === 'paid' || b.paymentStatus === 'Paid').length
-  };
+  }), [bookings]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
@@ -5621,7 +5762,12 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
                       <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-white/20 shadow-xl">
                         {profile?.photoURL ? (
-                          <img src={profile.photoURL} alt={profile.displayName} className="w-full h-full object-cover" />
+                          <img 
+                            src={profile.photoURL} 
+                            alt={profile.displayName} 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer"
+                          />
                         ) : (
                           <div className="w-full h-full bg-white/20 flex items-center justify-center text-4xl font-bold">
                             {profile?.displayName?.charAt(0)}
@@ -5689,7 +5835,14 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                 <OrderManageView user={user} profile={profile} bookings={bookings} onUpdate={fetchDashboardData} />
               )}
               {activeTab === 'booking-manager' && (
-                <BookingManagerView user={user} profile={profile} />
+                <BookingManagerView 
+                  user={user} 
+                  profile={profile} 
+                  bookings={bookings} 
+                  venues={venues} 
+                  services={services} 
+                  onUpdate={fetchDashboardData} 
+                />
               )}
               {activeTab === 'services' && (
                 <ServicesManageView user={user} services={services} />
@@ -5807,6 +5960,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">P.Status</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Type</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
@@ -5828,7 +5982,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                     b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
                                     b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
                                   }`}>
-                                    {b.status === 'confirmed' ? 'Accepted' : b.status}
+                                    {b.status === 'confirmed' ? 'Approved' : b.status === 'paid' ? 'Completed' : b.status}
                                   </span>
                                 </td>
                                 <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName}</td>
@@ -5850,6 +6004,31 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                   </span>
                                 </td>
                                 <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
+                                <td className="py-4">
+                                  <button 
+                                    onClick={() => {
+                                      try {
+                                        const pdfBlob = generateInvoice(b, 0, profile);
+                                        const url = URL.createObjectURL(pdfBlob);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        URL.revokeObjectURL(url);
+                                        toast.success('Invoice downloaded successfully');
+                                      } catch (err) {
+                                        console.error('Download error:', err);
+                                        toast.error('Failed to generate invoice');
+                                      }
+                                    }}
+                                    className="p-2 text-orange-600 hover:bg-orange-100 rounded-xl transition-all"
+                                    title="Download PDF Invoice"
+                                  >
+                                    <Download size={18} />
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -5876,7 +6055,7 @@ const VenueManageView = ({ user, venues }: { user: any, venues: Venue[] }) => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('venues').delete().eq('id', id);
+      const { error } = await db.from('venues').delete().eq('id', id);
       if (error) throw error;
       toast.success('Venue deleted');
       setDeletingId(null);
@@ -5949,12 +6128,13 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   
   const filteredBookings = visitorBookings.filter(b => {
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter || (statusFilter === 'paid' && isPaid);
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'pending' && b.status === 'pending') ||
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid')) ||
+                         (statusFilter === 'cancelled' && b.status === 'cancelled') ||
+                         (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     
-    // If status filter is 'all', show everything. 
-    // If it's a specific status, match it.
-    if (statusFilter === 'all') return matchesDate;
     return matchesStatus && matchesDate;
   });
 
@@ -5978,11 +6158,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       toast.error('Please confirm that you have called the visitor');
       return;
     }
-    const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
+    const { error } = await db.from('bookings').update({ status }).eq('id', id);
     if (!error) {
       toast.success('Status updated to ' + status);
       setIsAcceptModalOpen(false);
       setIsCallSatisfied(false);
+      if (onUpdate) onUpdate();
     } else {
       toast.error('Failed to update status');
     }
@@ -5990,11 +6171,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
 
   const handleUpdateAmount = async () => {
     if (!selectedBooking) return;
-    const { error } = await supabase.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
+    const { error } = await db.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
     if (!error) {
       toast.success('Booking amount updated');
       setIsAmountModalOpen(false);
       setSelectedBooking(null);
+      if (onUpdate) onUpdate();
     } else {
       toast.error('Failed to update amount');
     }
@@ -6017,15 +6199,15 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       
       const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
       
-      // Upload to Supabase Storage to get a public link
+      // Upload to Storage to get a public link
       const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await db.storage
         .from('images')
         .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
 
       let downloadUrl = '';
       if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(fileName);
         downloadUrl = publicUrl;
       }
 
@@ -6039,7 +6221,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       
       sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
       
-      await supabase.from('bookings').update({ 
+      await db.from('bookings').update({ 
         is_invoice_generated: true,
         extra_services: extraServices,
         payment_mode: paymentMode,
@@ -6078,15 +6260,15 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
         currentStatus: selectedBooking.status
       });
 
-      const { error } = await supabase.from('bookings').update({ 
+      const { error } = await db.from('bookings').update({ 
         payment_status: paymentStatus,
         status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
       }).eq('id', selectedBooking.id);
 
       if (error) {
-        console.error('Supabase Payment Update Error (OrderManage):', error);
+        console.error('Database Payment Update Error (OrderManage):', error);
         if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+          toast.error('Database schema error: payment_status column missing or cache stale.');
         } else {
           toast.error(`Error: ${error.message}`);
         }
@@ -6095,7 +6277,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
 
       if (onUpdate) onUpdate();
       
-      toast.success(`Payment status updated to ${paymentStatus}`);
+      toast.success(`Payment status updated to ${paymentStatus}${paymentStatus === 'Paid' ? ' and marked as Completed' : ''}`);
       setIsPaymentModalOpen(false);
       setSelectedBooking(null);
     } catch (err: any) {
@@ -6138,7 +6320,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
         handler: async function (response: any) {
           // 3. On success, update database
           try {
-            const { error } = await supabase.from('bookings').update({ 
+            const { error } = await db.from('bookings').update({ 
               status: 'paid',
               payment_status: 'Paid'
             }).eq('id', booking.id);
@@ -6146,7 +6328,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
             if (error) {
               console.error('Razorpay Payment Update Error:', error);
               if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
-                toast.error('Database schema error: payment_status column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+                toast.error('Database schema error: payment_status column missing or cache stale.');
               } else {
                 toast.error(`Failed to update payment status: ${error.message}`);
               }
@@ -6213,7 +6395,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : 
                   b.status === 'paid' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                 )}>
-                  {b.status}
+                  {b.status === 'paid' ? 'Completed' : b.status}
                 </span>
               </div>
               <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2 mt-2">
@@ -6562,7 +6744,7 @@ const ServicesManageView = ({ user, services }: { user: any, services: ServicePr
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from('service_providers').delete().eq('id', id);
+      const { error } = await db.from('service_providers').delete().eq('id', id);
       if (error) throw error;
       toast.success('Service deleted');
       setDeletingId(null);
@@ -6637,10 +6819,10 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       if (!user || !profile) return;
       setLoading(true);
       try {
-        const { data: pData } = await supabase.from('subscription_plans').select('*').eq('role', profile.role).eq('is_active', true);
+        const { data: pData } = await db.from('subscription_plans').select('*').eq('role', profile.role).eq('is_active', true);
         if (pData) setPlans(pData.map(d => ({ id: d.id, name: d.name, price: d.price, duration: d.duration, role: d.role, isActive: d.is_active, createdAt: d.created_at } as SubscriptionPlan)));
 
-        const { data: sData } = await supabase.from('user_subscriptions').select('*').eq('user_id', user.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
+        const { data: sData } = await db.from('user_subscriptions').select('*').eq('user_id', user.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
         if (sData && sData.length > 0) {
           const d = sData[0];
           setCurrentSub({ id: d.id, userId: d.user_id, planId: d.plan_id, startDate: d.start_date, endDate: d.end_date, status: d.status, amount: d.amount, createdAt: d.created_at });
@@ -6693,7 +6875,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
           else endDate.setFullYear(endDate.getFullYear() + 1);
 
           try {
-            const { error } = await supabase.from('user_subscriptions').insert([{
+            const { error } = await db.from('user_subscriptions').insert([{
               user_id: user.uid,
               plan_id: plan.id,
               start_date: startDate.toISOString(),
@@ -6823,7 +7005,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
       const updatedCatalogue = [...(selectedItem.catalogue || []), newItem as CatalogueItem];
       const table = activeType === 'venue' ? 'venues' : 'service_providers';
       
-      const { error } = await supabase.from(table).update({ catalogue: updatedCatalogue }).eq('id', selectedItem.id);
+      const { error } = await db.from(table).update({ catalogue: updatedCatalogue }).eq('id', selectedItem.id);
       if (error) throw error;
       
       setNewItem({ level: activeType === 'venue' ? 'rooms(ac)' : 'work sample', capacity: 0, images: [], videos: [], description: '' });
@@ -6840,7 +7022,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
     const updatedCatalogue = selectedItem.catalogue.filter((_, i) => i !== idx);
     const table = activeType === 'venue' ? 'venues' : 'service_providers';
     
-    const { error } = await supabase.from(table).update({ catalogue: updatedCatalogue }).eq('id', selectedItem.id);
+    const { error } = await db.from(table).update({ catalogue: updatedCatalogue }).eq('id', selectedItem.id);
     if (!error) {
       toast.success('Catalogue item removed');
     } else {
@@ -6941,18 +7123,19 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <div className="md:col-span-2">
                   <ImageUpload 
                     label="Upload Photos (Multiple)" 
+                    multiple={true}
                     onUpload={(url) => {
                       if (url) {
-                        setNewItem({...newItem, images: [...(newItem.images || []), url]});
+                        setNewItem(prev => ({...prev, images: [...(prev.images || []), url]}));
                       }
                     }}
                   />
                   <div className="grid grid-cols-4 gap-2 mt-2">
                     {newItem.images?.filter(img => img !== '').map((img, i) => (
                       <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
-                        <img src={img} className="w-full h-full object-cover" />
+                        <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <button 
-                          onClick={() => setNewItem({...newItem, images: newItem.images?.filter((_, idx) => idx !== i)})}
+                          onClick={() => setNewItem(prev => ({...prev, images: prev.images?.filter((_, idx) => idx !== i)}))}
                           className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
                         >
                           <X size={12} />
@@ -6964,14 +7147,15 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <div className="md:col-span-2">
                   <VideoUpload 
                     label="Upload Videos (Max 2 mins)" 
-                    onUpload={(url) => setNewItem({...newItem, videos: [...(newItem.videos || []), url]})}
+                    multiple={true}
+                    onUpload={(url) => setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}))}
                   />
                   <div className="grid grid-cols-4 gap-2 mt-2">
                     {newItem.videos?.map((vid, i) => (
                       <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
                         <video src={vid} className="w-full h-full object-cover" />
                         <button 
-                          onClick={() => setNewItem({...newItem, videos: newItem.videos?.filter((_, idx) => idx !== i)})}
+                          onClick={() => setNewItem(prev => ({...prev, videos: prev.videos?.filter((_, idx) => idx !== i)}))}
                           className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
                         >
                           <X size={12} />
@@ -6997,7 +7181,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                   <div className="w-full md:w-48 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       {item.images.slice(0, 4).map((img, idx) => (
-                        <img key={idx} src={img} className="w-full aspect-square object-cover rounded-xl shadow-sm" />
+                        <img key={idx} src={img} className="w-full aspect-square object-cover rounded-xl shadow-sm" referrerPolicy="no-referrer" />
                       ))}
                     </div>
                     {item.videos && item.videos.length > 0 && (
@@ -7071,7 +7255,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.from('service_providers').insert([{
+      const { error } = await db.from('service_providers').insert([{
         name: formData.name,
         service_type: formData.serviceType,
         description: formData.description,
@@ -7083,12 +7267,8 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         review_count: 0
       }]);
       if (error) {
-        console.error('Add Service Supabase Error:', error);
-        if (error.message.includes('column "district" does not exist')) {
-          toast.error('Database schema error: district column missing. Please run the FIX_DISTRICT_COLUMN.sql script.');
-        } else {
-          toast.error(`Failed to add service: ${error.message}`);
-        }
+        console.error('Add Service Error:', error);
+        toast.error(`Failed to add service: ${error.message}`);
         throw error;
       }
       toast.success('Service added successfully!');
@@ -7198,7 +7378,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
           <div className="md:col-span-2">
             <ImageUpload 
               label="Service Main Image" 
-              currentImage={formData.images[0]}
+              currentImage={formData.images?.[0]}
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
@@ -7224,7 +7404,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
   useEffect(() => {
     const fetchService = async () => {
       if (!id) return;
-      const { data, error } = await supabase.from('service_providers').select('*').eq('id', id).single();
+      const { data, error } = await db.from('service_providers').select('*').eq('id', id).single();
       if (!error && data) {
         if (data.provider_id !== user.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
@@ -7249,7 +7429,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
     e.preventDefault();
     if (!id) return;
     try {
-      const { error } = await supabase.from('service_providers').update({
+      const { error } = await db.from('service_providers').update({
         name: formData.name,
         service_type: formData.serviceType,
         description: formData.description,
@@ -7357,15 +7537,20 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           <div className="md:col-span-2">
             <ImageUpload 
               label="Service Main Image" 
-              currentImage={formData.images[0]}
+              currentImage={formData.images?.[0]}
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {[
+                'Weddings', 'Sangeet', 'Engagement', 'Haldi', 'Birthday Party', 'Anniversary', 
+                'Corporate Event', 'Seminar', 'Workshop', 'Exhibition', 'Music Concert', 
+                'Product Launch', 'School Event', 'Cultural Program', 'Special Occasion',
+                'work sample', 'portfolio'
+              ].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
@@ -7379,7 +7564,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
                       }
                     }}
                   />
-                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                  <span className="text-xs font-bold text-gray-700">{option}</span>
                 </label>
               ))}
             </div>
@@ -7405,7 +7590,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
   useEffect(() => {
     const fetchVenue = async () => {
       if (!id) return;
-      const { data, error } = await supabase.from('venues').select('*').eq('id', id).single();
+      const { data, error } = await db.from('venues').select('*').eq('id', id).single();
       if (!error && data) {
         if (data.owner_id !== user.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
@@ -7429,7 +7614,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
     e.preventDefault();
     if (!id) return;
     try {
-      const { error } = await supabase.from('venues').update({
+      const { error } = await db.from('venues').update({
         name: formData.name,
         venue_type: formData.venueType,
         description: formData.description,
@@ -7535,7 +7720,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           <div className="md:col-span-2">
             <ImageUpload 
               label="Venue Main Image" 
-              currentImage={formData.images[0]}
+              currentImage={formData.images?.[0]}
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
@@ -7551,9 +7736,16 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {['Weddings', 'Parties', 'Events', 'Meetings', 'Seminars', 'Special Occasion'].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-orange-50 transition-colors">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {[
+                'Weddings', 'Sangeet', 'Engagement', 'Haldi', 'Birthday Party', 'Anniversary', 
+                'Corporate Event', 'Seminar', 'Workshop', 'Exhibition', 'Music Concert', 
+                'Product Launch', 'School Event', 'Cultural Program', 'Special Occasion',
+                'rooms(ac)', 'rooms(non ac)', 'dinner hall', 'wedding hall', 'stage site', 
+                'cattering hall', 'parking site', 'party hall', 'meeting hall', 
+                'reshort site', 'counter site', 'garden site', 'ground', 'Indoor', 'Outdoor'
+              ].map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
@@ -7567,7 +7759,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
                       }
                     }}
                   />
-                  <span className="text-sm font-medium text-gray-700">{option}</span>
+                  <span className="text-xs font-bold text-gray-700">{option}</span>
                 </label>
               ))}
             </div>
@@ -7606,7 +7798,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
         return;
       }
 
-      const { error } = await supabase
+      const { error } = await db
         .from('users')
         .update({
           display_name: formData.displayName,
@@ -7776,7 +7968,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.from('venues').insert([{
+      const { error } = await db.from('venues').insert([{
         name: formData.name,
         venue_type: formData.venueType,
         description: formData.description,
@@ -7791,12 +7983,8 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         review_count: 0
       }]);
       if (error) {
-        console.error('Add Venue Supabase Error:', error);
-        if (error.message.includes('column "district" does not exist')) {
-          toast.error('Database schema error: district column missing. Please run the FIX_DISTRICT_COLUMN.sql script.');
-        } else {
-          toast.error(`Failed to add venue: ${error.message}`);
-        }
+        console.error('Add Venue Error:', error);
+        toast.error(`Failed to add venue: ${error.message}`);
         throw error;
       }
       toast.success('Venue added successfully!');
@@ -7899,7 +8087,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
           <div className="md:col-span-2">
             <ImageUpload 
               label="Venue Main Image" 
-              currentImage={formData.images[0]}
+              currentImage={formData.images?.[0]}
               onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
             />
           </div>
@@ -7951,8 +8139,8 @@ const SearchResultsView = () => {
     const fetchData = async () => {
       setLoading(true);
       const [venuesRes, servicesRes] = await Promise.all([
-        supabase.from('venues').select('*'),
-        supabase.from('service_providers').select('*')
+        db.from('venues').select('*'),
+        db.from('service_providers').select('*')
       ]);
 
       if (venuesRes.data) {
@@ -8217,6 +8405,21 @@ export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
   
   useEffect(() => {
+    console.log(`[DATABASE] Mode: ${isSupabaseConnected ? 'REAL SUPABASE' : 'MOCK DATA'}`);
+    if (isSupabaseConnected) {
+      // Test connection
+      db.from('users').select('uid').limit(1).then(({ error }) => {
+        if (error) {
+          console.error('[DATABASE] Connection test failed:', error.message);
+          toast.error('Database connection failed. Please check your Supabase keys.');
+        } else {
+          console.log('[DATABASE] Connection test successful!');
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
@@ -8246,7 +8449,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await db.auth.signOut();
       localStorage.removeItem('custom_user');
       localStorage.removeItem('custom_profile');
       setUser(null);
@@ -8269,11 +8472,11 @@ export default function App() {
           setUser(JSON.parse(savedUser));
           setProfile(JSON.parse(savedProfile));
         } else {
-          // Check Supabase session (if using Supabase Auth)
-          const { data: { session } } = await supabase.auth.getSession();
+          // Check session
+          const { data: { session } } = await db.auth.getSession();
           if (session?.user) {
             setUser(session.user);
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData, error: profileError } = await db
               .from('users')
               .select('*')
               .eq('uid', session.user.id)
@@ -8305,10 +8508,10 @@ export default function App() {
         }
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = db.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
             setUser(session.user);
-            const { data: profileData, error: profileError } = await supabase
+            const { data: profileData, error: profileError } = await db
               .from('users')
               .select('*')
               .eq('uid', session.user.id)
@@ -8341,19 +8544,19 @@ export default function App() {
 
         // Test connection and seed demo data if needed
         /*
-        const ownerId = '00000000-0000-0000-0000-000000000001'; // Demo UUIDs for Supabase
+        const ownerId = '00000000-0000-0000-0000-000000000001'; // Demo UUIDs for db
         const providerId = '00000000-0000-0000-0000-000000000002';
         
-        const { data: ownerProfile } = await supabase
+        const { data: ownerProfile } = await db
           .from('users')
           .select('*')
           .eq('uid', ownerId)
           .single();
 
         if (!ownerProfile) {
-          console.log('[INIT] Seeding demo data to Supabase...');
+          console.log('[INIT] Seeding demo data to db...');
           
-          await supabase.from('users').insert([
+          await db.from('users').insert([
             {
               uid: ownerId,
               registration_id: 'UTSAV111111',
@@ -8385,7 +8588,7 @@ export default function App() {
             }
           ]);
 
-          await supabase.from('venues').insert([{
+          await db.from('venues').insert([{
             id: '00000000-0000-0000-0000-000000000003',
             owner_id: ownerId,
             name: 'Royal Heritage Garden',
@@ -8404,7 +8607,7 @@ export default function App() {
             rating: 0
           }]);
 
-          await supabase.from('service_providers').insert([{
+          await db.from('service_providers').insert([{
             id: '00000000-0000-0000-0000-000000000004',
             provider_id: providerId,
             name: 'Tasty Bites Catering',
@@ -8416,7 +8619,7 @@ export default function App() {
             rating: 0
           }]);
           
-          console.log('Demo data seeded to Supabase');
+          console.log('Demo data seeded to db');
         }
         */
       } catch (err) {
@@ -8433,7 +8636,7 @@ export default function App() {
 
   useEffect(() => {
     const fetchAppRating = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('app_feedback')
         .select('rating');
       
@@ -8451,13 +8654,13 @@ export default function App() {
     };
     fetchAppRating();
     
-    const channel = supabase
+    const channel = db
       .channel('app_feedback_footer')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_feedback' }, fetchAppRating)
       .subscribe();
       
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, []);
 
@@ -8661,7 +8864,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   useEffect(() => {
     if (!user || user.email !== 'admin@eventmanager.com') return;
 
-    const channel = supabase
+    const channel = db
       .channel('admin_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchData)
@@ -8672,7 +8875,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
   }, [user, activeTab]);
 
@@ -8680,7 +8883,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     setLoading(true);
     try {
       if (activeTab === 'dashboard') {
-        const { data: bData } = await supabase.from('bookings').select('*').order('created_at', { ascending: false });
+        const { data: bData } = await db.from('bookings').select('*').order('created_at', { ascending: false });
         if (bData) setBookings(bData.map(d => ({
           ...d,
           userId: d.user_id,
@@ -8701,7 +8904,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           createdAt: d.created_at
         } as Booking)));
 
-        const { data: sData } = await supabase.from('user_subscriptions').select('*');
+        const { data: sData } = await db.from('user_subscriptions').select('*');
         if (sData) setSubscriptions(sData.map(d => ({
           ...d,
           userId: d.user_id,
@@ -8713,7 +8916,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       }
 
       if (activeTab === 'dashboard' || activeTab === 'users') {
-        const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+        const { data } = await db.from('users').select('*').order('created_at', { ascending: false });
         if (data) setUsers(data.map(d => ({
           uid: d.uid,
           registrationId: d.registration_id,
@@ -8727,7 +8930,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       }
       
       if (activeTab === 'plans') {
-        const { data } = await supabase.from('subscription_plans').select('*');
+        const { data } = await db.from('subscription_plans').select('*');
         if (data) setPlans(data.map(d => ({
           id: d.id,
           role: d.role,
@@ -8737,13 +8940,13 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           isActive: d.is_active
         } as SubscriptionPlan)));
       } else if (activeTab === 'notifications') {
-        const { data } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+        const { data } = await db.from('notifications').select('*').order('created_at', { ascending: false });
         if (data) setNotifications(data);
       } else if (activeTab === 'banners') {
-        const { data } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
+        const { data } = await db.from('banners').select('*').order('created_at', { ascending: false });
         if (data) setBanners(data);
       } else if (activeTab === 'servicePhotos') {
-        const { data } = await supabase.from('service_type_photos').select('*').order('created_at', { ascending: false });
+        const { data } = await db.from('service_type_photos').select('*').order('created_at', { ascending: false });
         if (data) setServicePhotos(data.map(d => ({
           id: d.id,
           serviceType: d.service_type,
@@ -8768,11 +8971,11 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         setLoading(true);
         try {
           // Update all venues
-          const { error: vError } = await supabase.from('venues').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+          const { error: vError } = await db.from('venues').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
           // Update all service providers
-          const { error: sError } = await supabase.from('service_providers').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+          const { error: sError } = await db.from('service_providers').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
           // Delete all reviews
-          const { error: rError } = await supabase.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          const { error: rError } = await db.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
           
           if (vError || sError || rError) {
             console.error('Reset error:', { vError, sError, rError });
@@ -8798,7 +9001,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       message: 'Are you sure you want to delete this notification?',
       isDanger: true,
       onConfirm: async () => {
-        const { error } = await supabase.from('notifications').delete().eq('id', id);
+        const { error } = await db.from('notifications').delete().eq('id', id);
         if (!error) {
           toast.success('Notification deleted');
           setNotifications(prev => prev.filter(n => n.id !== id));
@@ -8818,7 +9021,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       isDanger: true,
       onConfirm: async () => {
         console.log('Deleting banner:', id);
-        const { error } = await supabase.from('banners').delete().eq('id', id);
+        const { error } = await db.from('banners').delete().eq('id', id);
         if (!error) {
           toast.success('Banner deleted');
           setBanners(prev => prev.filter(b => b.id !== id));
@@ -8839,7 +9042,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       isDanger: true,
       onConfirm: async () => {
         console.log('Deleting service photo:', id);
-        const { error } = await supabase.from('service_type_photos').delete().eq('id', id);
+        const { error } = await db.from('service_type_photos').delete().eq('id', id);
         if (!error) {
           toast.success('Service photo deleted');
           setServicePhotos(prev => prev.filter(p => p.id !== id));
@@ -8855,7 +9058,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const toggleUserStatus = async (uid: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
     console.log(`Toggling user ${uid} status to ${newStatus}`);
-    const { error } = await supabase.from('users').update({ status: newStatus }).eq('uid', uid);
+    const { error } = await db.from('users').update({ status: newStatus }).eq('uid', uid);
     if (!error) {
       toast.success(`User ${newStatus === 'active' ? 'enabled' : 'disabled'}`);
       setUsers(prev => prev.map(u => u.uid === uid ? { ...u, status: newStatus } : u));
@@ -8872,7 +9075,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       message: 'Are you sure you want to delete this user?',
       isDanger: true,
       onConfirm: async () => {
-        const { error } = await supabase.from('users').delete().eq('uid', uid);
+        const { error } = await db.from('users').delete().eq('uid', uid);
         if (!error) {
           toast.success('User deleted');
           setUsers(prev => prev.filter(u => u.uid !== uid));
@@ -8893,7 +9096,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     setLoading(true);
     try {
       console.log(`Updating plan ${id} price to ${newPrice}`);
-      const { error } = await supabase.from('subscription_plans').update({ price: newPrice }).eq('id', id);
+      const { error } = await db.from('subscription_plans').update({ price: newPrice }).eq('id', id);
       
       if (error) throw error;
       
@@ -8908,7 +9111,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   };
 
   const togglePlanStatus = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('subscription_plans').update({ is_active: !currentStatus }).eq('id', id);
+    const { error } = await db.from('subscription_plans').update({ is_active: !currentStatus }).eq('id', id);
     if (!error) {
       toast.success(`Plan ${!currentStatus ? 'enabled' : 'disabled'}`);
       fetchData();
@@ -8962,11 +9165,11 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         is_active: true
       }));
       
-      const { error } = await supabase.from('notifications').insert(inserts);
+      const { error } = await db.from('notifications').insert(inserts);
       if (error) {
         console.error('Add Notification Error:', error);
         if (error.message.includes('column "is_active" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: is_active column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+          toast.error('Database schema error: is_active column missing or cache stale.');
         } else {
           toast.error(`Failed to add notifications: ${error.message}`);
         }
@@ -8989,15 +9192,15 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     try {
       const uploadPromises = Array.from(files).map(async (file) => {
         const filePath = `banners/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file);
+        const { error: uploadError } = await db.storage.from('images').upload(filePath, file);
         if (uploadError) throw uploadError;
         
-        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(filePath);
+        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(filePath);
         return { title: file.name, image_url: publicUrl, is_active: true };
       });
       
       const bannerData = await Promise.all(uploadPromises);
-      const { error } = await supabase.from('banners').insert(bannerData);
+      const { error } = await db.from('banners').insert(bannerData);
       if (error) throw error;
       
       toast.success(`${files.length} banner(s) added`);
@@ -9016,15 +9219,15 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     try {
       const uploadPromises = Array.from(files).map(async (file) => {
         const filePath = `service_photos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file);
+        const { error: uploadError } = await db.storage.from('images').upload(filePath, file);
         if (uploadError) throw uploadError;
         
-        const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(filePath);
+        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(filePath);
         return { service_type: serviceType, image_url: publicUrl };
       });
       
       const photoData = await Promise.all(uploadPromises);
-      const { error } = await supabase.from('service_type_photos').insert(photoData);
+      const { error } = await db.from('service_type_photos').insert(photoData);
       if (error) throw error;
       
       toast.success(`${files.length} photo(s) added for ${serviceType}`);
@@ -9041,7 +9244,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     if (!editingNotification) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('notifications')
         .update({
           title: editingNotification.title,
@@ -9069,19 +9272,19 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       try {
         // Update password in admin_settings
         if (adminProfile.password) {
-          await supabase
+          await db
             .from('admin_settings')
             .update({ value: adminProfile.password })
             .eq('key', 'admin_password');
         }
         
         // Update mobile in admin_settings
-        await supabase
+        await db
           .from('admin_settings')
           .upsert({ key: 'admin_mobile', value: adminProfile.mobileNumber });
 
         // Also update the users table for the admin user
-        await supabase
+        await db
           .from('users')
           .update({
             display_name: adminProfile.displayName,
@@ -9496,7 +9699,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {banners.map(b => (
                       <div key={b.id} className="group relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                        <img src={b.imageUrl} alt="Banner" className="w-full h-48 object-cover" />
+                        <img src={b.imageUrl} alt="Banner" className="w-full h-48 object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
                             onClick={() => deleteBanner(b.id)}
@@ -9549,7 +9752,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {servicePhotos.map(p => (
                       <div key={p.id} className="group relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
-                        <img src={p.imageUrl} alt={p.serviceType} className="w-full h-40 object-cover" />
+                        <img src={p.imageUrl} alt={p.serviceType} className="w-full h-40 object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
                             onClick={() => deleteServicePhoto(p.id)}
@@ -9643,7 +9846,7 @@ const VenueListView = () => {
 
   useEffect(() => {
     const fetchVenues = async () => {
-      const { data: venuesData, error } = await supabase
+      const { data: venuesData, error } = await db
         .from('venues')
         .select('*');
       
@@ -9768,7 +9971,7 @@ const ServiceListView = ({ user }: { user: any }) => {
 
   useEffect(() => {
     const fetchServices = async () => {
-      const { data: servicesData, error } = await supabase
+      const { data: servicesData, error } = await db
         .from('service_providers')
         .select('*');
       

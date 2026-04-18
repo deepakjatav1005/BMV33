@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import {createRoot} from 'react-dom/client';
 import App, { ErrorBoundary } from './App.tsx';
 import './index.css';
