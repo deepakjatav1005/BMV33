@@ -1,6 +1,6 @@
 {
-  "name": "BOOK MY VANUE",
-  "description": "A comprehensive event management platform for booking venues and services. Manage profiles, catalogs, and bookings with ease.",
+  "name": "BEST VANUE OPTION",
+  "description": "The best platform for finding and booking venues for your special events. Discover, compare, and book venues with ease.",
   "requestFramePermissions": [
     "geolocation"
   ]

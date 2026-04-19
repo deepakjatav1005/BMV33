@@ -3,6 +3,317 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+  =============================================================================
+  MASTER SQL SCRIPT FOR SUPABASE (Execute in Supabase SQL Editor):
+  =============================================================================
+  -- ENABLE UUID EXTENSION
+  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  -- 1. Users Table
+  CREATE TABLE IF NOT EXISTS public.users (
+      uid TEXT PRIMARY KEY,
+      registration_id TEXT UNIQUE,
+      display_name TEXT,
+      father_name TEXT,
+      mobile_number TEXT UNIQUE,
+      email TEXT,
+      photo_url TEXT,
+      role TEXT,
+      state TEXT,
+      district TEXT,
+      block TEXT,
+      pincode TEXT,
+      venue_type TEXT, -- Added for owners
+      status TEXT DEFAULT 'active',
+      password TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 2. Venues Table
+  CREATE TABLE IF NOT EXISTS public.venues (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      owner_id TEXT,
+      name TEXT,
+      venue_type TEXT,
+      description TEXT,
+      address TEXT,
+      state TEXT,
+      district TEXT,
+      block TEXT,
+      pincode TEXT,
+      capacity INTEGER,
+      price_per_day NUMERIC,
+      images TEXT[],
+      video_url TEXT, -- Added video support
+      facilities TEXT[],
+      available_for TEXT[],
+      rating NUMERIC(3,1) DEFAULT 0,
+      review_count INTEGER DEFAULT 0,
+      catalogue JSONB DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 3. Service Providers Table
+  CREATE TABLE IF NOT EXISTS public.service_providers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      provider_id TEXT,
+      name TEXT,
+      service_type TEXT,
+      description TEXT,
+      price_range TEXT,
+      price_level TEXT,
+      images TEXT[],
+      video_url TEXT, -- Added video support
+      facilities TEXT[],
+      available_for TEXT[],
+      state TEXT,
+      district TEXT,
+      block TEXT,
+      pincode TEXT,
+      rating NUMERIC(3,1) DEFAULT 0,
+      review_count INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 4. Bookings Table
+  CREATE TABLE IF NOT EXISTS public.bookings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT,
+      owner_id TEXT,
+      target_id UUID,
+      target_type TEXT,
+      target_name TEXT,
+      visitor_name TEXT,
+      visitor_mobile TEXT,
+      event_date DATE,
+      end_date DATE,
+      start_time TIME,
+      end_time TIME,
+      event_type TEXT,
+      party_name TEXT,
+      party_address TEXT,
+      message TEXT,
+      status TEXT DEFAULT 'pending',
+      total_amount NUMERIC DEFAULT 0,
+      updated_amount NUMERIC,
+      payment_mode TEXT DEFAULT 'Cash',
+      payment_status TEXT DEFAULT 'Unpaid',
+      transaction_id TEXT,
+      is_invoice_generated BOOLEAN DEFAULT FALSE,
+      invoice_url TEXT,
+      is_manual BOOLEAN DEFAULT FALSE,
+      extra_services JSONB DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 5. App Feedback Table
+  CREATE TABLE IF NOT EXISTS public.app_feedback (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT,
+      user_name TEXT,
+      visitor_mobile TEXT,
+      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 6. Reviews Table
+  CREATE TABLE IF NOT EXISTS public.reviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      target_id UUID NOT NULL,
+      user_id TEXT,
+      visitor_name TEXT,
+      visitor_mobile TEXT,
+      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 7. Subscription Plans
+  CREATE TABLE IF NOT EXISTS public.subscription_plans (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      role TEXT,
+      name TEXT,
+      price NUMERIC,
+      duration TEXT,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 8. User Subscriptions
+  CREATE TABLE IF NOT EXISTS public.user_subscriptions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT,
+      plan_id UUID,
+      start_date DATE,
+      end_date DATE,
+      status TEXT DEFAULT 'active',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- 9. App Meta Tables
+  CREATE TABLE IF NOT EXISTS public.notifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title TEXT,
+      message TEXT,
+      target_role TEXT DEFAULT 'all',
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- MIGRATION: Ensure target_role exists if table was created earlier
+  DO $$ 
+  BEGIN 
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notifications' AND column_name='target_role') THEN
+          ALTER TABLE public.notifications ADD COLUMN target_role TEXT DEFAULT 'all';
+      END IF;
+  END $$;
+
+  CREATE TABLE IF NOT EXISTS public.banners (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title TEXT,
+      image_url TEXT,
+      link TEXT,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS public.service_type_photos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      service_type TEXT,
+      image_url TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS public.moments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      media_url TEXT,
+      type TEXT DEFAULT 'image',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS public.admin_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  -- ENABLE RLS & ADD POLICIES (Simplification: Permit Public Access for Demo)
+  -- FOR PRODUCTION, SPECIFY AUTH.UID() CHECKS
+  ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+  
+  ALTER TABLE public.venues ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access venues" ON public.venues FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.service_providers ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access providers" ON public.service_providers FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access bookings" ON public.bookings FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access reviews" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.app_feedback ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access app_feedback" ON public.app_feedback FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access banners" ON public.banners FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.service_type_photos ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access service_photos" ON public.service_type_photos FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.moments ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access moments" ON public.moments FOR ALL USING (true) WITH CHECK (true);
+
+  -- 10. STORAGE POLICIES (Run these in SQL Editor)
+  -- Note: You MUST create a bucket named 'images' in the Supabase Storage UI first
+  -- and set it to 'Public'. If policies are needed, use these:
+  -- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');
+  -- CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'images');
+  -- CREATE POLICY "Public Update" ON storage.objects FOR UPDATE USING (bucket_id = 'images');
+  -- CREATE POLICY "Public Delete" ON storage.objects FOR DELETE USING (bucket_id = 'images');
+
+  ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access settings" ON public.admin_settings FOR ALL USING (true) WITH CHECK (true);
+  
+  ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access plans" ON public.subscription_plans FOR ALL USING (true) WITH CHECK (true);
+
+  ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Public full access subscriptions" ON public.user_subscriptions FOR ALL USING (true) WITH CHECK (true);
+
+  -- ENABLE REALTIME FOR ALL TABLES
+  BEGIN;
+    DROP PUBLICATION IF EXISTS supabase_realtime;
+    CREATE PUBLICATION supabase_realtime FOR ALL TABLES;
+  COMMIT;
+
+  -- Ensure replica identity is set to FULL for all tables to ensure clean updates
+  ALTER TABLE public.users REPLICA IDENTITY FULL;
+  ALTER TABLE public.venues REPLICA IDENTITY FULL;
+  ALTER TABLE public.service_providers REPLICA IDENTITY FULL;
+  ALTER TABLE public.bookings REPLICA IDENTITY FULL;
+  ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+  ALTER TABLE public.banners REPLICA IDENTITY FULL;
+
+  -- =============================================================================
+  -- MIGRATIONS / PATCHES (Run these if your tables already exist but are missing columns)
+  -- =============================================================================
+  -- Patch for Users table (Missing venue_type)
+  DO $$ 
+  BEGIN 
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='venue_type') THEN
+          ALTER TABLE public.users ADD COLUMN venue_type TEXT;
+      END IF;
+  END $$;
+
+  -- Patch for Service Providers table (Missing facilities)
+  DO $$ 
+  BEGIN 
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_providers' AND column_name='facilities') THEN
+          ALTER TABLE public.service_providers ADD COLUMN facilities TEXT[];
+      END IF;
+  END $$;
+
+  -- Patch for Service Providers table (Missing video_url)
+  DO $$ 
+  BEGIN 
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_providers' AND column_name='video_url') THEN
+          ALTER TABLE public.service_providers ADD COLUMN video_url TEXT;
+      END IF;
+  END $$;
+
+  -- Patch for Venues table (Missing video_url)
+  DO $$ 
+  BEGIN 
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='venues' AND column_name='video_url') THEN
+          ALTER TABLE public.venues ADD COLUMN video_url TEXT;
+      END IF;
+  END $$;
+
+  -- Ensure App Feedback table exists and has RLS
+  CREATE TABLE IF NOT EXISTS public.app_feedback (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id TEXT,
+      user_name TEXT,
+      visitor_mobile TEXT,
+      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+  );
+  ALTER TABLE public.app_feedback ENABLE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS "Public full access app_feedback" ON public.app_feedback;
+  CREATE POLICY "Public full access app_feedback" ON public.app_feedback FOR ALL USING (true) WITH CHECK (true);
+
+  =============================================================================
+*/
+
 import React, { Component, useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -173,11 +484,11 @@ const translations: Record<string, any> = {
     allStates: "All States",
     allDistricts: "All Districts",
     allBlocks: "All Blocks",
-    whyPlanTitle: "Why Plan with BOOK MY VANUE?",
+    whyPlanTitle: "Why Plan with BEST VANUE OPTION?",
     verifiedPartners: "Verified Partners",
     bestPrices: "Best Prices",
     support247: "24/7 Support",
-    footerCopyright: "© 2026 BOOK MY VANUE India. All rights reserved.",
+    footerCopyright: "© 2026 BEST VANUE OPTION India. All rights reserved.",
     joinAsOwner: "Join Us as Venue Owner",
     joinAsProvider: "Join Us as Service Provider",
     register: "Register",
@@ -206,11 +517,11 @@ const translations: Record<string, any> = {
     allStates: "सभी राज्य",
     allDistricts: "सभी जिले",
     allBlocks: "सभी ब्लॉक",
-    whyPlanTitle: "BOOK MY VANUE के साथ योजना क्यों बनाएं?",
+    whyPlanTitle: "BEST VANUE OPTION के साथ योजना क्यों बनाएं?",
     verifiedPartners: "सत्यापित भागीदार",
     bestPrices: "सर्वोत्तम मूल्य",
     support247: "24/7 सहायता",
-    footerCopyright: "© 2026 BOOK MY VANUE इंडिया। सर्वाधिकार सुरक्षित।",
+    footerCopyright: "© 2026 BEST VANUE OPTION इंडिया। सर्वाधिकार सुरक्षित।",
     joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
     joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
     register: "पंजीकरण करें",
@@ -235,7 +546,157 @@ import { UserProfile, Venue, ServiceProvider, Booking, UserRole, VenueType, Revi
 
 declare var Razorpay: any;
 
-// --- Error Handling ---
+// --- Constants ---
+const VENUE_TYPES = [
+  'marriage garden', 
+  'hotel', 
+  'marriage hall', 
+  'restorent', 
+  'community halls'
+].sort();
+
+const SERVICE_TYPES = [
+  'dj and sound service',
+  'tent house',
+  'photo and videography',
+  'drone photo and videography',
+  'stage decorator',
+  'catrors',
+  'halbai',
+  'flower decorators',
+  'dhol and bands',
+  'ghoda gadi',
+  'light decorators',
+  'mehandi artits',
+  'makup artits',
+  'fast foods service',
+  'laundry services',
+  'event cloth and jwelary',
+  'musical group',
+  'vehicle on rent',
+  'pujari ji',
+  'event managers',
+  'helpers',
+  'gifts and hampers',
+  'other related services'
+].sort();
+
+const AVAILABLE_FOR_OPTIONS = [
+  'marriage', 'party', 'function', 'meetings', 'special event', 'conferences'
+].sort();
+
+const VENUE_FACILITY_OPTIONS = [
+  'ac rooms', 'non ac rooms', 'conference halls', 'lowns', 'parking', 'halls', 
+  'dyning hall', 'marriage hall', 'party hall', 'meeting hall', 'enterence', 
+  'securities', 'stage site', 'gardens', 'sweeming pools', 'receptions'
+].sort();
+
+const SERVICE_FACILITY_OPTIONS = [
+  'service with full garrenty', 'doorstep service', 'supply service only', 
+  'take from shope service', 'as per work service', 'delavery service'
+].sort();
+
+const getFinancialYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  if (month >= 4) {
+    return `${year}-${(year + 1).toString().slice(-2)}`;
+  }
+  return `${year - 1}-${year.toString().slice(-2)}`;
+};
+
+const generateTransactionId = (ownerRegId: string, count: number) => {
+  const fy = getFinancialYear();
+  const num = (count + 1).toString().padStart(3, '0');
+  return `${ownerRegId}/${fy}/${num}`;
+};
+
+const MultiSelect = ({ 
+  label, 
+  options, 
+  selected, 
+  onChange, 
+  canAddCustom = false 
+}: { 
+  label: string, 
+  options: string[], 
+  selected: string[], 
+  onChange: (items: string[]) => void,
+  canAddCustom?: boolean
+}) => {
+  const [customValue, setCustomValue] = useState('');
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter(i => i !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const handleAddCustom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customValue.trim() && !selected.includes(customValue.trim())) {
+      onChange([...selected, customValue.trim()]);
+      setCustomValue('');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <label className="block text-sm font-bold text-gray-700">{label}</label>
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggleOption(opt)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-bold border transition-all",
+              selected.includes(opt)
+                ? "bg-orange-600 text-white border-orange-600 shadow-md"
+                : "bg-white text-gray-500 border-gray-100 hover:border-orange-200"
+            )}
+          >
+            {opt}
+          </button>
+        ))}
+        {selected.filter(i => !options.includes(i)).map(custom => (
+          <button
+            key={custom}
+            type="button"
+            onClick={() => toggleOption(custom)}
+            className="px-4 py-2 rounded-xl text-sm font-bold bg-orange-100 text-orange-600 border border-orange-200 flex items-center space-x-2"
+          >
+            <span>{custom}</span>
+            <X size={14} />
+          </button>
+        ))}
+      </div>
+      {canAddCustom && (
+        <div className="flex space-x-2">
+          <input 
+            type="text" 
+            placeholder="Add custom... (e.g. Wi-Fi)"
+            className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+            value={customValue}
+            onChange={(e) => setCustomValue(e.target.value)}
+          />
+          <button 
+            type="button"
+            onClick={handleAddCustom}
+            className="px-4 py-2 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors"
+          >
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 export enum OperationType {
   CREATE = 'create',
@@ -360,8 +821,8 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
       const { error } = await db.from('app_feedback').insert([feedbackData]);
       if (error) {
         console.error('App Feedback Error:', error);
-        if (error.message.includes('column "visitor_mobile" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: visitor_mobile column missing or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
+        if (error.message.includes('column "visitor_mobile" does not exist') || error.message.includes('table "public.app_feedback" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Database schema error: Table or column missing. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
         } else {
           toast.error(`Failed to submit feedback: ${error.message}`);
         }
@@ -514,137 +975,87 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
   );
 };
 
-const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, user }: { 
+// --- Review System ---
+const ReviewSection = ({ 
+  targetId, 
+  targetType, 
+  targetName, 
+  currentRating, 
+  onReviewAdded,
+  user 
+}: { 
   targetId: string, 
   targetType: 'venue' | 'service', 
-  currentRating: number,
+  targetName: string, 
+  currentRating: number, 
   onReviewAdded: () => void,
   user: any 
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [visitorName, setVisitorName] = useState('');
-  const [visitorMobile, setVisitorMobile] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [visitorName, setVisitorName] = useState(user?.displayName || '');
+  const [visitorMobile, setVisitorMobile] = useState(user?.mobileNumber || '');
+  
+  const fetchReviews = async () => {
+    const { data } = await db.from('reviews').select('*').eq('target_id', targetId).order('created_at', { ascending: false });
+    if (data) setReviews(data.map(d => ({
+      id: d.id,
+      userId: d.user_id,
+      userName: d.visitor_name,
+      visitorMobile: d.visitor_mobile,
+      rating: d.rating,
+      comment: d.comment,
+      createdAt: d.created_at
+    } as Review)));
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchReviews = async () => {
-      const { data, error } = await db
-        .from('reviews')
-        .select('*')
-        .eq('target_id', targetId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (!error && data) {
-        setReviews(data.map(d => ({
-          ...d,
-          targetId: d.target_id,
-          targetType: d.target_type,
-          userId: d.user_id,
-          userName: d.user_name,
-          visitorMobile: d.visitor_mobile,
-          createdAt: d.created_at
-        }) as Review));
-      }
-    };
-
     fetchReviews();
-
-    const subscription = db
-      .channel(`reviews_${targetId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'reviews',
-        filter: `target_id=eq.${targetId}`
-      }, fetchReviews)
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [targetId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim()) {
-      toast.error('Please enter a comment');
+    if (visitorMobile.length !== 10) {
+      toast.error('Mobile number must be 10 digits');
       return;
     }
-    if (!user && !visitorName.trim()) {
-      toast.error('Please enter your name');
-      return;
-    }
-    if (!user && !visitorMobile.trim()) {
-      toast.error('Please enter your mobile number for future promotions');
-      return;
-    }
-    if (!user && !/^\d{10}$/.test(visitorMobile)) {
-      toast.error('Please enter a valid 10-digit mobile number');
-      return;
-    }
-
+    
     setIsSubmitting(true);
     try {
-      const reviewData = {
+      const { error } = await db.from('reviews').insert([{
         target_id: targetId,
-        target_type: targetType,
-        user_id: user?.uid || 'visitor',
-        user_name: user?.displayName || visitorName,
-        visitor_mobile: user?.mobileNumber || visitorMobile,
+        visitor_name: visitorName,
+        visitor_mobile: visitorMobile,
         rating,
-        comment
-      };
+        comment,
+        user_id: user?.uid || null
+      }]);
+      
+      if (error) throw error;
+      
+      // Update the average rating and review count on the target
+      const newCount = reviews.length + 1;
+      const newRating = ((currentRating * reviews.length) + rating) / newCount;
 
-      const { error: rError } = await db.from('reviews').insert([reviewData]);
-      if (rError) {
-        console.error('Add Review Error:', rError);
-        if (rError.message.includes('column "visitor_mobile" does not exist') || rError.message.includes('column "target_type" does not exist') || rError.message.includes('schema cache')) {
-          toast.error('Database schema error: missing columns in reviews or cache stale. Please run the FIX_DISTRICT_COLUMN.sql script in Supabase SQL Editor.');
-        } else {
-          toast.error(`Failed to submit review: ${rError.message}`);
-        }
-        throw rError;
-      }
-      
-      // Update average rating and review count on target document
-      // Fetch all reviews for this target to get accurate average
-      const { data: allR } = await db
-        .from('reviews')
-        .select('rating')
-        .eq('target_id', targetId);
-      
-      const allRatings = allR || [];
-      const newAvg = allRatings.reduce((acc, r) => acc + r.rating, 0) / allRatings.length;
-      
-      const { error: tError } = await db
-        .from(targetType === 'venue' ? 'venues' : 'service_providers')
-        .update({
-          rating: Number(newAvg.toFixed(1)),
-          review_count: allRatings.length
-        })
-        .eq('id', targetId);
-      
-      if (tError) throw tError;
+      const table = targetType === 'venue' ? 'venues' : 'service_providers';
+      await db.from(table).update({ 
+        rating: Math.round(newRating * 10) / 10, 
+        review_count: newCount 
+      }).eq('id', targetId);
 
-      setComment('');
-      setVisitorName('');
-      setVisitorMobile('');
-      setRating(5);
-      setIsSuccess(true);
       toast.success('Review submitted successfully!');
+      setComment('');
+      if (!user) {
+        setVisitorName('');
+        setVisitorMobile('');
+      }
+      fetchReviews();
       onReviewAdded();
-      
-      setTimeout(() => {
-        setIsSuccess(false);
-        setShowForm(false);
-      }, 3000);
     } catch (err) {
-      console.error('Review error:', err);
       toast.error('Failed to submit review');
     } finally {
       setIsSubmitting(false);
@@ -652,162 +1063,110 @@ const ReviewSection = ({ targetId, targetType, currentRating, onReviewAdded, use
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-bold text-gray-900">Ratings & Reviews</h3>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="text-orange-600 font-bold hover:text-orange-700 flex items-center space-x-2"
-        >
-          <Plus size={20} />
-          <span>Write a Review</span>
-        </button>
+    <div className="mt-12 space-y-8">
+      <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+        <h3 className="text-2xl font-bold text-gray-900 mb-6">Rate & Review {targetName}</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-center space-x-2 mb-4">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                className="focus:outline-none"
+              >
+                <Star
+                  size={32}
+                  className={cn(
+                    "transition-all",
+                    star <= rating ? "text-yellow-500 fill-yellow-500 scale-110" : "text-gray-300"
+                  )}
+                />
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              required
+              type="text"
+              placeholder="Your Name"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
+              value={visitorName}
+              onChange={(e) => setVisitorName(e.target.value)}
+            />
+            <input
+              required
+              type="tel"
+              placeholder="Your Mobile Number"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
+              value={visitorMobile}
+              onChange={(e) => setVisitorMobile(e.target.value)}
+            />
+          </div>
+          <textarea
+            required
+            placeholder="Tell us about your experience..."
+            rows={4}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={cn(
+              "w-full bg-orange-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-orange-100 transition-all",
+              isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-orange-700"
+            )}
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Review'}
+          </button>
+        </form>
       </div>
 
-      {showForm && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-orange-50 p-6 rounded-3xl border border-orange-100"
-        >
-          {isSuccess ? (
-            <div className="py-12 text-center">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check size={32} />
-              </div>
-              <h4 className="text-xl font-bold text-gray-900 mb-2">Thank You!</h4>
-              <p className="text-gray-600 mb-6">Your review has been submitted successfully.</p>
-              <button 
-                onClick={() => {
-                  setIsSuccess(false);
-                  setShowForm(false);
-                }}
-                className="px-8 py-2 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all"
-              >
-                Close
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="flex items-center space-x-4 mb-4">
-              <span className="text-sm font-bold text-gray-700">Your Rating:</span>
-              <div className="flex items-center space-x-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    className="focus:outline-none transition-transform hover:scale-110"
-                  >
-                    <Star 
-                      size={24} 
-                      className={star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'} 
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {!user && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Your Name</label>
-                  <input 
-                    type="text"
-                    required
-                    value={visitorName}
-                    onChange={(e) => setVisitorName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white"
-                    placeholder="Enter your name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Mobile Number (For Promotions)</label>
-                  <input 
-                    type="tel"
-                    required
-                    maxLength={10}
-                    value={visitorMobile}
-                    onChange={(e) => setVisitorMobile(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white"
-                    placeholder="10-digit mobile number"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Your Review</label>
-              <textarea 
-                required
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white h-32 resize-none"
-                placeholder="Share your experience..."
-              />
-            </div>
-
-            <div className="flex justify-end space-x-4">
-              <button 
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-6 py-2 text-gray-500 font-bold hover:text-gray-700"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 transition-all disabled:opacity-50"
-              >
-                {isSubmitting ? 'Submitting...' : 'Post Review'}
-              </button>
-            </div>
-          </form>
-        )}
-      </motion.div>
-    )}
-
       <div className="space-y-6">
-        {reviews.length > 0 ? (
-          reviews.map((review) => (
-            <div key={review.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold">
-                    {review.userName?.charAt(0) || 'U'}
-                  </div>
+        <h3 className="text-2xl font-bold text-gray-900">Guest Reviews ({reviews.length})</h3>
+        {loading ? (
+          <div className="text-center py-10">
+            <div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        ) : reviews.length > 0 ? (
+          <div className="space-y-4">
+            {reviews.map((review) => (
+              <div key={review.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
                   <div>
                     <h4 className="font-bold text-gray-900">{review.userName}</h4>
-                    <p className="text-xs text-gray-400">
-                      {review.createdAt ? format(new Date(review.createdAt), 'MMM dd, yyyy') : 'Just now'}
-                    </p>
+                    <div className="flex items-center mt-1">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          size={14}
+                          className={cn(
+                            s <= review.rating ? "text-yellow-500 fill-yellow-500" : "text-gray-200"
+                          )}
+                        />
+                      ))}
+                    </div>
                   </div>
+                  <span className="text-xs text-gray-400">
+                    {format(new Date(review.createdAt), 'MMM d, yyyy')}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-1 text-yellow-500">
-                  {[...Array(5)].map((_, i) => (
-                    <Star 
-                      key={i} 
-                      size={14} 
-                      className={i < review.rating ? 'fill-yellow-500' : 'text-gray-200'} 
-                    />
-                  ))}
-                </div>
+                <p className="text-gray-600 italic">"{review.comment}"</p>
               </div>
-              <p className="text-gray-600 leading-relaxed">{review.comment}</p>
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
           <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-            <p className="text-gray-400">No reviews yet. Be the first to share your experience!</p>
+            <MessageSquare className="mx-auto text-gray-400 mb-4" size={48} />
+            <p className="text-gray-500">No reviews yet. Be the first to share your experience!</p>
           </div>
         )}
       </div>
     </div>
   );
 };
-
-/// --- Components ---
 
 const VideoUpload = ({ 
   onUpload, 
@@ -842,8 +1201,8 @@ const VideoUpload = ({
           await new Promise<void>((resolve, reject) => {
             video.onloadedmetadata = function() {
               window.URL.revokeObjectURL(video.src);
-              if (video.duration > 300) { // Limit to 5 mins maybe? Previous was 120s
-                toast.error(`Video ${file.name} is too long (max 5 mins)`);
+              if (video.duration > 60) { 
+                toast.error(`Video ${file.name} is too long (max 60 seconds)`);
                 reject('duration');
               } else {
                 resolve();
@@ -869,7 +1228,8 @@ const VideoUpload = ({
         .from('images') 
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: file.type // Explicitly set content type for videos
         });
 
       if (error) throw error;
@@ -916,7 +1276,7 @@ const VideoUpload = ({
           />
         </label>
       </div>
-      <p className="text-[10px] text-gray-400 italic">Max duration: 5 minutes. Suggested: High quality 1080p.</p>
+      <p className="text-[10px] text-gray-400 italic">Max duration: 60 seconds. Suggested: High quality 1080p.</p>
     </div>
   );
 };
@@ -943,17 +1303,21 @@ const ImageUpload = ({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-          toast.error(`File ${file.name} is not a valid image`);
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+          toast.error(`File ${file.name} is not a valid image (JPEG, PNG, WEBP, GIF supported)`);
           continue;
         }
 
-        if (file.size > 10 * 1024 * 1024) { 
-          toast.error(`File ${file.name} is too large (max 10MB)`);
+        if (file.size > 20 * 1024 * 1024) { 
+          toast.error(`File ${file.name} is too large (max 20MB)`);
           continue;
         }
 
-        await processAndUpload(file);
+        if (file.type === 'image/gif') {
+          await uploadRawFile(file);
+        } else {
+          await processAndUpload(file);
+        }
       }
     } finally {
       setIsUploading(false);
@@ -1019,6 +1383,30 @@ const ImageUpload = ({
     }
   };
 
+  const uploadRawFile = async (file: File) => {
+    try {
+      const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const { error } = await db.storage
+        .from('images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = db.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      onUpload(publicUrl);
+    } catch (err: any) {
+      console.error('Raw Upload Error:', err);
+      toast.error(`Failed to upload ${file.name}`);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <label className="block text-sm font-bold text-gray-700">{label}</label>
@@ -1063,7 +1451,7 @@ const ImageUpload = ({
           />
         </label>
       </div>
-      <p className="text-[10px] text-gray-400 italic">Supported formats: JPEG, PNG, WEBP (Max 10MB). Suggested dimensions: 1200x1200px (1:1 ratio).</p>
+      <p className="text-[10px] text-gray-400 italic">Supported formats: JPEG, PNG, WEBP, GIF (Max 20MB). Suggested dimensions: 1200x1200px (1:1 ratio).</p>
     </div>
   );
 };
@@ -1081,7 +1469,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
         const { count, error } = await db
           .from('bookings')
           .select('*', { count: 'exact', head: true })
-          .eq('owner_id', user.uid)
+          .eq('owner_id', user?.uid)
           .eq('status', 'pending');
         
         if (!error) setPendingCount(count || 0);
@@ -1090,12 +1478,12 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
       fetchPending();
 
       const subscription = db
-        .channel(`pending_bookings_${user.uid}`)
+        .channel(`pending_bookings_${user?.uid}`)
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
           table: 'bookings',
-          filter: `owner_id=eq.${user.uid}`
+          filter: `owner_id=eq.${user?.uid}`
         }, fetchPending)
         .subscribe();
 
@@ -1116,9 +1504,18 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-orange-200">EM</div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">BOOK MY VANUE</span>
+            <Link to="/" className="flex items-center space-x-2 group">
+              <div className="relative">
+                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-orange-200 group-hover:rotate-12 transition-transform">BVO</div>
+                <div 
+                  className={cn(
+                    "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm",
+                    isSupabaseConnected ? "bg-green-500" : "bg-red-500"
+                  )} 
+                  title={isSupabaseConnected ? "Live Supabase Connected" : "Local Mock Mode - No Sync"}
+                />
+              </div>
+              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hidden sm:inline-block">BEST VANUE OPTION</span>
             </Link>
 
             <div className="hidden md:flex items-center space-x-8">
@@ -1286,13 +1683,23 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
   );
 };
 
-const Hero = () => {
+const Hero = ({ banners }: { banners: AppBanner[] }) => {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedBlock, setSelectedBlock] = useState('');
   const navigate = useNavigate();
+  const [currentBanner, setCurrentBanner] = useState(0);
+
+  useEffect(() => {
+    if (banners.length > 0) {
+      const timer = setInterval(() => {
+        setCurrentBanner(prev => (prev + 1) % banners.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [banners.length]);
 
   const states = Object.keys(LOCATION_DATA || {});
   const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
@@ -1308,14 +1715,24 @@ const Hero = () => {
     navigate(`/search?${params.toString()}`);
   };
 
+  const defaultBanner = "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000";
+
   return (
     <div className="relative h-[750px] md:h-[850px] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000" 
-          alt="Wedding Venue" 
-          className="w-full h-full object-cover brightness-50"
-        />
+        <AnimatePresence mode="wait">
+          <motion.img 
+            key={banners[currentBanner]?.imageUrl || 'default'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            src={banners[currentBanner]?.imageUrl || defaultBanner} 
+            alt="Wedding Venue" 
+            className="w-full h-full object-cover brightness-50"
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
       </div>
       
       <div className="relative z-10 max-w-6xl w-full px-4 text-center">
@@ -1602,7 +2019,7 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             <CheckCircle size={40} className="text-white" />
           </div>
           <h2 className="text-3xl font-bold">Registration Successful!</h2>
-          <p className="mt-2 opacity-90">Welcome to the BOOK MY VANUE family</p>
+          <p className="mt-2 opacity-90">Welcome to the BEST VANUE OPTION family</p>
         </div>
 
         <div className="p-8 space-y-6">
@@ -1689,7 +2106,7 @@ const ChangePasswordView = ({ user, profile, onUpdateProfile }: { user: any, pro
       const { data: userData, error: fetchError } = await db
         .from('users')
         .select('password, mobile_number')
-        .eq('uid', user.uid)
+        .eq('uid', user?.uid)
         .single();
 
       if (fetchError) throw fetchError;
@@ -1706,7 +2123,7 @@ const ChangePasswordView = ({ user, profile, onUpdateProfile }: { user: any, pro
       const { error: updateError } = await db
         .from('users')
         .update({ password: formData.newPassword })
-        .eq('uid', user.uid);
+        .eq('uid', user?.uid);
 
       if (updateError) throw updateError;
 
@@ -1901,7 +2318,8 @@ const RegistrationView = () => {
     district: '',
     block: '',
     pincode: '',
-    venueType: 'Marriage Garden' as VenueType
+    venueType: 'marriage garden' as VenueType,
+    serviceType: 'dj and sound service' as ServiceType
   });
 
   useEffect(() => {
@@ -1983,11 +2401,16 @@ const RegistrationView = () => {
       const { error } = await db.from('users').insert([profileData]);
       if (error) {
         console.error('Registration Error:', error);
+        if (error.message.includes('column "venue_type" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Registration failed: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
+        } else {
+          toast.error(`Registration failed: ${error.message}`);
+        }
         throw error;
       }
       
       // Send WhatsApp Message (Mocked)
-      const whatsappMsg = `*Welcome to BOOK MY VANUE!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
+      const whatsappMsg = `*Welcome to BEST VANUE OPTION!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
       const waUrl = `https://wa.me/91${formData.mobileNumber}?text=${whatsappMsg}`;
       
       // In a real app, you'd call a backend API to send this. 
@@ -2080,10 +2503,21 @@ const RegistrationView = () => {
                 <label className="block text-sm font-bold text-gray-700 mb-1">Venue Type</label>
                 <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500"
                   value={formData.venueType} onChange={e => setFormData({...formData, venueType: e.target.value as VenueType})}>
-                  <option value="Marriage Garden">Marriage Garden</option>
-                  <option value="Hotel">Hotel</option>
-                  <option value="Marriage Hall">Marriage Hall</option>
-                  <option value="Resort">Resort</option>
+                  {VENUE_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.role === 'provider' && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Service Type</label>
+                <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500"
+                  value={formData.serviceType} onChange={e => setFormData({...formData, serviceType: e.target.value as ServiceType})}>
+                  {SERVICE_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
                 </select>
               </div>
             )}
@@ -2166,28 +2600,40 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
     setLoading(true);
 
     // Admin Login Check
-    if (regId.toLowerCase() === 'admin@eventmanager.com') {
-      const { data: adminSettings } = await db
-        .from('admin_settings')
-        .select('value')
-        .eq('key', 'admin_password')
+    if (regId.toLowerCase() === 'deepakjatav1005@gmail.com' || regId === '9165436918') {
+      const { data: adminUserInDb } = await db
+        .from('users')
+        .select('*')
+        .eq('email', 'deepakjatav1005@gmail.com')
         .single();
       
-      if (adminSettings && adminSettings.value === password) {
-        const adminUser = { uid: 'admin_123', email: 'admin@eventmanager.com' };
-        const adminProfile: UserProfile = {
+      const adminPass = adminUserInDb?.password || '9165436918';
+      
+      if (password === adminPass) {
+        const u = { uid: adminUserInDb?.uid || 'admin_123', email: 'deepakjatav1005@gmail.com' };
+        const p: UserProfile = adminUserInDb ? {
+          uid: adminUserInDb.uid,
+          registrationId: adminUserInDb.registration_id,
+          displayName: adminUserInDb.display_name,
+          mobileNumber: adminUserInDb.mobile_number,
+          email: adminUserInDb.email,
+          photoURL: adminUserInDb.photo_url,
+          role: 'admin',
+          status: 'active',
+          createdAt: adminUserInDb.created_at
+        } : {
           uid: 'admin_123',
           registrationId: 'ADMIN_001',
-          displayName: 'System Admin',
-          mobileNumber: '0000000000',
-          email: 'admin@eventmanager.com',
+          displayName: 'Deepak Jatav',
+          mobileNumber: '9165436918',
+          email: 'deepakjatav1005@gmail.com',
           photoURL: null,
           role: 'admin',
           status: 'active',
           createdAt: new Date().toISOString()
         };
-        onLogin(adminUser, adminProfile);
-        toast.success('Welcome Admin!');
+        onLogin(u, p);
+        toast.success('Welcome Deepak Jatav!');
         navigate('/admin');
         setLoading(false);
         return;
@@ -2271,7 +2717,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
           <span>Back to Home</span>
         </Link>
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg shadow-orange-200">EM</div>
+          <div className="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg shadow-orange-200">BVO</div>
           <h1 className="text-2xl font-bold text-gray-900">Partner Login</h1>
           <p className="text-gray-500 mt-2">Enter your credentials to access dashboard</p>
         </div>
@@ -2310,41 +2756,46 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 };
 
 const GalleryView = () => {
-  const [images, setImages] = useState<string[]>([]);
+  const [media, setMedia] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportFilters, setReportFilters] = useState({
-    name: '',
-    mobile: '',
-    startDate: '',
-    endDate: '',
-    paymentMode: '',
-    paymentStatus: ''
-  });
   const [displayCount, setDisplayCount] = useState(20);
 
   useEffect(() => {
-    const fetchImages = async () => {
-      const { data, error } = await db.from('venues').select('images');
-      if (!error && data) {
-        let vImages = data.flatMap(d => d.images || []);
-        // Limit to 100 latest
-        vImages = vImages.slice(0, 100);
-        setImages(vImages.length > 0 ? vImages : [
+    const fetchMedia = async () => {
+      try {
+        const [vRes, mRes, sRes] = await Promise.all([
+          db.from('venues').select('images'),
+          db.from('moments').select('media_url'),
+          db.from('service_type_photos').select('image_url')
+        ]);
+
+        let allMedia: string[] = [];
+        if (vRes.data) allMedia.push(...vRes.data.flatMap(d => d.images || []));
+        if (mRes.data) allMedia.push(...mRes.data.map(d => d.media_url));
+        if (sRes.data) allMedia.push(...sRes.data.map(d => d.image_url));
+
+        // Filter out empty and limit
+        allMedia = allMedia.filter(m => !!m).slice(0, 150);
+        
+        setMedia(allMedia.length > 0 ? allMedia : [
           'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800',
           'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800',
           'https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&q=80&w=800',
           'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&q=80&w=800'
         ]);
+      } catch (err) {
+        console.error('Gallery fetch error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetchImages();
+    fetchMedia();
   }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight + 100 && displayCount < images.length) {
-      setDisplayCount(prev => Math.min(prev + 20, 100));
+    if (scrollHeight - scrollTop <= clientHeight + 100 && displayCount < media.length) {
+      setDisplayCount(prev => Math.min(prev + 20, 150));
     }
   };
 
@@ -2353,7 +2804,7 @@ const GalleryView = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Event Gallery</h1>
-          <p className="text-gray-500">Glimpses of beautiful celebrations across our venues (Max 100 latest photos)</p>
+          <p className="text-gray-500">Glimpses of beautiful celebrations and special moments</p>
         </div>
         <Link to="/" className="flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-orange-50 px-4 py-2 rounded-full">
           <Home size={20} />
@@ -2371,19 +2822,23 @@ const GalleryView = () => {
           onScroll={handleScroll}
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {images.slice(0, displayCount).map((img, i) => (
+            {media.slice(0, displayCount).map((url, i) => (
               <motion.div 
                 key={i}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ scale: 1.02 }}
-                className="aspect-square rounded-2xl overflow-hidden shadow-lg"
+                className="aspect-square rounded-2xl overflow-hidden shadow-lg bg-gray-100"
               >
-                <img src={img} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                {url.includes('.mp4') || url.includes('video') ? (
+                  <video src={url} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                ) : (
+                  <img src={url} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                )}
               </motion.div>
             ))}
           </div>
-          {displayCount < images.length && (
+          {displayCount < media.length && (
             <div className="text-center py-8">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
             </div>
@@ -2402,12 +2857,12 @@ const AboutView = () => {
         <Home size={18} />
         <span>{t('home')}</span>
       </Link>
-      <div className="w-24 h-24 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-5xl font-bold mx-auto mb-8 shadow-2xl shadow-orange-200">EM</div>
-      <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BOOK MY VANUE</h1>
+      <div className="w-24 h-24 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-5xl font-bold mx-auto mb-8 shadow-2xl shadow-orange-200">BVO</div>
+      <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VANUE OPTION</h1>
       <p className="text-xl text-gray-600 leading-relaxed mb-12">
-        BOOK MY VANUE is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
+        BEST VANUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
         We bridge the gap between hosts and the finest venues and service providers in the country. 
-        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BOOK MY VANUE provides 
+        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VANUE OPTION provides 
         the tools and connections you need to plan with ease and celebrate with joy.
       </p>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -2637,7 +3092,7 @@ const TermsView = () => {
           <div className="prose prose-orange max-w-none text-gray-600 space-y-6">
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
-              <p>By accessing and using the BOOK MY VANUE application, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
+              <p>By accessing and using the BEST VANUE OPTION application, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">2. User Responsibilities</h2>
@@ -2649,7 +3104,7 @@ const TermsView = () => {
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">4. Liability</h2>
-              <p>BOOK MY VANUE acts as a facilitator between customers and providers. We are not liable for any disputes, damages, or service failures between the parties.</p>
+              <p>BEST VANUE OPTION acts as a facilitator between customers and providers. We are not liable for any disputes, damages, or service failures between the parties.</p>
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">5. Contact Information</h2>
@@ -2849,7 +3304,7 @@ const HomeView = ({ user }: { user: any }) => {
             </AnimatePresence>
           </div>
         ) : (
-          <Hero />
+          <Hero banners={banners} />
         )}
       </div>
 
@@ -3334,6 +3789,18 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         }
       }
 
+      // Get financial year start date
+      const now = new Date();
+      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+
+      const { count } = await db.from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', venue?.ownerId)
+        .gte('created_at', fyStart);
+      
+      const tid = generateTransactionId(ownerProfile?.registration_id || 'BVO', count || 0);
+
       const { error } = await db.from('bookings').insert([{
         user_id: user?.uid || 'visitor',
         visitor_name: visitorName,
@@ -3348,7 +3815,8 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         end_time: endTime,
         status: 'pending',
         total_amount: venue?.pricePerDay || 0,
-        message
+        message,
+        transaction_id: tid
       }]);
 
       if (error) throw error;
@@ -3562,6 +4030,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
               <ReviewSection 
                 targetId={venue.id} 
                 targetType="venue" 
+                targetName={venue.name}
                 currentRating={venue.rating} 
                 onReviewAdded={fetchVenue}
                 user={user}
@@ -3818,6 +4287,18 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         }
       }
 
+      // Get financial year start date
+      const now = new Date();
+      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+
+      const { count } = await db.from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', service?.providerId)
+        .gte('created_at', fyStart);
+      
+      const tid = generateTransactionId(providerProfile?.registration_id || 'BVO', count || 0);
+
       const { error } = await db.from('bookings').insert([{
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
@@ -3832,7 +4313,8 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         message,
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
-        event_type: eventType
+        event_type: eventType,
+        transaction_id: tid
       }]);
 
       if (error) throw error;
@@ -4013,6 +4495,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
               <ReviewSection 
                 targetId={service.id} 
                 targetType="service" 
+                targetName={service.name}
                 currentRating={service.rating} 
                 onReviewAdded={fetchService}
                 user={user}
@@ -4219,7 +4702,7 @@ const BookingManagerView = ({
     const { data, error } = await db
       .from('bookings')
       .select('*')
-      .eq('owner_id', user.uid)
+      .eq('owner_id', user?.uid)
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -4258,17 +4741,17 @@ const BookingManagerView = ({
     fetchBookings();
 
     const channel = db
-      .channel(`booking_manager_changes_${user.uid}`)
+      .channel(`booking_manager_changes_${user?.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchBookings();
       })
       .subscribe();
 
     const fetchMyItems = async () => {
-      const { data: vData } = await db.from('venues').select('*').eq('owner_id', user.uid);
+      const { data: vData } = await db.from('venues').select('*').eq('owner_id', user?.uid);
       if (vData) setVenues(vData.map(d => ({ id: d.id, ...d } as any)));
       
-      const { data: sData } = await db.from('service_providers').select('*').eq('provider_id', user.uid);
+      const { data: sData } = await db.from('service_providers').select('*').eq('provider_id', user?.uid);
       if (sData) setServices(sData.map(d => ({ id: d.id, ...d } as any)));
     };
 
@@ -4456,11 +4939,25 @@ const BookingManagerView = ({
 
     setLoading(true);
     try {
+      // Get financial year start date
+      const now = new Date();
+      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+
+      const { count } = await db.from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', user?.uid)
+        .gte('created_at', fyStart);
+      
+      const targetVenue = venues.find(v => v.id === manualBooking.targetId);
+      const isService = !targetVenue;
+      const tid = generateTransactionId(profile?.registrationId || 'BVO', count || 0);
+
       const { error } = await db.from('bookings').insert([{
-        user_id: user.uid,
-        owner_id: user.uid,
+        user_id: user?.uid,
+        owner_id: user?.uid,
         target_id: manualBooking.targetId,
-        target_type: venues.find(v => v.id === manualBooking.targetId) ? 'venue' : 'service',
+        target_type: isService ? 'service' : 'venue',
         target_name: manualBooking.targetName,
         event_date: manualBooking.eventDate,
         end_date: manualBooking.endDate || null,
@@ -4473,11 +4970,12 @@ const BookingManagerView = ({
         status: 'confirmed',
         is_manual: true,
         payment_mode: manualBooking.paymentMode,
-        total_amount: manualBooking.totalAmount
+        total_amount: manualBooking.totalAmount,
+        transaction_id: tid
       }]);
       if (error) throw error;
       setIsManualModalOpen(false);
-      const whatsappMsg = `*Booking Confirmation - BOOK MY VANUE*%0A%0A` +
+      const whatsappMsg = `*Booking Confirmation - BEST VANUE OPTION*%0A%0A` +
         `Hello ${manualBooking.partyName}, your booking for *${manualBooking.targetName}* has been confirmed!%0A%0A` +
         `*Booking Details:*%0A` +
         `*Date:* ${manualBooking.eventDate}${manualBooking.endDate ? ' to ' + manualBooking.endDate : ''}%0A` +
@@ -5226,7 +5724,7 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Invoice No: INV-${booking.id.substring(0, 8).toUpperCase()}`, 140, 55);
+  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + booking.id.substring(0, 8).toUpperCase())}`, 140, 55);
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 60);
   doc.text(`Time: ${timestamp.split(' ')[1]}`, 140, 65);
   
@@ -5302,17 +5800,17 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setDrawColor(234, 88, 12);
   doc.line(20, 265, 190, 265);
   
-  // App Logo (EM) in footer
+  // App Logo (BVO) in footer
   doc.setFillColor(234, 88, 12);
   doc.circle(25, 275, 6, 'F');
   doc.setFontSize(8);
   doc.setTextColor(255);
   doc.setFont("helvetica", "bold");
-  doc.text("EM", 25, 276, { align: 'center' });
+  doc.text("BVO", 25, 276, { align: 'center' });
 
   doc.setFontSize(14);
   doc.setTextColor(234, 88, 12);
-  doc.text("BOOK MY VANUE", 35, 276);
+  doc.text("BEST VANUE OPTION", 35, 276);
   
   doc.setFontSize(8);
   doc.setTextColor(100);
@@ -5322,7 +5820,7 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setTextColor(234, 88, 12);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("www.bookmyvanue.in", 190, 276, { align: 'right' });
+  doc.text("www.bestvanueoption.in", 190, 276, { align: 'right' });
 
   return doc.output('blob');
 };
@@ -5424,21 +5922,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const { data: sub } = await db
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', user.uid)
+        .eq('user_id', user?.uid)
         .eq('status', 'active')
         .maybeSingle();
       
       if (!sub) {
         setShowSubscriptionReminder(true);
         // Weekly reminder logic: check if we already reminded this week
-        const lastReminded = localStorage.getItem(`last_reminded_${user.uid}`);
+        const lastReminded = localStorage.getItem(`last_reminded_${user?.uid}`);
         const now = new Date().getTime();
         const oneWeek = 7 * 24 * 60 * 60 * 1000;
         
         if (!lastReminded || now - parseInt(lastReminded) > oneWeek) {
           const msg = `Hello ${profile.displayName}, you don't have an active subscription plan. Please subscribe to continue receiving business inquiries.`;
           sendWhatsAppAlert(profile.mobileNumber, msg);
-          localStorage.setItem(`last_reminded_${user.uid}`, now.toString());
+          localStorage.setItem(`last_reminded_${user?.uid}`, now.toString());
         }
       }
     };
@@ -5473,7 +5971,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const { data: bData } = await db
         .from('bookings')
         .select('*')
-        .or(`user_id.eq.${user.uid},owner_id.eq.${user.uid}`);
+        .or(`user_id.eq.${user?.uid},owner_id.eq.${user?.uid}`);
       
       if (bData) {
         setBookings(bData.map(d => ({
@@ -5507,7 +6005,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const { data: vData } = await db
         .from('venues')
         .select('*')
-        .eq('owner_id', user.uid);
+        .eq('owner_id', user?.uid);
       
       if (vData) {
         setVenues(vData.map(d => ({
@@ -5525,7 +6023,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const { data: sData } = await db
         .from('service_providers')
         .select('*')
-        .eq('provider_id', user.uid);
+        .eq('provider_id', user?.uid);
       
       if (sData) {
         setServices(sData.map(d => ({
@@ -5553,21 +6051,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
     // Realtime subscriptions
     const bookingChannel = db
-      .channel(`dashboard_bookings_${user.uid}`)
+      .channel(`dashboard_bookings_${user?.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
         fetchDashboardData();
       })
       .subscribe();
 
     const venueChannel = db
-      .channel(`dashboard_venues_${user.uid}`)
+      .channel(`dashboard_venues_${user?.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'venues' }, () => {
         fetchDashboardData();
       })
       .subscribe();
 
     const serviceChannel = db
-      .channel(`dashboard_services_${user.uid}`)
+      .channel(`dashboard_services_${user?.uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_providers' }, () => {
         fetchDashboardData();
       })
@@ -7146,7 +7644,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 </div>
                 <div className="md:col-span-2">
                   <VideoUpload 
-                    label="Upload Videos (Max 2 mins)" 
+                    label="Upload Videos (Max 60 seconds)" 
                     multiple={true}
                     onUpload={(url) => setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}))}
                   />
@@ -7243,11 +7741,13 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    serviceType: 'Caterer',
+    serviceType: SERVICE_TYPES[0],
     description: '',
     priceRange: '',
     priceLevel: 'per day',
-    images: [''],
+    images: [] as string[],
+    video_url: '',
+    facilities: [] as string[],
     availableFor: [] as string[],
   });
 
@@ -7262,13 +7762,24 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
         images: formData.images.filter(i => i !== ''),
+        video_url: formData.video_url,
+        facilities: formData.facilities,
+        available_for: formData.availableFor,
+        state: profile?.state || '',
+        district: profile?.district || '',
+        block: profile?.block || '',
+        pincode: profile?.pincode || '',
         provider_id: user.uid,
         rating: 0,
         review_count: 0
       }]);
       if (error) {
         console.error('Add Service Error:', error);
-        toast.error(`Failed to add service: ${error.message}`);
+        if (error.message.includes('column "facilities" does not exist') || error.message.includes('schema cache')) {
+          toast.error('Failed to add service: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
+        } else {
+          toast.error(`Failed to add service: ${error.message}`);
+        }
         throw error;
       }
       toast.success('Service added successfully!');
@@ -7375,12 +7886,36 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
             />
           </div>
 
-          <div className="md:col-span-2">
-            <ImageUpload 
-              label="Service Main Image" 
-              currentImage={formData.images?.[0]}
-              onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
-            />
+          <div className="md:col-span-2 space-y-4">
+            <label className="block text-sm font-bold text-gray-700">Media Uploads (Photos & Videos)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageUpload 
+                label="Add Service Photos" 
+                multiple={true}
+                onUpload={(url) => setFormData({...formData, images: [...formData.images, url]})}
+              />
+              <VideoUpload 
+                label="Add Service Video (Max 60s)" 
+                currentVideo={formData.video_url}
+                onUpload={(url) => setFormData({...formData, video_url: url})}
+              />
+            </div>
+            {formData.images.length > 0 && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
+                {formData.images.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
+                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, images: formData.images.filter((_, i) => i !== idx)})}
+                      className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <button 
@@ -7417,6 +7952,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           serviceType: data.service_type,
           priceRange: data.price_range,
           priceLevel: data.price_level || 'per day',
+          video_url: data.video_url || '',
           availableFor: data.available_for || []
         });
       }
@@ -7436,6 +7972,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
         images: formData.images,
+        video_url: formData.video_url,
         available_for: formData.availableFor
       }).eq('id', id);
       if (error) throw error;
@@ -7534,12 +8071,36 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
           </div>
-          <div className="md:col-span-2">
-            <ImageUpload 
-              label="Service Main Image" 
-              currentImage={formData.images?.[0]}
-              onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
-            />
+          <div className="md:col-span-2 space-y-4">
+            <label className="block text-sm font-bold text-gray-700">Media Uploads (Photos & Videos)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageUpload 
+                label="Add Service Photos" 
+                multiple={true}
+                onUpload={(url) => setFormData({...formData, images: [...(formData.images || []), url]})}
+              />
+              <VideoUpload 
+                label="Add Service Video (Max 60s)" 
+                currentVideo={formData.video_url}
+                onUpload={(url) => setFormData({...formData, video_url: url})}
+              />
+            </div>
+            {formData.images?.length > 0 && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
+                {formData.images.map((img: string, idx: number) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
+                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, images: formData.images.filter((_: any, i: number) => i !== idx)})}
+                      className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
@@ -7602,6 +8163,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           ownerId: data.owner_id,
           venueType: data.venue_type,
           pricePerDay: data.price_per_day,
+          video_url: data.video_url || '',
           availableFor: data.available_for || []
         });
       }
@@ -7623,6 +8185,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images,
+        video_url: formData.video_url,
         facilities: formData.facilities,
         available_for: formData.availableFor
       }).eq('id', id);
@@ -7717,12 +8280,36 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             />
           </div>
 
-          <div className="md:col-span-2">
-            <ImageUpload 
-              label="Venue Main Image" 
-              currentImage={formData.images?.[0]}
-              onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
-            />
+          <div className="md:col-span-2 space-y-4">
+            <label className="block text-sm font-bold text-gray-700">Media Uploads (Photos & Videos)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageUpload 
+                label="Add Venue Photos" 
+                multiple={true}
+                onUpload={(url) => setFormData({...formData, images: [...(formData.images || []), url]})}
+              />
+              <VideoUpload 
+                label="Add Venue Video (Max 60s)" 
+                currentVideo={formData.video_url}
+                onUpload={(url) => setFormData({...formData, video_url: url})}
+              />
+            </div>
+            {formData.images?.length > 0 && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
+                {formData.images.map((img: string, idx: number) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
+                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, images: formData.images.filter((_: any, i: number) => i !== idx)})}
+                      className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Facilities (Comma separated)</label>
@@ -7956,11 +8543,12 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     description: '',
     address: '',
     pincode: profile?.pincode || '',
-    venueType: 'Marriage Garden',
+    venueType: VENUE_TYPES[0],
     capacity: 0,
     pricePerDay: 0,
-    images: [''],
-    facilities: [''],
+    images: [] as string[],
+    video_url: '',
+    facilities: [] as string[],
     availableFor: [] as string[],
   });
 
@@ -7973,15 +8561,22 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
+        state: profile?.state || '',
+        district: profile?.district || '',
+        block: profile?.block || '',
         pincode: formData.pincode || profile?.pincode || '',
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images.filter(i => i !== ''),
-        facilities: formData.facilities.filter(a => a !== ''),
+        video_url: formData.video_url,
+        facilities: formData.facilities,
+        available_for: formData.availableFor,
         owner_id: user.uid,
         rating: 0,
         review_count: 0
       }]);
+      
+      console.log('Submitting venue to DB:', { name: formData.name, owner: user.uid });
       if (error) {
         console.error('Add Venue Error:', error);
         toast.error(`Failed to add venue: ${error.message}`);
@@ -8084,12 +8679,36 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               onChange={(e) => setFormData({...formData, description: e.target.value})}
             />
           </div>
-          <div className="md:col-span-2">
-            <ImageUpload 
-              label="Venue Main Image" 
-              currentImage={formData.images?.[0]}
-              onUpload={(url) => setFormData({...formData, images: [url, ...formData.images.slice(1)]})}
-            />
+          <div className="md:col-span-2 space-y-4">
+            <label className="block text-sm font-bold text-gray-700">Media Uploads (Photos & Videos)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageUpload 
+                label="Add Venue Photos" 
+                multiple={true}
+                onUpload={(url) => setFormData({...formData, images: [...formData.images, url]})}
+              />
+              <VideoUpload 
+                label="Add Venue Video (Max 60s)" 
+                currentVideo={formData.video_url}
+                onUpload={(url) => setFormData({...formData, video_url: url})}
+              />
+            </div>
+            {formData.images.length > 0 && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
+                {formData.images.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
+                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <button 
+                      type="button"
+                      onClick={() => setFormData({...formData, images: formData.images.filter((_, i) => i !== idx)})}
+                      className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-bold text-gray-700 mb-2">Facilities (Comma separated)</label>
@@ -8672,7 +9291,7 @@ export default function App() {
           transition={{ repeat: Infinity, duration: 2 }}
           className="w-20 h-20 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-4xl font-bold shadow-2xl"
         >
-          EM
+          BVO
         </motion.div>
       </div>
     );
@@ -8735,8 +9354,8 @@ export default function App() {
                 <div className="col-span-1 md:col-span-2">
                   <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
                     <div className="flex items-center space-x-2">
-                      <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg text-center">EM</div>
-                      <span className="text-2xl font-bold">BOOK MY VANUE</span>
+                      <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg text-center">BVO</div>
+                      <span className="text-2xl font-bold">BEST VANUE OPTION</span>
                     </div>
                   </div>
                   <p className="text-gray-400 max-w-sm mb-6">
@@ -8804,7 +9423,7 @@ export default function App() {
 
 const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -8814,6 +9433,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [servicePhotos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
+  const [moments, setMoments] = useState<{id: string, media_url: string, type: string, created_at: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportFilters, setReportFilters] = useState({
     name: '',
@@ -8847,14 +9467,14 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
   // Admin profile state
   const [adminProfile, setAdminProfile] = useState({
-    displayName: profile?.displayName || 'Admin',
-    email: profile?.email || 'admin@eventmanager.com',
-    mobileNumber: profile?.mobileNumber || '0000000000',
+    displayName: profile?.displayName || 'Deepak Jatav',
+    email: profile?.email || 'deepakjatav1005@gmail.com',
+    mobileNumber: profile?.mobileNumber || '9165436918',
     password: ''
   });
 
   useEffect(() => {
-    if (!user || user.email !== 'admin@eventmanager.com') {
+    if (!user || user.email !== 'deepakjatav1005@gmail.com') {
       navigate('/');
       return;
     }
@@ -8862,7 +9482,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   }, [user, activeTab]);
 
   useEffect(() => {
-    if (!user || user.email !== 'admin@eventmanager.com') return;
+    if (!user || user.email !== 'deepakjatav1005@gmail.com') return;
 
     const channel = db
       .channel('admin_realtime')
@@ -8906,11 +9526,12 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
         const { data: sData } = await db.from('user_subscriptions').select('*');
         if (sData) setSubscriptions(sData.map(d => ({
-          ...d,
+          id: d.id,
           userId: d.user_id,
           planId: d.plan_id,
           startDate: d.start_date,
           endDate: d.end_date,
+          status: d.status,
           createdAt: d.created_at
         }) as UserSubscription));
       }
@@ -8953,6 +9574,11 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           imageUrl: d.image_url,
           createdAt: d.created_at
         } as ServiceTypePhoto)));
+      }
+
+      if (activeTab === 'moments') {
+        const { data } = await db.from('moments').select('*').order('created_at', { ascending: false });
+        if (data) setMoments(data);
       }
     } catch (err) {
       console.error(err);
@@ -9168,20 +9794,31 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       const { error } = await db.from('notifications').insert(inserts);
       if (error) {
         console.error('Add Notification Error:', error);
-        if (error.message.includes('column "is_active" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: is_active column missing or cache stale.');
+        
+        // Retry without target_role if schema is old
+        if (error.message.includes('column "target_role" does not exist') || error.message.includes('schema cache')) {
+           const retryInserts = messages.map(msg => ({
+            title: newNotification.title || 'System Update',
+            message: msg.trim(),
+            is_active: true
+          }));
+          const { error: retryError } = await db.from('notifications').insert(retryInserts);
+          if (retryError) throw retryError;
+          toast.success(`${messages.length} notification(s) added (Legacy mode)`);
         } else {
           toast.error(`Failed to add notifications: ${error.message}`);
+          throw error;
         }
-        throw error;
+      } else {
+        toast.success(`${messages.length} notification(s) added`);
       }
       
-      toast.success(`${messages.length} notification(s) added`);
       setIsNotificationModalOpen(false);
       setNewNotification({ title: '', message: '' });
       fetchData();
     } catch (err) {
-      toast.error('Failed to add notifications');
+      console.error('Final Notification Error:', err);
+      toast.error('Failed to submit notifications. Check SQL Master Script in App.tsx');
     }
   };
 
@@ -9212,31 +9849,64 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
-  const handleAddServicePhotos = async (files: FileList | null, serviceType: ServiceType) => {
-    if (!files || files.length === 0) return;
-    
+  const handleAddServicePhotoUrl = async (url: string, type: string) => {
+    if (!url) return;
     setLoading(true);
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const filePath = `service_photos/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const { error: uploadError } = await db.storage.from('images').upload(filePath, file);
-        if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(filePath);
-        return { service_type: serviceType, image_url: publicUrl };
-      });
-      
-      const photoData = await Promise.all(uploadPromises);
-      const { error } = await db.from('service_type_photos').insert(photoData);
+      const { error } = await db.from('service_type_photos').insert([{ 
+        service_type: newServicePhoto.serviceType, 
+        image_url: url 
+      }]);
       if (error) throw error;
-      
-      toast.success(`${files.length} photo(s) added for ${serviceType}`);
+      toast.success(`Media added for ${newServicePhoto.serviceType}`);
       fetchData();
     } catch (err) {
-      toast.error('Failed to upload service photos');
+      toast.error('Failed to add service media');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddMoment = async (url: string, type: 'image' | 'video' | 'gif') => {
+    if (!url) return;
+    setLoading(true);
+    try {
+      // Auto-detect type if it's generic 'image' but ends in .gif or is a video
+      let finalType = type;
+      if (url.toLowerCase().endsWith('.gif')) finalType = 'gif';
+      if (url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+
+      const { error } = await db.from('moments').insert([{ 
+        media_url: url,
+        type: finalType
+      }]);
+      if (error) throw error;
+      toast.success('Moment added successfully');
+      fetchData();
+    } catch (err) {
+      toast.error('Failed to add moment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteMoment = async (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Moment',
+      message: 'Are you sure you want to delete this moment?',
+      isDanger: true,
+      onConfirm: async () => {
+        const { error } = await db.from('moments').delete().eq('id', id);
+        if (!error) {
+          toast.success('Moment deleted');
+          fetchData();
+        } else {
+          toast.error('Failed to delete moment');
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleEditNotification = async (e: React.FormEvent) => {
@@ -9331,6 +10001,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             { id: 'notifications', label: 'Notifications', icon: Bell },
             { id: 'banners', label: 'Banners', icon: Image },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
+            { id: 'moments', label: 'Moments Photos', icon: Sparkles },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
           ].map(tab => (
             <button
@@ -9366,12 +10037,17 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
                       <div className="flex items-center justify-between mb-4">
                         <div className="bg-blue-50 p-3 rounded-2xl text-blue-600">
                           <Users size={24} />
                         </div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${isSupabaseConnected ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                            {isSupabaseConnected ? 'LIVE DB' : 'MOCK DB'}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-3xl font-black text-gray-900">{users.length}</div>
                       <div className="mt-2 text-sm text-gray-500">
@@ -9411,6 +10087,51 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         {bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid').length}
                       </div>
                       <div className="mt-2 text-sm text-gray-500">Successfully completed</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                      <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Owners', value: users.filter(u => u.role === 'owner').length },
+                                { name: 'Providers', value: users.filter(u => u.role === 'provider').length }
+                              ]}
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              <Cell fill="#f97316" />
+                              <Cell fill="#0ea5e9" />
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                      <h4 className="text-lg font-bold text-gray-900 mb-6">Booking Status</h4>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={[
+                            { name: 'Total', count: bookings.length },
+                            { name: 'Paid', count: bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid').length },
+                            { name: 'Pending', count: bookings.filter(b => b.paymentStatus === 'Pending' || b.status === 'pending').length },
+                            { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
+                          ]}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
 
@@ -9719,58 +10440,98 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
               {activeTab === 'servicePhotos' && (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-900">Service Type Photos</h3>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Service Type Photos & Videos</h3>
                     <div className="flex items-center space-x-4">
                       <select 
                         className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500"
                         value={newServicePhoto.serviceType}
                         onChange={(e) => setNewServicePhoto({...newServicePhoto, serviceType: e.target.value as ServiceType})}
                       >
-                        {[
-                          'Caterer', 'DJ and Sounds', 'Tent House', 'Photo and Videographer', 
-                          'Stage Decorator', 'Flower Decorator', 'Makeup Artist', 'Halbai', 
-                          'Event Manager', 'Waiters', 'Dhol Bands', 'Light Decorator', 
-                          'Drone Camera', 'Mehendi Service', 'Event Cloth and Jwellary on Rent', 
-                          'Fast food stalls', 'Loundry service', 'Helper', 'Pandit Ji Brahman', 
-                          'SPARKS AND Firecrackers', 'Other Related Services'
-                        ].map(t => <option key={t} value={t}>{t}</option>)}
+                        {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <label className="cursor-pointer bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 transition-all">
-                        <input 
-                          type="file" 
-                          multiple 
-                          accept="image/*" 
-                          className="hidden" 
-                          onChange={(e) => handleAddServicePhotos(e.target.files, newServicePhoto.serviceType)}
-                        />
-                        Upload Photos
-                      </label>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100 mb-8">
+                    <ImageUpload 
+                      label="Upload Photo or GIF" 
+                      onUpload={(url) => handleAddServicePhotoUrl(url, 'image')} 
+                    />
+                    <VideoUpload 
+                      label="Upload Video (Max 60s)" 
+                      onUpload={(url) => handleAddServicePhotoUrl(url, 'video')} 
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {servicePhotos.map(p => (
-                      <div key={p.id} className="group relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
-                        <img src={p.imageUrl} alt={p.serviceType} className="w-full h-40 object-cover" referrerPolicy="no-referrer" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div key={p.id} className="group relative aspect-video rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                        {p.imageUrl.includes('.mp4') || p.imageUrl.includes('video') ? (
+                          <video src={p.imageUrl} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                        ) : (
+                          <img src={p.imageUrl} alt={p.serviceType} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                          <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">{p.serviceType}</p>
+                        </div>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
                             onClick={() => deleteServicePhoto(p.id)}
-                            className="bg-white text-red-600 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"
+                            className="bg-white text-red-600 p-2 rounded-full shadow-lg hover:bg-red-50 transition-colors"
                           >
-                            <Trash2 size={20} />
+                            <Trash2 size={18} />
                           </button>
-                        </div>
-                        <div className="p-3">
-                          <p className="text-xs font-bold text-orange-600 uppercase tracking-wider">{p.serviceType}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                  {servicePhotos.length === 0 && (
+                </div>
+              )}
+
+              {activeTab === 'moments' && (
+                <div className="space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Special Moments</h3>
+                      <p className="text-sm text-gray-500">Highlight photos and videos of your best events</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100">
+                    <ImageUpload 
+                      label="Upload Highlight Photo/GIF" 
+                      onUpload={(url) => handleAddMoment(url, 'image')} 
+                    />
+                    <VideoUpload 
+                      label="Upload Highlight Video (Max 60s)" 
+                      onUpload={(url) => handleAddMoment(url, 'video')} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {moments.map(m => (
+                      <div key={m.id} className="group relative aspect-square rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
+                        {m.type === 'video' || m.media_url.includes('.mp4') ? (
+                          <video src={m.media_url} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                        ) : (
+                          <img src={m.media_url} alt="Moment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            onClick={() => deleteMoment(m.id)}
+                            className="bg-white text-red-600 p-2 rounded-full shadow-lg hover:bg-red-50"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {moments.length === 0 && (
                     <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                      <ImageIcon size={48} className="mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500">No service type photos uploaded yet.</p>
+                      <Sparkles size={48} className="mx-auto text-gray-300 mb-4" />
+                      <p className="text-gray-500">No moments uploaded yet.</p>
                     </div>
                   )}
                 </div>

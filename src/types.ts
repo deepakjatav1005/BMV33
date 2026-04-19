@@ -1,5 +1,10 @@
 export type UserRole = 'user' | 'owner' | 'provider' | 'admin';
-export type VenueType = 'Marriage Garden' | 'Hotel' | 'Marriage Hall' | 'Resort';
+export type VenueType = 
+  | 'marriage garden' 
+  | 'hotel' 
+  | 'marriage hall' 
+  | 'restorent' 
+  | 'community halls';
 
 export interface UserProfile {
   uid: string;
@@ -62,9 +67,9 @@ export interface AppBanner {
 
 export interface Review {
   id: string;
-  userId: string;
+  userId?: string;
   userName: string;
-  visitorMobile?: string;
+  visitorMobile: string;
   rating: number;
   comment: string;
   createdAt: any;
@@ -121,28 +126,28 @@ export interface Venue {
 }
 
 export type ServiceType = 
-  | 'Caterer' 
-  | 'DJ and Sounds' 
-  | 'Tent House' 
-  | 'Photo and Videographer' 
-  | 'Stage Decorator' 
-  | 'Flower Decorator' 
-  | 'Makeup Artist' 
-  | 'Halbai' 
-  | 'Event Manager' 
-  | 'Waiters' 
-  | 'Dhol Bands'
-  | 'Light Decorator'
-  | 'Drone Camera'
-  | 'Mehendi Service'
-  | 'Event Cloth and Jwellary on Rent'
-  | 'Fast food stalls'
-  | 'Loundry service'
-  | 'Helper'
-  | 'Pandit Ji Brahman'
-  | 'SPARKS AND Firecrackers'
-  | 'Ghoda Bagghi'
-  | 'Other Related Services';
+  | 'dj and sound service'
+  | 'tent house'
+  | 'photo and videography'
+  | 'drone photo and videography'
+  | 'stage decorator'
+  | 'catrors'
+  | 'halbai'
+  | 'flower decorators'
+  | 'dhol and bands'
+  | 'ghoda gadi'
+  | 'light decorators'
+  | 'mehandi artits'
+  | 'makup artits'
+  | 'fast foods service'
+  | 'laundry services'
+  | 'event cloth and jwelary'
+  | 'musical group'
+  | 'vehicle on rent'
+  | 'pujari ji'
+  | 'event managers'
+  | 'helpers'
+  | 'other related services';
 
 export interface ServiceProvider {
   id: string;
@@ -197,6 +202,7 @@ export interface Booking {
   isManual?: boolean;
   is_invoice_generated?: boolean;
   invoice_url?: string;
+  transaction_id?: string;
   extra_services?: { name: string; amount: number }[];
   createdAt: any;
 }

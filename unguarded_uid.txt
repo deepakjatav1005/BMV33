@@ -1,0 +1,32 @@
+1472:          .eq('owner_id', user.uid)
+1481:        .channel(`pending_bookings_${user.uid}`)
+1486:          filter: `owner_id=eq.${user.uid}`
+2109:        .eq('uid', user.uid)
+2126:        .eq('uid', user.uid);
+4705:      .eq('owner_id', user.uid)
+4744:      .channel(`booking_manager_changes_${user.uid}`)
+4751:      const { data: vData } = await db.from('venues').select('*').eq('owner_id', user.uid);
+4754:      const { data: sData } = await db.from('service_providers').select('*').eq('provider_id', user.uid);
+4949:        .eq('owner_id', user.uid)
+4957:        user_id: user.uid,
+4958:        owner_id: user.uid,
+5925:        .eq('user_id', user.uid)
+5932:        const lastReminded = localStorage.getItem(`last_reminded_${user.uid}`);
+5939:          localStorage.setItem(`last_reminded_${user.uid}`, now.toString());
+5974:        .or(`user_id.eq.${user.uid},owner_id.eq.${user.uid}`);
+6008:        .eq('owner_id', user.uid);
+6026:        .eq('provider_id', user.uid);
+6054:      .channel(`dashboard_bookings_${user.uid}`)
+6061:      .channel(`dashboard_venues_${user.uid}`)
+6068:      .channel(`dashboard_services_${user.uid}`)
+6800:            userId: user.uid,
+7323:        const { data: sData } = await db.from('user_subscriptions').select('*').eq('user_id', user.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
+7350:            userId: user.uid,
+7377:              user_id: user.uid,
+7772:        provider_id: user.uid,
+7944:        if (data.provider_id !== user.uid && profile?.role !== 'admin') {
+8156:        if (data.owner_id !== user.uid && profile?.role !== 'admin') {
+8402:        .eq('uid', user.uid);
+8574:        owner_id: user.uid,
+8579:      console.log('Submitting venue to DB:', { name: formData.name, owner: user.uid });
+9965:          .eq('uid', user.uid);

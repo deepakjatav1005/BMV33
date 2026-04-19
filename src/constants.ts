@@ -4,18 +4,19 @@ export const DEFAULT_MOCK_DATA: Record<string, any[]> = {
   service_providers: [],
   banners: [],
   notifications: [
-    { id: '1', title: 'Welcome!', message: 'Welcome to BOOK MY VANUE! Start by exploring venues and services.', created_at: new Date().toISOString() },
+    { id: '1', title: 'Welcome!', message: 'Welcome to BEST VANUE OPTION! Start by exploring venues and services.', created_at: new Date().toISOString() },
   ],
   bookings: [],
   reviews: [],
   app_feedback: [],
   users: [
-    { id: 'admin-id', uid: 'admin-id', email: 'admin@eventmanager.com', password: 'admin', role: 'admin', display_name: 'System Admin', mobile_number: '0000000000' }
+    { id: 'admin-id', uid: 'admin-id', email: 'deepakjatav1005@gmail.com', password: '9165436918', role: 'admin', display_name: 'Deepak Jatav', mobile_number: '9165436918' }
   ],
   subscription_plans: [
-    { id: '1', name: 'Basic', price: 999, role: 'venue_owner', is_active: true, duration: '1 Year' },
-    { id: '2', name: 'Premium', price: 2999, role: 'venue_owner', is_active: true, duration: '1 Year' },
-    { id: '3', name: 'Service Provider', price: 499, role: 'provider', is_active: true, duration: '1 Year' },
+    { id: '1', role: 'owner', name: 'Monthly Plan', price: 100, duration: 'month', isActive: true },
+    { id: '2', role: 'owner', name: 'Annual Plan', price: 1000, duration: 'year', isActive: true },
+    { id: '3', role: 'provider', name: 'Monthly Plan', price: 30, duration: 'month', isActive: true },
+    { id: '4', role: 'provider', name: 'Annual Plan', price: 300, duration: 'year', isActive: true },
   ],
   user_subscriptions: [],
   service_type_photos: []

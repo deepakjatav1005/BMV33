@@ -2,16 +2,23 @@
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_MOCK_DATA } from '../constants';
 
-const STORAGE_KEY = 'APP_MOCK_DATA';
+const STORAGE_KEY = 'BEST_VANUE_OPTION_DATA_V1';
 const SESSION_KEY = 'APP_SESSION';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Initialize real Supabase if keys are present
-export const supabase = (supabaseUrl && supabaseAnonKey) 
+export const supabase = (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined') 
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+if (supabase) {
+  console.log('✅ Supabase connected successfully to:', supabaseUrl);
+} else {
+  console.warn('⚠️ Supabase keys NOT found or invalid. Falling back to Mock Data (LocalStorage).');
+  console.log('Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your Environment/Secrets.');
+}
 
 const getLocalData = () => {
   const saved = localStorage.getItem(STORAGE_KEY);
