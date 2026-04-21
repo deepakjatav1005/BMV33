@@ -204,5 +204,17 @@ export interface Booking {
   invoice_url?: string;
   transaction_id?: string;
   extra_services?: { name: string; amount: number }[];
+  advance_amount?: number;
+  payments?: BookingPayment[];
+  createdAt: any;
+}
+
+export interface BookingPayment {
+  id: string;
+  bookingId: string;
+  amount: number;
+  paymentMode: 'Cash' | 'Online' | 'PhonePe' | 'GPay' | 'Other';
+  paymentDate: string;
+  paymentType: 'Advance' | 'Pending' | 'Round off';
   createdAt: any;
 }

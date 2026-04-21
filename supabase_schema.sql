@@ -63,21 +63,32 @@ CREATE TABLE public.service_providers (
 -- 4. Bookings Table
 CREATE TABLE public.bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES public.users(uid) ON DELETE SET NULL,
-    owner_id UUID REFERENCES public.users(uid) ON DELETE SET NULL,
+    user_id TEXT, -- User ID of the person booking
+    owner_id TEXT, -- User ID of the venue/service owner
     visitor_name TEXT,
     visitor_mobile TEXT,
+    party_name TEXT,
+    party_address TEXT,
     event_type TEXT,
     target_id UUID, -- Can be venue id or service provider id
     target_type TEXT CHECK (target_type IN ('venue', 'service')),
     target_name TEXT,
     event_date DATE,
-    total_amount NUMERIC,
+    end_date DATE,
+    start_time TIME,
+    end_time TIME,
+    message TEXT,
+    status TEXT DEFAULT 'pending',
+    total_amount NUMERIC DEFAULT 0,
     updated_amount NUMERIC,
     payment_status TEXT DEFAULT 'pending',
     payment_mode TEXT,
+    transaction_id TEXT,
     is_invoice_generated BOOLEAN DEFAULT FALSE,
+    is_manual BOOLEAN DEFAULT FALSE,
+    extra_services JSONB DEFAULT '[]',
     invoice_url TEXT,
+    advance_amount NUMERIC DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

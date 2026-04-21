@@ -395,7 +395,8 @@ import {
   PersonStanding,
   HandHelping,
   Layout,
-  Users2
+  Users2,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
@@ -446,6 +447,306 @@ const ConfirmModal = ({
             )}
           >
             {confirmText}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const ManagePaymentModal = ({ 
+  isOpen, 
+  onClose, 
+  booking, 
+  onUpdate,
+  currentUserUid
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  booking: Booking | null,
+  onUpdate: () => void,
+  currentUserUid?: string
+}) => {
+  const [payments, setPayments] = useState<BookingPayment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    amount: 0,
+    paymentMode: 'Cash' as any,
+    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+    paymentType: 'Pending' as any
+  });
+
+  useEffect(() => {
+    if (isOpen && booking) {
+      fetchPayments();
+    }
+  }, [isOpen, booking]);
+
+  const fetchPayments = async () => {
+    if (!booking) return;
+    setLoading(true);
+    try {
+      const { data, error } = await db.from('booking_payments')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPayments(data || []);
+    } catch (err) {
+      console.error('Fetch payments error:', err);
+      toast.error('Failed to fetch payment records');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegisterPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!booking) return;
+    if (newPayment.amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: payError } = await db.from('booking_payments').insert([{
+        booking_id: booking.id,
+        amount: newPayment.amount,
+        payment_mode: newPayment.paymentMode,
+        payment_date: newPayment.paymentDate,
+        payment_type: newPayment.paymentType
+      }]);
+
+      if (payError) throw payError;
+
+      const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0) + newPayment.amount;
+      const targetAmount = booking.updatedAmount || booking.totalAmount || 0;
+      
+      // Update booking status if fully paid
+      if (totalReceived >= targetAmount) {
+        await db.from('bookings').update({ 
+          payment_status: 'Paid',
+          status: 'paid'
+        }).eq('id', booking.id);
+      }
+
+      toast.success('Payment registered successfully');
+      setIsRegistering(false);
+      setNewPayment({
+        amount: 0,
+        paymentMode: 'Cash',
+        paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        paymentType: 'Pending'
+      });
+      fetchPayments();
+      onUpdate();
+    } catch (err) {
+      console.error('Register payment error:', err);
+      toast.error('Failed to register payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !booking) return null;
+
+  const totalAmount = (booking.updatedAmount || booking.totalAmount || 0);
+  const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0);
+  const pendingAmount = Math.max(0, totalAmount - totalReceived);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
+        <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Payment Records</h3>
+            <p className="text-sm text-gray-500 font-medium">{booking.partyName || booking.visitorName} • {booking.targetName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Booking</span>
+              <span className="text-2xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
+            </div>
+            <div className="bg-green-50/50 p-6 rounded-3xl border border-green-100">
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid Amount</span>
+              <span className="text-2xl font-black text-green-900">₹{totalReceived.toLocaleString()}</span>
+            </div>
+            <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100">
+              <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">Pending Balance</span>
+              <span className="text-2xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h4 className="text-lg font-bold text-gray-900 flex items-center tracking-tight">
+                <Clock className="mr-2 text-orange-600" size={20} />
+                Transaction History
+              </h4>
+              {pendingAmount > 0 && !isRegistering && currentUserUid === booking.ownerId && (
+                <button 
+                  onClick={() => setIsRegistering(true)}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
+                >
+                  <Plus size={16} className="mr-2" />
+                  Register Payment
+                </button>
+              )}
+            </div>
+
+            {isRegistering && (
+              <motion.form 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onSubmit={handleRegisterPayment}
+                className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-200 mb-8 space-y-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Paid Amount (₹)</label>
+                    <input 
+                      required
+                      type="number"
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold"
+                      value={newPayment.amount || ''}
+                      onChange={(e) => setNewPayment({...newPayment, amount: parseInt(e.target.value) || 0})}
+                      max={pendingAmount}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Payment Type</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold"
+                      value={newPayment.paymentType}
+                      onChange={(e) => {
+                        const type = e.target.value as any;
+                        setNewPayment({
+                          ...newPayment, 
+                          paymentType: type,
+                          paymentMode: type === 'Round off' ? 'Other' : newPayment.paymentMode
+                        });
+                      }}
+                    >
+                      <option value="Advance">Advance</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Round off">Round off (Concession)</option>
+                    </select>
+                  </div>
+                  {newPayment.paymentType !== 'Round off' && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Payment Mode</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold"
+                        value={newPayment.paymentMode}
+                        onChange={(e) => setNewPayment({...newPayment, paymentMode: e.target.value as any})}
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="Online">Online</option>
+                        <option value="PhonePe">PhonePe</option>
+                        <option value="GPay">GPay</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Payment Date</label>
+                    <input 
+                      required
+                      type="date"
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold"
+                      value={newPayment.paymentDate}
+                      onChange={(e) => setNewPayment({...newPayment, paymentDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="flex space-x-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsRegistering(false)}
+                    className="flex-1 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-100"
+                  >
+                    Save Entry
+                  </button>
+                </div>
+              </motion.form>
+            )}
+
+            <div className="space-y-4">
+              {loading && !isRegistering && (
+                <div className="flex justify-center p-8">
+                  <RefreshCw className="animate-spin text-orange-600" size={32} />
+                </div>
+              )}
+              
+              {!loading && payments.length === 0 ? (
+                <div className="text-center p-12 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                  <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <IndianRupee size={24} />
+                  </div>
+                  <p className="text-gray-500 font-medium">No payment records found yet.</p>
+                </div>
+              ) : (
+                payments.map(p => (
+                  <div key={p.id} className="flex justify-between items-center p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all group">
+                    <div className="flex items-center space-x-5">
+                      <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors">
+                        {p.paymentMode === 'Online' || p.paymentMode === 'PhonePe' || p.paymentMode === 'GPay' ? <Globe size={28} /> : <IndianRupee size={28} />}
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-3 mb-1">
+                          <span className="font-black text-xl text-gray-900">₹{p.amount.toLocaleString()}</span>
+                          <span className={cn(
+                            "text-[10px] uppercase font-black px-2.5 py-1 rounded-full tracking-wider",
+                            p.paymentType === 'Advance' ? "bg-blue-100 text-blue-600" : 
+                            p.paymentType === 'Round off' ? "bg-purple-100 text-purple-600" : "bg-orange-100 text-orange-600"
+                          )}>
+                            {p.paymentType === 'Round off' ? 'Concession' : p.paymentType}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                          {p.paymentType === 'Round off' ? 'Adjustment' : p.paymentMode} • {formatDateDDMMYYYY(p.paymentDate)}
+                        </p>
+                      </div>
+                    </div>
+                    {pendingAmount === 0 && p === payments[0] && (
+                       <div className="flex items-center text-green-600 font-black text-[10px] uppercase tracking-widest bg-green-50 px-4 py-2 rounded-full border border-green-100 shadow-sm">
+                         <CheckCircle size={14} className="mr-2" strokeWidth={3} />
+                         Fully Paid
+                       </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 border-t border-gray-100 bg-gray-50/50">
+          <button 
+            onClick={onClose}
+            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-xl shadow-gray-200 text-lg flex items-center justify-center"
+          >
+            Done
           </button>
         </div>
       </motion.div>
@@ -542,7 +843,7 @@ const useTranslation = () => React.useContext(LanguageContext);
 
 import { CNZLogo } from './components/CNZLogo';
 import { PoweredByCNZ } from './components/PoweredByCNZ';
-import { UserProfile, Venue, ServiceProvider, Booking, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
+import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
 
 declare var Razorpay: any;
 
@@ -596,20 +897,55 @@ const SERVICE_FACILITY_OPTIONS = [
   'take from shope service', 'as per work service', 'delavery service'
 ].sort();
 
-const getFinancialYear = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  if (month >= 4) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
+const getCurrentYear = () => {
+  return new Date().getFullYear();
+};
+
+const formatTime12h = (timeStr: string | null | undefined) => {
+  if (!timeStr) return '';
+  try {
+    // Handle timestamp strings that might be passed here
+    if (timeStr.includes('T') || timeStr.includes('-')) {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return format(d, 'hh:mm a');
+      }
+    }
+
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    
+    const hours = parts[0];
+    const minutes = parts[1].split(' ')[0]; // Remove any trailing info like ' AM' or ' PM'
+    
+    const h = parseInt(hours);
+    if (isNaN(h)) return timeStr;
+    
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const m = minutes.padStart(2, '0');
+    return `${h12.toString().padStart(2, '0')}:${m} ${ampm}`;
+  } catch (err) {
+    return timeStr;
   }
-  return `${year - 1}-${year.toString().slice(-2)}`;
+};
+
+const formatDateDDMMYYYY = (date: Date | string | null | undefined) => {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+    return format(d, 'dd/MM/yyyy');
+  } catch {
+    return typeof date === 'string' ? date : '';
+  }
 };
 
 const generateTransactionId = (ownerRegId: string, count: number) => {
-  const fy = getFinancialYear();
-  const num = (count + 1).toString().padStart(3, '0');
-  return `${ownerRegId}/${fy}/${num}`;
+  // Extract only the numeric part from the registration ID (e.g., BMVVO900001 -> 900001)
+  const idNumber = ownerRegId.replace(/\D/g, '') || '00000';
+  const serial = (count + 1).toString().padStart(3, '0');
+  return `BVO/${idNumber}/${serial}`;
 };
 
 const MultiSelect = ({ 
@@ -1150,7 +1486,7 @@ const ReviewSection = ({
                     </div>
                   </div>
                   <span className="text-xs text-gray-400">
-                    {format(new Date(review.createdAt), 'MMM d, yyyy')}
+                    {formatDateDDMMYYYY(review.createdAt)}
                   </span>
                 </div>
                 <p className="text-gray-600 italic">"{review.comment}"</p>
@@ -1329,8 +1665,13 @@ const ImageUpload = ({
     try {
       // Client-side resizing
       const img = document.createElement('img');
+      img.crossOrigin = 'anonymous'; // Ensure cross-origin resilience
       img.src = URL.createObjectURL(file);
-      await new Promise((resolve) => (img.onload = resolve));
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error('Failed to load image for processing'));
+      });
 
       const canvas = document.createElement('canvas');
       const MAX_WIDTH = 1200;
@@ -1361,7 +1702,9 @@ const ImageUpload = ({
 
       if (!blob) throw new Error('Failed to process image');
 
-      const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}.jpg`;
+      // Use a more unique path to prevent conflicts
+      const filePath = `uploads/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${file.name.replace(/\s+/g, '_')}.jpg`;
+      
       const { error } = await db.storage
         .from('images')
         .upload(filePath, blob, {
@@ -1377,9 +1720,10 @@ const ImageUpload = ({
         .getPublicUrl(filePath);
 
       onUpload(publicUrl);
+      URL.revokeObjectURL(img.src);
     } catch (err: any) {
       console.error('Upload Error:', err);
-      toast.error(`Failed to upload ${file.name}`);
+      toast.error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -1526,12 +1870,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
               <Link to="/search" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
-              {user && (
-                <Link to="/dashboard?tab=orders" className="flex items-center space-x-1 text-gray-600 hover:text-orange-600 font-bold transition-all bg-orange-50/50 px-4 py-2 rounded-xl border border-orange-100 hover:bg-orange-50">
-                  <Calendar size={18} />
-                  <span>My Bookings</span>
-                </Link>
-              )}
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
               
               <button 
@@ -1556,16 +1894,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                   >
                     <Star size={20} className="group-hover:scale-110 transition-transform" fill="currentColor" />
                   </button>
-                  {(profile?.role === 'owner' || profile?.role === 'provider' || profile?.role === 'admin') && (
-                    <Link to="/dashboard?tab=booking-manager" className="relative p-2 text-orange-600 hover:bg-orange-50 rounded-xl transition-all group" title="Booking Manager">
-                      <Bell size={24} className="group-hover:scale-110 transition-transform" />
-                      {pendingCount > 0 && (
-                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white animate-pulse">
-                          {pendingCount}
-                        </span>
-                      )}
-                    </Link>
-                  )}
                   <Link to={profile?.role === 'admin' ? "/admin" : "/dashboard"} className="flex items-center space-x-3 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 hover:bg-orange-100 transition-all group">
                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-orange-200">
                       {profile?.photoURL ? (
@@ -1608,9 +1936,10 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
     <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, height: 0, y: -20 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="md:hidden bg-white border-b border-orange-100 overflow-hidden"
           >
           <div className="px-4 py-6 space-y-2">
@@ -1619,8 +1948,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               { to: "/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
               { to: "/search", label: "Search", icon: <Search size={18} /> },
               { to: "/about", label: "About", icon: <Info size={18} /> },
-              ...(user ? [{ to: "/dashboard?tab=orders", label: "My Bookings", icon: <Calendar size={18} /> }] : []),
-              ...(user && (profile?.role === 'owner' || profile?.role === 'provider' || profile?.role === 'admin') ? [{ to: "/dashboard?tab=booking-manager", label: "Booking Manager", icon: <Bell size={18} /> }] : []),
             ].map((item) => (
               <Link 
                 key={item.to}
@@ -1640,7 +1967,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 px-4">Account</p>
                 {[
-                  ...(profile?.role === 'owner' || profile?.role === 'provider' ? [{ to: "/dashboard?tab=booking-manager", label: `Booking Manager ${pendingCount > 0 ? `(${pendingCount})` : ''}`, icon: <Calendar size={18} /> }] : []),
                   { to: "/change-password", label: "Change Password", icon: <ShieldCheck size={18} /> },
                   { to: profile?.role === 'admin' ? "/admin" : "/dashboard", label: profile?.role === 'admin' ? "Admin Panel" : "Dashboard", icon: <LayoutDashboard size={18} /> },
                 ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
@@ -1845,25 +2171,6 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
 };
 
 const CategorySection = () => {
-  const categories = [
-    { name: 'Venues', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=400', link: '/venues' },
-    { name: 'Catering', image: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=400', link: '/services?type=Caterer' },
-    { name: 'DJ & Music', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400', link: '/services?type=DJ and Sounds' },
-    { name: 'Tent House', image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80&w=400', link: '/services?type=Tent House' },
-    { name: 'Photography', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=400', link: '/services?type=Photo and Videographer' },
-    { name: 'Makeup', image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Makeup Artist' },
-    { name: 'Decoration', image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=400', link: '/services?type=Light Decorator' },
-    { name: 'Event Manager', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80&w=400', link: '/services?type=Event Manager' },
-    { name: 'Pandit Ji', image: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&q=80&w=400', link: '/services?type=Pandit Ji Brahman' },
-    { name: 'Mehendi', image: 'https://images.unsplash.com/photo-1542642837-739074a911c0?auto=format&fit=crop&q=80&w=400', link: '/services?type=Mehendi Service' },
-    { name: 'Drone', image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Drone Camera' },
-    { name: 'Rentals', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&q=80&w=400', link: '/services?type=Event Cloth and Jwellary on Rent' },
-    { name: 'Halbai', image: 'https://images.unsplash.com/photo-1589676062352-b19035222f5f?auto=format&fit=crop&q=80&w=400', link: '/services?type=Halbai' },
-    { name: 'Waiters', image: 'https://images.unsplash.com/photo-1590650153855-d9e808231d41?auto=format&fit=crop&q=80&w=400', link: '/services?type=Waiters' },
-    { name: 'Dhol Bands', image: 'https://images.unsplash.com/photo-1514525253344-f814d074358a?auto=format&fit=crop&q=80&w=400', link: '/services?type=Dhol Bands' },
-    { name: 'Flower Decor', image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=400', link: '/services?type=Flower Decorator' },
-  ];
-
   return (
     <section className="py-24 bg-white overflow-hidden relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -1873,34 +2180,114 @@ const CategorySection = () => {
           </h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto">Discover everything you need for your event with our curated categories.</p>
         </div>
-        
-        <div className="relative">
-          <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
-            {[...categories, ...categories].map((cat, idx) => (
-              <motion.div
-                key={idx}
-                whileHover={{ scale: 1.05, rotateY: 15 }}
-                className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
-              >
-                <Link to={cat.link} className="block w-full h-full">
-                  <img 
-                    src={cat.image} 
-                    alt={cat.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-                    <h3 className="text-2xl font-black text-white uppercase tracking-widest drop-shadow-lg">{cat.name}</h3>
-                    <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        <CategoryDisplay />
       </div>
     </section>
+  );
+};
+
+const CategoryDisplay = () => {
+  const [allUploadedPhotos, setAllUploadedPhotos] = useState<any[]>([]);
+  
+  const defaultCategories = [
+    { name: 'Venues', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=400', link: '/venues' },
+    { name: 'Catering', image: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=400', link: '/services?type=catrors', serviceType: 'catrors' },
+    { name: 'DJ & Music', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400', link: '/services?type=dj and sound service', serviceType: 'dj and sound service' },
+    { name: 'Tent House', image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80&w=400', link: '/services?type=tent house', serviceType: 'tent house' },
+    { name: 'Photography', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=400', link: '/services?type=photo and videography', serviceType: 'photo and videography' },
+    { name: 'Makeup', image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=400', link: '/services?type=makup artits', serviceType: 'makup artits' },
+    { name: 'Decoration', image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=400', link: '/services?type=light decorators', serviceType: 'light decorators' },
+    { name: 'Event Manager', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80&w=400', link: '/services?type=event managers', serviceType: 'event managers' },
+    { name: 'Pandit Ji', image: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&q=80&w=400', link: '/services?type=pujari ji', serviceType: 'pujari ji' },
+    { name: 'Mehendi', image: 'https://images.unsplash.com/photo-1542642837-739074a911c0?auto=format&fit=crop&q=80&w=400', link: '/services?type=mehandi artits', serviceType: 'mehandi artits' },
+    { name: 'Drone', image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&q=80&w=400', link: '/services?type=drone photo and videography', serviceType: 'drone photo and videography' },
+    { name: 'Rentals', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&q=80&w=400', link: '/services?type=event cloth and jwelary', serviceType: 'event cloth and jwelary' },
+    { name: 'Halbai', image: 'https://images.unsplash.com/photo-1589676062352-b19035222f5f?auto=format&fit=crop&q=80&w=400', link: '/services?type=halbai', serviceType: 'halbai' },
+    { name: 'Waiters', image: 'https://images.unsplash.com/photo-1590650153855-d9e808231d41?auto=format&fit=crop&q=80&w=400', link: '/services?type=helpers', serviceType: 'helpers' },
+    { name: 'Dhol Bands', image: 'https://images.unsplash.com/photo-1514525253344-f814d074358a?auto=format&fit=crop&q=80&w=400', link: '/services?type=dhol and bands', serviceType: 'dhol and bands' },
+    { name: 'Flower Decor', image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=400', link: '/services?type=flower decorators', serviceType: 'flower decorators' },
+  ];
+  
+  const [displayCategories, setDisplayCategories] = useState<any[]>(defaultCategories);
+
+  useEffect(() => {
+    const fetchPhotos = async () => {
+      const { data } = await db.from('service_type_photos').select('*');
+      if (data && data.length > 0) {
+        setAllUploadedPhotos(data);
+        
+        // Merge uploaded photos with default categories
+        // We want to show ALL uploaded photos as distinct cards
+        const uploadedCategories = data.map((p: any) => ({
+          name: p.service_type || 'Special Service',
+          image: p.image_url,
+          link: `/services?type=${encodeURIComponent(p.service_type)}`,
+          serviceType: p.service_type,
+          isUploaded: true
+        }));
+
+        // Filter default categories to only those that don't have an uploaded photo for their service type
+        // Or actually, just show all defaults + all uploaded?
+        // Let's show all uploaded ones first, then defaults that aren't represented
+        const uploadedTypes = new Set(data.map((p: any) => p.service_type));
+        const filteredDefaults = defaultCategories.filter(cat => !cat.serviceType || !uploadedTypes.has(cat.serviceType));
+        
+        setDisplayCategories([...uploadedCategories, ...filteredDefaults]);
+      } else {
+        setDisplayCategories(defaultCategories);
+      }
+    };
+    fetchPhotos();
+    
+    const channel = db.channel('category_photos_display')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_type_photos' }, fetchPhotos)
+      .subscribe();
+      
+    return () => { db.removeChannel(channel); };
+  }, []);
+
+  return (
+    <div className="relative overflow-hidden">
+      <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
+        {[...displayCategories, ...displayCategories].map((cat: any, idx) => (
+          <motion.div
+            key={idx}
+            whileHover={{ scale: 1.05, rotateY: 15 }}
+            className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
+          >
+            <Link to={cat.link} className="block w-full h-full">
+              {(cat.image && (cat.image.includes('.mp4') || cat.image.includes('video'))) ? (
+                <video 
+                  src={cat.image} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  autoPlay 
+                  muted 
+                  loop 
+                  playsInline
+                />
+              ) : (
+                <img 
+                  src={cat.image} 
+                  alt={cat.name}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
+                <h3 className="text-xl font-black text-white uppercase tracking-widest drop-shadow-lg text-center px-4">{cat.name}</h3>
+                <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+              </div>
+              {cat.isUploaded && (
+                <div className="absolute top-4 right-4 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter">
+                  Pro
+                </div>
+              )}
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -3676,19 +4063,31 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
 };
 
 const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | null }) => {
-  const { id } = useParams();
-  const [venue, setVenue] = useState<Venue | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [bookingDate, setBookingDate] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('21:00');
-  const [visitorName, setVisitorName] = useState(profile?.displayName || '');
-  const [visitorMobile, setVisitorMobile] = useState(profile?.mobileNumber || '');
-  const [eventType, setEventType] = useState('');
-  const [message, setMessage] = useState('');
-  const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
-  const [isCallSatisfied, setIsCallSatisfied] = useState(false);
-  const [ownerProfile, setOwnerProfile] = useState<any>(null);
+    const { id } = useParams();
+    const [venue, setVenue] = useState<Venue | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [bookingDate, setBookingDate] = useState('');
+    const [startTime, setStartTime] = useState('09:00');
+    const [endTime, setEndTime] = useState('21:00');
+    const [visitorName, setVisitorName] = useState(profile?.displayName || '');
+    const [visitorMobile, setVisitorMobile] = useState(profile?.mobileNumber || '');
+    const [eventType, setEventType] = useState('');
+    const [visitorAddress, setVisitorAddress] = useState(profile?.pincode ? `${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}` : '');
+    const [message, setMessage] = useState('');
+    const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+    const [isCallSatisfied, setIsCallSatisfied] = useState(false);
+    const [ownerProfile, setOwnerProfile] = useState<any>(null);
+
+    // Update form when profile loads
+    useEffect(() => {
+        if (profile) {
+            if (!visitorName) setVisitorName(profile.displayName || '');
+            if (!visitorMobile) setVisitorMobile(profile.mobileNumber || '');
+            if (!visitorAddress && profile.pincode) {
+                setVisitorAddress(`${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}`);
+            }
+        }
+    }, [profile]);
 
   const fetchVenue = async () => {
     if (!id) return;
@@ -3741,7 +4140,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingDate || !visitorName || !visitorMobile || !eventType) {
+    if (!bookingDate || !visitorName || !visitorMobile || !eventType || !visitorAddress) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -3789,19 +4188,21 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         }
       }
 
-      // Get financial year start date
+      // Get calendar year start date (January 1st)
       const now = new Date();
-      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
-      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-      const { count } = await db.from('bookings')
+      const { count, error: countError } = await db.from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('owner_id', venue?.ownerId)
-        .gte('created_at', fyStart);
-      
-      const tid = generateTransactionId(ownerProfile?.registration_id || 'BVO', count || 0);
+        .gte('created_at', yearStart);
 
-      const { error } = await db.from('bookings').insert([{
+      if (countError) console.error('Count query error:', countError);
+      
+      const ownerRegId = ownerProfile?.registration_id || ownerProfile?.registrationId || 'BVO';
+      const tid = generateTransactionId(ownerRegId, count || 0);
+
+      const bookingData = {
         user_id: user?.uid || 'visitor',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
@@ -3814,10 +4215,13 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: venue?.pricePerDay || 0,
-        message,
+        total_amount: Number(venue?.pricePerDay) || 0,
+        message: message || '',
+        party_address: visitorAddress,
         transaction_id: tid
-      }]);
+      };
+
+      const { error } = await db.from('bookings').insert([bookingData]);
 
       if (error) throw error;
 
@@ -3825,7 +4229,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       try {
         const { data: ownerProfile } = await db.from('users').select('mobile_number').eq('uid', venue?.ownerId).single();
         if (ownerProfile?.mobile_number) {
-          const alertMsg = `New Booking Query for ${venue?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nEvent: ${eventType}\nDate: ${bookingDate}\nMessage: ${message || 'No message'}`;
+          const alertMsg = `New Booking Query for ${venue?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nAddress: ${visitorAddress}\nEvent: ${eventType}\nDate: ${bookingDate}\nMessage: ${message || 'No message'}`;
           sendWhatsAppAlert(ownerProfile.mobile_number, alertMsg);
         }
       } catch (waErr) {
@@ -3834,8 +4238,9 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
       setBookingStatus('success');
       toast.success('Booking request sent successfully!');
-    } catch (err) {
-      toast.error('Failed to send booking request');
+    } catch (err: any) {
+      console.error('Booking Error:', err);
+      toast.error(`Failed to send booking request: ${err.message || 'Unknown error'}`);
       setBookingStatus('idle');
     }
   };
@@ -4100,6 +4505,17 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Your Full Address</label>
+                      <textarea 
+                        required
+                        rows={2}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                        placeholder="Village/City, Block, District, State, Pincode"
+                        value={visitorAddress}
+                        onChange={(e) => setVisitorAddress(e.target.value)}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">Event Date</label>
                       <div className="relative">
                         <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -4180,9 +4596,21 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   const [visitorName, setVisitorName] = useState(profile?.displayName || '');
   const [visitorMobile, setVisitorMobile] = useState(profile?.mobileNumber || '');
   const [eventType, setEventType] = useState('');
+  const [visitorAddress, setVisitorAddress] = useState(profile?.pincode ? `${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}` : '');
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [providerProfile, setProviderProfile] = useState<any>(null);
+
+  // Update form when profile loads
+  useEffect(() => {
+    if (profile) {
+      if (!visitorName) setVisitorName(profile.displayName || '');
+      if (!visitorMobile) setVisitorMobile(profile.mobileNumber || '');
+      if (!visitorAddress && profile.pincode) {
+        setVisitorAddress(`${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}`);
+      }
+    }
+  }, [profile]);
 
   const fetchService = async () => {
     if (!id) return;
@@ -4235,11 +4663,11 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date) {
-      toast.error('Please select a date');
+    if (!date || !visitorName || !visitorMobile || !eventType || !visitorAddress) {
+      toast.error('Please fill all required fields');
       return;
     }
-    if (!user && !/^\d{10}$/.test(visitorMobile)) {
+    if (!/^\d{10}$/.test(visitorMobile)) {
       toast.error('Please enter a valid 10-digit mobile number');
       return;
     }
@@ -4287,19 +4715,21 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         }
       }
 
-      // Get financial year start date
+      // Get calendar year start date (January 1st)
       const now = new Date();
-      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
-      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-      const { count } = await db.from('bookings')
+      const { count, error: countError } = await db.from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('owner_id', service?.providerId)
-        .gte('created_at', fyStart);
+        .gte('created_at', yearStart);
       
-      const tid = generateTransactionId(providerProfile?.registration_id || 'BVO', count || 0);
+      if (countError) console.error('Count query error:', countError);
 
-      const { error } = await db.from('bookings').insert([{
+      const providerRegId = providerProfile?.registration_id || providerProfile?.registrationId || 'BVO';
+      const tid = generateTransactionId(providerRegId, count || 0);
+
+      const bookingData = {
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
         target_type: 'service',
@@ -4310,12 +4740,15 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         end_time: endTime,
         status: 'pending',
         total_amount: 0,
-        message,
+        message: message || '',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
+        party_address: visitorAddress,
         event_type: eventType,
         transaction_id: tid
-      }]);
+      };
+
+      const { error } = await db.from('bookings').insert([bookingData]);
 
       if (error) throw error;
 
@@ -4323,7 +4756,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       try {
         const { data: providerProfile } = await db.from('users').select('mobile_number').eq('uid', service?.providerId).single();
         if (providerProfile?.mobile_number) {
-          const alertMsg = `New Service Query for ${service?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nDate: ${date}\nMessage: ${message || 'No message'}`;
+          const alertMsg = `New Service Query for ${service?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nAddress: ${visitorAddress}\nDate: ${date}\nMessage: ${message || 'No message'}`;
           sendWhatsAppAlert(providerProfile.mobile_number, alertMsg);
         }
       } catch (waErr) {
@@ -4332,8 +4765,9 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
       setBookingStatus('success');
       toast.success('Booking inquiry sent successfully!');
-    } catch (err) {
-      toast.error('Failed to send inquiry');
+    } catch (err: any) {
+      console.error('Inquiry Error:', err);
+      toast.error(`Failed to send inquiry: ${err.message || 'Unknown error'}`);
       setBookingStatus('idle');
     }
   };
@@ -4565,6 +4999,17 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Your Full Address</label>
+                    <textarea 
+                      required
+                      rows={2}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                      placeholder="Village/City, Block, District, State, Pincode"
+                      value={visitorAddress}
+                      onChange={(e) => setVisitorAddress(e.target.value)}
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Event Date</label>
                     <input 
                       required
@@ -4653,13 +5098,9 @@ const BookingManagerView = ({
   const bookingsPerPage = 20;
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
-  const [expenditure, setExpenditure] = useState(0);
-  const [extraServices, setExtraServices] = useState<{ name: string; amount: number }[]>([]);
-  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [manualBooking, setManualBooking] = useState({
     partyName: '',
@@ -4669,17 +5110,16 @@ const BookingManagerView = ({
     endDate: '',
     startTime: '09:00',
     endTime: '21:00',
-    eventType: '',
+    eventType: 'Wedding',
     targetId: '',
-    targetName: '',
-    paymentMode: 'Cash',
-    totalAmount: 0
+    targetName: ''
   });
   const [venues, setVenues] = useState<Venue[]>(parentVenues || []);
   const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
+  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
 
   useEffect(() => {
     if (parentBookings) setBookings(parentBookings);
@@ -4699,11 +5139,15 @@ const BookingManagerView = ({
       onUpdate();
       return;
     }
-    const { data, error } = await db
+    const query = db
       .from('bookings')
-      .select('*')
-      .eq('owner_id', user?.uid)
-      .order('created_at', { ascending: false });
+      .select('*, booking_payments(*)');
+    
+    if (profile?.role !== 'admin') {
+      query.eq('owner_id', user?.uid);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (!error && data) {
       setBookings(data.map(d => ({
@@ -4725,11 +5169,21 @@ const BookingManagerView = ({
         status: d.status,
         isManual: d.is_manual,
         totalAmount: d.total_amount || 0,
+        advance_amount: d.advance_amount || 0,
         updatedAmount: d.updated_amount,
         paymentStatus: d.payment_status,
         paymentMode: d.payment_mode,
         is_invoice_generated: d.is_invoice_generated,
         invoice_url: d.invoice_url,
+        payments: (d.booking_payments || []).map((p: any) => ({
+          id: p.id,
+          bookingId: p.booking_id,
+          amount: p.amount,
+          paymentMode: p.payment_mode,
+          paymentDate: p.payment_date,
+          paymentType: p.payment_type,
+          createdAt: p.created_at
+        })),
         createdAt: d.created_at
       } as Booking)));
     }
@@ -4748,10 +5202,14 @@ const BookingManagerView = ({
       .subscribe();
 
     const fetchMyItems = async () => {
-      const { data: vData } = await db.from('venues').select('*').eq('owner_id', user?.uid);
+      const vQuery = db.from('venues').select('*');
+      if (profile?.role !== 'admin') vQuery.eq('owner_id', user?.uid);
+      const { data: vData } = await vQuery;
       if (vData) setVenues(vData.map(d => ({ id: d.id, ...d } as any)));
       
-      const { data: sData } = await db.from('service_providers').select('*').eq('provider_id', user?.uid);
+      const sQuery = db.from('service_providers').select('*');
+      if (profile?.role !== 'admin') sQuery.eq('provider_id', user?.uid);
+      const { data: sData } = await sQuery;
       if (sData) setServices(sData.map(d => ({ id: d.id, ...d } as any)));
     };
 
@@ -4819,71 +5277,6 @@ const BookingManagerView = ({
     }
   };
 
-  const confirmInvoice = async () => {
-    if (selectedBooking) {
-      const updatedBooking = {
-        ...selectedBooking,
-        extra_services: extraServices,
-        paymentMode,
-        paymentStatus: 'Pending' as 'Pending',
-        status: selectedBooking.status
-      };
-      
-      const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
-      
-      // Upload to Supabase Storage to get a public link
-      const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
-      const { data: uploadData, error: uploadError } = await db.storage
-        .from('images')
-        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-
-      let downloadUrl = '';
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(fileName);
-        downloadUrl = publicUrl;
-      }
-
-      const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
-      
-      let msg = `Hello ${selectedBooking.partyName || selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: Pending.`;
-      if (downloadUrl) {
-        msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
-      }
-      
-      sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
-      
-      await db.from('bookings').update({ 
-        is_invoice_generated: true,
-        extra_services: extraServices,
-        payment_mode: paymentMode,
-        payment_status: 'Pending',
-        invoice_url: downloadUrl
-      }).eq('id', selectedBooking.id);
-      
-      if (onUpdate) onUpdate();
-      
-      // Update local state for immediate UI feedback
-      setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { 
-        ...b, 
-        is_invoice_generated: true, 
-        paymentStatus: 'Pending',
-        paymentMode: paymentMode,
-        invoice_url: downloadUrl
-      } : b));
-      
-      setIsInvoiceModalOpen(false);
-      setSelectedBooking(null);
-      setExpenditure(0);
-      setExtraServices([]);
-      setPaymentStatus('Pending');
-      toast.success('Invoice generated and shared via WhatsApp');
-      
-      // Explicitly fetch to ensure sync
-      fetchBookings();
-    }
-  };
-
   const handleUpdatePaymentStatus = async () => {
     if (!selectedBooking) {
       console.error('No booking selected for payment update');
@@ -4939,15 +5332,14 @@ const BookingManagerView = ({
 
     setLoading(true);
     try {
-      // Get financial year start date
+      // Get current year start date (January 1st)
       const now = new Date();
-      const fyYear = now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
-      const fyStart = new Date(fyYear, 3, 1).toISOString(); // April 1st
+      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
       const { count } = await db.from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('owner_id', user?.uid)
-        .gte('created_at', fyStart);
+        .gte('created_at', yearStart);
       
       const targetVenue = venues.find(v => v.id === manualBooking.targetId);
       const isService = !targetVenue;
@@ -4969,8 +5361,8 @@ const BookingManagerView = ({
         visitor_mobile: manualBooking.mobileNumber,
         status: 'confirmed',
         is_manual: true,
-        payment_mode: manualBooking.paymentMode,
-        total_amount: manualBooking.totalAmount,
+        payment_mode: 'Cash',
+        total_amount: 0,
         transaction_id: tid
       }]);
       if (error) throw error;
@@ -4980,13 +5372,11 @@ const BookingManagerView = ({
         `*Booking Details:*%0A` +
         `*Date:* ${manualBooking.eventDate}${manualBooking.endDate ? ' to ' + manualBooking.endDate : ''}%0A` +
         `*Time:* ${manualBooking.startTime} - ${manualBooking.endTime}%0A` +
-        `*Event:* ${manualBooking.eventType}%0A` +
-        `*Amount:* ₹${manualBooking.totalAmount}%0A` +
-        `*Payment Mode:* ${manualBooking.paymentMode}%0A%0A` +
+        `*Event:* ${manualBooking.eventType}%0A%0A` +
         `Thank you for choosing our service!`;
       
       sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
-      toast.success('Manual booking added successfully');
+      toast.success('Manual booking added and locked as accepted');
       setManualBooking({
         partyName: '',
         partyAddress: '',
@@ -4995,11 +5385,9 @@ const BookingManagerView = ({
         endDate: '',
         startTime: '09:00',
         endTime: '21:00',
-        eventType: '',
+        eventType: 'Wedding',
         targetId: '',
-        targetName: '',
-        paymentMode: 'Cash',
-        totalAmount: 0
+        targetName: ''
       });
       setManualCallSatisfied(false);
       if (onUpdate) onUpdate();
@@ -5106,11 +5494,11 @@ const BookingManagerView = ({
                   <div className="flex items-center space-x-2">
                     <span className={cn(
                       "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
-                      (booking.status === 'confirmed' || booking.status === 'paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                      (booking.status === 'confirmed' || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
-                      {booking.status === 'paid' ? 'Completed' : booking.status}
+                      {(booking.status === 'paid' || booking.paymentStatus === 'Paid') ? 'PAID' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
                     </span>
-                    {booking.status === 'confirmed' || booking.status === 'paid' ? (
+                    {(booking.status === 'confirmed' || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? (
                       <>
                         <button 
                           disabled={booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid'}
@@ -5132,36 +5520,35 @@ const BookingManagerView = ({
                           <Edit2 size={18} />
                         </button>
                         <button 
+                          disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
                           onClick={() => {
+                            if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
+                              toast.error('Payment status is already marked as PAID');
+                              return;
+                            }
                             setSelectedBooking(booking);
-                            setIsInvoiceModalOpen(true);
+                            setPaymentStatus(booking.paymentStatus || 'Pending');
+                            setIsPaymentModalOpen(true);
                           }}
-                          className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"
-                          title="Generate Invoice"
+                          className={cn(
+                            "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
+                            (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
+                          )}
+                          title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
                         >
-                          <Download size={18} />
+                          <CreditCard size={18} />
+                          <span className="text-sm font-medium">Payment Status</span>
                         </button>
-                        {(booking.paymentStatus || booking.is_invoice_generated || booking.status === 'confirmed') && (
-                          <div className="flex space-x-2">
                             <button 
-                              disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
                               onClick={() => {
-                                if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
-                                  toast.error('Payment status is already marked as PAID');
-                                  return;
-                                }
                                 setSelectedBooking(booking);
-                                setPaymentStatus(booking.paymentStatus || 'Pending');
-                                setIsPaymentModalOpen(true);
+                                setIsPaymentRecordModalOpen(true);
                               }}
-                              className={cn(
-                                "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
-                                (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
-                              )}
-                              title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
+                              className="flex items-center space-x-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                              title="Manage Payment Transactions"
                             >
-                              <CreditCard size={18} />
-                              <span className="text-sm font-medium">Payment Status</span>
+                              <IndianRupee size={18} />
+                              <span className="text-sm font-medium">Manage Payments</span>
                             </button>
                             <button 
                               onClick={() => {
@@ -5186,16 +5573,14 @@ const BookingManagerView = ({
                             >
                               <Download size={18} />
                             </button>
-                          </div>
-                        )}
-                      </>
-                    ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
+                </div>
+              ))
+            ) : (
           <div className="text-center py-20 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
             <div className="w-20 h-20 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-6">
               <Calendar size={40} />
@@ -5241,18 +5626,18 @@ const BookingManagerView = ({
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-2xl rounded-3xl md:rounded-[40px] shadow-2xl overflow-hidden max-h-[95vh] flex flex-col mx-2 md:mx-4"
             >
-              <div className="p-8 md:p-10">
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900">Manual Booking</h2>
+              <div className="p-4 sm:p-6 md:p-10 overflow-y-auto scrollbar-hide">
+                <div className="flex justify-between items-center mb-6 md:mb-8 sticky top-0 bg-white z-10 pb-2 border-b border-gray-50 md:border-none">
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Manual Booking</h2>
                   <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <X size={24} />
                   </button>
                 </div>
 
-                <form onSubmit={handleManualBooking} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form onSubmit={handleManualBooking} className="space-y-4 md:space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Select Venue/Service</label>
                       <select 
@@ -5275,7 +5660,7 @@ const BookingManagerView = ({
                       </select>
                     </div>
 
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Party Name</label>
                       <input 
                         required
@@ -5350,50 +5735,16 @@ const BookingManagerView = ({
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Event Type</label>
-                      <input 
+                      <select 
                         required
-                        type="text" 
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                         value={manualBooking.eventType}
                         onChange={(e) => setManualBooking({...manualBooking, eventType: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount (₹)</label>
-                      <input 
-                        required
-                        type="number" 
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                        value={manualBooking.totalAmount || ''}
-                        onChange={(e) => setManualBooking({...manualBooking, totalAmount: parseInt(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Payment Mode</label>
-                      <div className="flex space-x-4">
-                        <label className="flex items-center space-x-2 cursor-pointer">
-                          <input 
-                            type="radio" 
-                            name="paymentMode" 
-                            value="Cash"
-                            checked={manualBooking.paymentMode === 'Cash'}
-                            onChange={(e) => setManualBooking({...manualBooking, paymentMode: e.target.value})}
-                            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                          />
-                          <span className="text-sm font-medium">Cash</span>
-                        </label>
-                        <label className="flex items-center space-x-2 cursor-pointer">
-                          <input 
-                            type="radio" 
-                            name="paymentMode" 
-                            value="Online"
-                            checked={manualBooking.paymentMode === 'Online'}
-                            onChange={(e) => setManualBooking({...manualBooking, paymentMode: e.target.value})}
-                            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                          />
-                          <span className="text-sm font-medium">Online</span>
-                        </label>
-                      </div>
+                      >
+                        {['Wedding', 'Reception', 'Engagement', 'Haldi', 'Mehendi', 'Sangeet', 'Birthday Party', 'Anniversary', 'Corporate Event', 'Seminar', 'Exhibition', 'Others'].map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -5453,110 +5804,6 @@ const BookingManagerView = ({
               <div className="flex space-x-4 pt-4">
                 <button onClick={() => setIsAmountModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
                 <button onClick={handleUpdateAmount} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Update</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Invoice Modal */}
-      {isInvoiceModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Generate Invoice</h3>
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
-                <div className="text-sm text-gray-500">{selectedBooking?.partyName || selectedBooking?.visitorName} | {selectedBooking?.eventDate}</div>
-                <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
-                  <div className="flex space-x-4">
-                    {['Cash', 'Online'].map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => setPaymentMode(mode as any)}
-                        className={cn(
-                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
-                          paymentMode === mode ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        )}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold mb-2 text-gray-700">Additional Expenditure (INR)</label>
-                <input 
-                  type="number" 
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                  value={expenditure} 
-                  onChange={e => setExpenditure(parseFloat(e.target.value) || 0)}
-                  placeholder="Enter extra costs if any"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-bold text-gray-700">Extra Services & Charges</label>
-                  <button 
-                    onClick={() => setExtraServices([...extraServices, { name: '', amount: 0 }])}
-                    className="text-orange-600 text-sm font-bold flex items-center hover:text-orange-700"
-                  >
-                    <Plus size={16} className="mr-1" /> Add Another
-                  </button>
-                </div>
-                {extraServices.map((service, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
-                    <input 
-                      type="text" 
-                      placeholder="Service Name"
-                      className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                      value={service.name}
-                      onChange={e => {
-                        const newServices = [...extraServices];
-                        newServices[index].name = e.target.value;
-                        setExtraServices(newServices);
-                      }}
-                    />
-                    <div className="flex space-x-2">
-                      <input 
-                        type="number" 
-                        placeholder="Amount"
-                        className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={service.amount || ''}
-                        onChange={e => {
-                          const newServices = [...extraServices];
-                          newServices[index].amount = parseFloat(e.target.value) || 0;
-                          setExtraServices(newServices);
-                        }}
-                      />
-                      <button 
-                        onClick={() => setExtraServices(extraServices.filter((_, i) => i !== index))}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                <div className="text-lg font-bold text-gray-900">
-                  Total: ₹{((selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0) + expenditure + extraServices.reduce((sum, s) => sum + s.amount, 0)).toLocaleString()}
-                </div>
-                <div className="flex space-x-3">
-                  <button onClick={() => setIsInvoiceModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
-                  <button onClick={confirmInvoice} className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200">Generate & Send</button>
-                </div>
               </div>
             </div>
           </div>
@@ -5649,6 +5896,19 @@ const BookingManagerView = ({
           </div>
         </div>
       )}
+
+      {isPaymentRecordModalOpen && (
+        <ManagePaymentModal 
+          isOpen={isPaymentRecordModalOpen}
+          onClose={() => setIsPaymentRecordModalOpen(false)}
+          booking={selectedBooking}
+          currentUserUid={user?.uid}
+          onUpdate={() => {
+            if (onUpdate) onUpdate();
+            fetchBookings();
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -5685,10 +5945,14 @@ const numberToWords = (num: number): string => {
 
 const generateInvoice = (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
   const doc = new jsPDF();
-  const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
+  const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
   const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
   const extraServicesTotal = booking.extra_services?.reduce((sum, s) => sum + s.amount, 0) || 0;
-  const totalAmount = baseAmount + expenditure + extraServicesTotal;
+  const subTotal = baseAmount + expenditure + extraServicesTotal;
+  const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
+  const totalAdvanceLegacy = (booking.advance_amount || 0);
+  const totalReceived = totalPayments + totalAdvanceLegacy;
+  const balanceDue = subTotal - totalReceived;
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
   const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
   
@@ -5725,8 +5989,8 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + booking.id.substring(0, 8).toUpperCase())}`, 140, 55);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 140, 60);
-  doc.text(`Time: ${timestamp.split(' ')[1]}`, 140, 65);
+  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 140, 60);
+  doc.text(`Time: ${formatTime12h(timestamp.split(' ')[1])}`, 140, 65);
   
   // Customer Details (Bill To)
   doc.setFontSize(12);
@@ -5741,9 +6005,9 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
     doc.text(`Address: ${booking.partyAddress}`, 20, 93);
   }
   doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 98);
-  doc.text(`Date: ${booking.eventDate}${booking.endDate ? ' to ' + booking.endDate : ''}`, 20, 103);
+  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 103);
   if (booking.startTime) {
-    doc.text(`Timing: ${booking.startTime} - ${booking.endTime}`, 20, 108);
+    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 108);
   }
 
   // Payment Mode & Status
@@ -5781,20 +6045,64 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
     });
   }
 
-  // Total
+  // Total Section
   doc.setDrawColor(200);
   doc.line(20, currentY + 5, 190, currentY + 5);
+  currentY += 15;
+  
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  doc.text("Total Booking Amount:", 110, currentY);
+  doc.text(`INR ${subTotal.toLocaleString()}`, 185, currentY, { align: 'right' });
+  currentY += 10;
+  
+  if (totalReceived > 0) {
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payments Breakdown:", 25, currentY);
+    currentY += 7;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    
+    if (totalAdvanceLegacy > 0) {
+      doc.text("Advance (Initial Entry):", 25, currentY);
+      doc.text(`(-) INR ${totalAdvanceLegacy.toLocaleString()}`, 160, currentY, { align: 'right' });
+      currentY += 6;
+    }
+    
+    (booking.payments || []).forEach(p => {
+       const label = p.paymentType === 'Round off' ? 'Concession' : `${p.paymentType} (${p.paymentMode})`;
+       doc.text(`${label} - ${formatDateDDMMYYYY(p.paymentDate)}:`, 25, currentY);
+       doc.text(`(-) INR ${p.amount.toLocaleString()}`, 160, currentY, { align: 'right' });
+       currentY += 6;
+    });
+
+    currentY += 4;
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Total Received:", 110, currentY);
+    doc.setTextColor(22, 101, 52); // Dark Green
+    doc.text(`INR ${totalReceived.toLocaleString()}`, 185, currentY, { align: 'right' });
+    currentY += 10;
+  }
+  
   doc.setFontSize(14);
   doc.setTextColor(234, 88, 12);
   doc.setFont("helvetica", "bold");
-  doc.text("Total Amount:", 110, currentY + 20);
-  doc.text(`INR ${totalAmount.toLocaleString()}`, 185, currentY + 20, { align: 'right' });
+  doc.text("Balance Due (Total Due):", 110, currentY);
+  doc.text(`INR ${balanceDue.toLocaleString()}`, 185, currentY, { align: 'right' });
+  currentY += 12;
 
   // Amount in words
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "italic");
-  doc.text(`Amount in words: ${numberToWords(totalAmount)}`, 20, currentY + 30);
+  doc.text(`Amount in words (Balance): ${numberToWords(balanceDue)}`, 20, currentY);
 
   // --- Footer ---
   doc.setDrawColor(234, 88, 12);
@@ -5853,19 +6161,26 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     });
 
     if (type === 'excel') {
-      const data = filteredBookings.map((b, index) => ({
-        'S.No': index + 1,
-        'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
-        'Customer Name': b.partyName || b.visitorName || 'N/A',
-        'Mobile Number': b.visitorMobile || 'N/A',
-        'Address': b.partyAddress || 'N/A',
-        'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
-        'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
-        'Invoice Amount (Rs)': b.updatedAmount || b.totalAmount || 0,
-        'Payment Mode': b.paymentMode || 'N/A',
-        'Payment Status': b.paymentStatus || 'Pending',
-        'Booking Type': b.isManual ? 'Manual' : 'Order'
-      }));
+      const data = filteredBookings.map((b, index) => {
+        const subTotal = (b.updatedAmount || b.totalAmount || 0);
+        const advance = b.advance_amount || 0;
+        const balance = subTotal - advance;
+        return {
+          'S.No': index + 1,
+          'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
+          'Customer Name': b.partyName || b.visitorName || 'N/A',
+          'Mobile Number': b.visitorMobile || 'N/A',
+          'Address': b.partyAddress || 'N/A',
+          'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
+          'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
+          'Invoice Amount (Rs)': subTotal,
+          'Advance Paid (Rs)': advance,
+          'Balance Due (Rs)': balance,
+          'Payment Mode': b.paymentMode || 'N/A',
+          'Payment Status': b.paymentStatus || 'Pending',
+          'Booking Type': b.isManual ? 'Manual' : 'Order'
+        };
+      });
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
@@ -5889,19 +6204,37 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         (b.partyAddress || 'N/A').substring(0, 20),
         `${b.eventDate} ${b.startTime || ''}`,
         `INV-${b.id.substring(0, 8).toUpperCase()}`,
-        `Rs.${b.updatedAmount || b.totalAmount}`,
+        `Rs.${(b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)}`,
         b.paymentMode || 'N/A',
         b.paymentStatus || 'Pending',
         b.isManual ? 'Manual' : 'Order'
       ]);
+      
+      const tableHeaders = [
+        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Adv.', 'Bal.', 'Mode', 'Type']
+      ];
+      
+      const pdfData = filteredBookings.map((b, index) => [
+        (index + 1).toString(),
+        b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
+        b.partyName || b.visitorName || 'N/A',
+        b.visitorMobile || 'N/A',
+        (b.partyAddress || 'N/A').substring(0, 15),
+        b.eventDate,
+        b.id.substring(0, 5).toUpperCase(),
+        (b.advance_amount || 0).toString(),
+        ((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toString(),
+        b.paymentMode || 'N/A',
+        b.isManual ? 'M' : 'O'
+      ]);
 
       (doc as any).autoTable({
-        head: headers,
-        body: data,
+        head: tableHeaders,
+        body: pdfData,
         startY: 40,
         theme: 'grid',
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [234, 88, 12] } // Orange-600
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [234, 88, 12] }
       });
       
       doc.save("booking_report.pdf");
@@ -5914,30 +6247,38 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   const [services, setServices] = useState<ServiceProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSubscriptionReminder, setShowSubscriptionReminder] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
   useEffect(() => {
     const checkSubscription = async () => {
       if (!profile || profile.role === 'user' || profile.role === 'admin') return;
       
-      const { data: sub } = await db
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user?.uid)
-        .eq('status', 'active')
-        .maybeSingle();
-      
-      if (!sub) {
-        setShowSubscriptionReminder(true);
-        // Weekly reminder logic: check if we already reminded this week
-        const lastReminded = localStorage.getItem(`last_reminded_${user?.uid}`);
-        const now = new Date().getTime();
-        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+      try {
+        const { data: sub, error } = await db
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', user?.uid)
+          .eq('status', 'active')
+          .maybeSingle();
         
-        if (!lastReminded || now - parseInt(lastReminded) > oneWeek) {
-          const msg = `Hello ${profile.displayName}, you don't have an active subscription plan. Please subscribe to continue receiving business inquiries.`;
-          sendWhatsAppAlert(profile.mobileNumber, msg);
-          localStorage.setItem(`last_reminded_${user?.uid}`, now.toString());
+        if (error) throw error;
+        
+        if (!sub) {
+          setShowSubscriptionReminder(true);
+          setIsSubscriptionModalOpen(true);
+          // Weekly reminder logic: check if we already reminded this week
+          const lastReminded = localStorage.getItem(`last_reminded_${user?.uid}`);
+          const now = new Date().getTime();
+          const oneWeek = 7 * 24 * 60 * 60 * 1000;
+          
+          if (!lastReminded || now - parseInt(lastReminded) > oneWeek) {
+            const msg = `Hello ${profile.displayName}, you don't have an active subscription plan. Please subscribe to continue receiving business inquiries.`;
+            sendWhatsAppAlert(profile.mobileNumber, msg);
+            localStorage.setItem(`last_reminded_${user?.uid}`, now.toString());
+          }
         }
+      } catch (err) {
+        console.error("Error checking subscription:", err);
       }
     };
     if (profile && user) checkSubscription();
@@ -5968,10 +6309,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   const fetchDashboardData = async () => {
     if (!user?.uid) return;
     try {
-      const { data: bData } = await db
-        .from('bookings')
-        .select('*')
-        .or(`user_id.eq.${user?.uid},owner_id.eq.${user?.uid}`);
+      let bQuery = db.from('bookings').select('*, booking_payments(*)');
+      if (profile?.role !== 'admin') {
+        bQuery = bQuery.or(`user_id.eq.${user?.uid},owner_id.eq.${user?.uid}`);
+      }
+      const { data: bData } = await bQuery;
       
       if (bData) {
         setBookings(bData.map(d => ({
@@ -5988,6 +6330,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           status: d.status,
           totalAmount: d.total_amount || 0,
           updatedAmount: d.updated_amount,
+          advance_amount: d.advance_amount || 0,
           eventType: d.event_type,
           partyName: d.party_name,
           partyAddress: d.party_address,
@@ -5998,14 +6341,24 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           isManual: d.is_manual,
           is_invoice_generated: d.is_invoice_generated,
           invoice_url: d.invoice_url,
+          payments: (d.booking_payments || []).map((p: any) => ({
+            id: p.id,
+            bookingId: p.booking_id,
+            amount: p.amount,
+            paymentMode: p.payment_mode,
+            paymentDate: p.payment_date,
+            paymentType: p.payment_type,
+            createdAt: p.created_at
+          })),
           createdAt: d.created_at
         }) as Booking));
       }
 
-      const { data: vData } = await db
-        .from('venues')
-        .select('*')
-        .eq('owner_id', user?.uid);
+      const vQuery = db.from('venues').select('*');
+      if (profile?.role !== 'admin') {
+        vQuery.eq('owner_id', user?.uid);
+      }
+      const { data: vData } = await vQuery;
       
       if (vData) {
         setVenues(vData.map(d => ({
@@ -6020,10 +6373,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         }) as Venue));
       }
 
-      const { data: sData } = await db
-        .from('service_providers')
-        .select('*')
-        .eq('provider_id', user?.uid);
+      const sQuery = db.from('service_providers').select('*');
+      if (profile?.role !== 'admin') {
+        sQuery.eq('provider_id', user?.uid);
+      }
+      const { data: sData } = await sQuery;
       
       if (sData) {
         setServices(sData.map(d => ({
@@ -6454,7 +6808,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Address</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
-                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Amount</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Total</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-orange-600">Advance</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-blue-600">Balance</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">P.Status</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Type</th>
@@ -6487,12 +6843,14 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                 <td className="py-4 text-sm text-gray-600">{b.visitorMobile}</td>
                                 <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">{b.partyAddress || 'N/A'}</td>
                                 <td className="py-4 text-sm text-gray-600">
-                                  {format(new Date(b.eventDate), 'MMM dd, yyyy')} {b.startTime || ''}
+                                  {formatDateDDMMYYYY(b.eventDate)} {formatTime12h(b.startTime)}
                                 </td>
                                 <td className="py-4 text-xs font-mono text-gray-500">
-                                  INV-{b.id.substring(0, 8).toUpperCase()}
+                                  {b.transaction_id || ('INV-' + b.id.substring(0, 8).toUpperCase())}
                                 </td>
-                                <td className="py-4 font-bold text-gray-900">₹{b.updatedAmount || b.totalAmount}</td>
+                                <td className="py-4 font-bold text-gray-900">₹{(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</td>
+                                <td className="py-4 font-bold text-orange-600">₹{(b.advance_amount || 0).toLocaleString()}</td>
+                                <td className="py-4 font-black text-blue-600">₹{((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toLocaleString()}</td>
                                 <td className="py-4 text-sm text-gray-600">{b.paymentMode || 'N/A'}</td>
                                 <td className="py-4">
                                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
@@ -6543,6 +6901,50 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isSubscriptionModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSubscriptionModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden p-8 text-center"
+            >
+              <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <CreditCard size={40} />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Activate Your Business</h2>
+              <p className="text-gray-500 mb-8">You don't have an active subscription. Subscribe to a plan to start receiving and managing business inquiries.</p>
+              
+              <div className="space-y-3">
+                <button 
+                  onClick={() => {
+                    handleTabChange('subscription');
+                    setIsSubscriptionModalOpen(false);
+                  }}
+                  className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all"
+                >
+                  View Subscription Plans
+                </button>
+                <button 
+                  onClick={() => setIsSubscriptionModalOpen(false)}
+                  className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  I'll do it later
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -6638,13 +7040,10 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
 
   const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
+  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [expenditure, setExpenditure] = useState(0);
-  const [extraServices, setExtraServices] = useState<{ name: string; amount: number }[]>([]);
-  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [newAmount, setNewAmount] = useState(0);
 
@@ -6680,62 +7079,28 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     }
   };
 
-  const handleGenerateInvoice = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setIsInvoiceModalOpen(true);
-  };
+  const handleGenerateInvoice = async (booking: Booking) => {
+    try {
+      const pdfBlob = generateInvoice(booking, 0, profile);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
-  const confirmInvoice = async () => {
-    if (selectedBooking) {
-      const updatedBooking = {
-        ...selectedBooking,
-        extra_services: extraServices,
-        paymentMode,
-        paymentStatus: 'Pending' as 'Pending',
-        status: selectedBooking.status
-      };
-      
-      const pdfBlob = generateInvoice(updatedBooking, expenditure, profile);
-      
-      // Upload to Storage to get a public link
-      const fileName = `invoices/INV-${selectedBooking.id.substring(0, 8)}-${Date.now()}.pdf`;
-      const { data: uploadData, error: uploadError } = await db.storage
-        .from('images')
-        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-
-      let downloadUrl = '';
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(fileName);
-        downloadUrl = publicUrl;
-      }
-
-      const extraTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
-      const finalAmount = (selectedBooking.updatedAmount || selectedBooking.totalAmount || 0) + expenditure + extraTotal;
-      
-      let msg = `Hello ${selectedBooking.visitorName}, your invoice for ${selectedBooking.targetName} has been generated. Total Amount: INR ${finalAmount.toLocaleString()}. Payment Mode: ${paymentMode}. Status: Pending.`;
-      if (downloadUrl) {
-        msg += `\n\nDownload Invoice PDF: ${downloadUrl}`;
-      }
-      
-      sendWhatsAppAlert(selectedBooking.visitorMobile || '', msg);
-      
+      // Still update base metadata if needed
       await db.from('bookings').update({ 
-        is_invoice_generated: true,
-        extra_services: extraServices,
-        payment_mode: paymentMode,
-        payment_status: 'Pending',
-        status: selectedBooking.status,
-        invoice_url: downloadUrl
-      }).eq('id', selectedBooking.id);
+        is_invoice_generated: true
+      }).eq('id', booking.id);
       
       if (onUpdate) onUpdate();
-      
-      setIsInvoiceModalOpen(false);
-      setSelectedBooking(null);
-      setExpenditure(0);
-      setExtraServices([]);
-      setPaymentStatus('Pending');
-      toast.success('Invoice generated and shared via WhatsApp');
+      toast.success('Invoice generated and downloaded');
+    } catch (err) {
+      console.error('Invoice error:', err);
+      toast.error('Failed to generate invoice');
     }
   };
 
@@ -6797,7 +7162,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           currency: 'INR',
           receipt: `booking_${booking.id}`,
           notes: {
-            userId: user.uid,
+            userId: user?.uid,
             bookingId: booking.id,
             targetName: booking.targetName
           }
@@ -6889,16 +7254,22 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                 <span className="font-bold text-lg">{b.targetName}</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                  b.status === 'confirmed' ? "bg-green-100 text-green-700" : 
-                  b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : 
-                  b.status === 'paid' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                  (b.status === 'confirmed' || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-green-100 text-green-700" : 
+                  b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
                 )}>
-                  {b.status === 'paid' ? 'Completed' : b.status}
+                  {(b.status === 'paid' || b.paymentStatus === 'Paid') ? 'PAID' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2 mt-2">
                 <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={14} className="mr-1 text-orange-600" /> {b.eventDate}</span>
                 <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={14} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
+                <span className={cn(
+                  "flex items-center px-3 py-1 rounded-lg border font-bold text-xs",
+                  (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-green-50 text-green-700 border-green-100" : "bg-orange-50 text-orange-700 border-orange-100"
+                )}>
+                  <CreditCard size={12} className="mr-1" />
+                  {(b.paymentStatus || 'Pending').toUpperCase()}
+                </span>
                 {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-lg border border-orange-100 font-bold"><Clock size={14} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
               </div>
               
@@ -6969,32 +7340,54 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     <span>Update Amount</span>
                   </button>
                   <button 
-                    onClick={() => handleGenerateInvoice(b)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 flex items-center space-x-2"
+                    disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
+                    onClick={() => {
+                      if (b.paymentStatus === 'Paid' || b.status === 'paid') {
+                        toast.error('Invoice cannot be re-generated after payment is completed');
+                        return;
+                      }
+                      handleGenerateInvoice(b);
+                    }}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
+                      (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"
+                    )}
                   >
                     <Download size={16} />
                     <span>Invoice</span>
                   </button>
-                  {(b.paymentStatus || b.is_invoice_generated || b.status === 'confirmed') && (
-                    <button 
-                      disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
-                      onClick={() => {
-                        if (b.paymentStatus === 'Paid' || b.status === 'paid') {
-                          toast.error('Payment status is already marked as PAID');
-                          return;
-                        }
-                        setSelectedBooking(b);
-                        setPaymentStatus(b.paymentStatus || 'Pending');
-                        setIsPaymentModalOpen(true);
-                      }}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                        (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
-                      )}
-                    >
-                      <CreditCard size={16} />
-                      <span>Payment Status</span>
-                    </button>
+                  {(b.paymentStatus || b.is_invoice_generated || b.status === 'confirmed' || b.status === 'paid') && (
+                    <>
+                      <button 
+                        disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
+                        onClick={() => {
+                          if (b.paymentStatus === 'Paid' || b.status === 'paid') {
+                            toast.error('Payment status is already marked as PAID');
+                            return;
+                          }
+                          setSelectedBooking(b);
+                          setPaymentStatus(b.paymentStatus || 'Pending');
+                          setIsPaymentModalOpen(true);
+                        }}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
+                          (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
+                        )}
+                      >
+                        <CreditCard size={16} />
+                        <span>Payment Status</span>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedBooking(b);
+                          setIsPaymentRecordModalOpen(true);
+                        }}
+                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all hover:bg-blue-100"
+                      >
+                        <IndianRupee size={16} />
+                        <span>Manage Payments</span>
+                      </button>
+                    </>
                   )}
                 </>
               )}
@@ -7047,109 +7440,6 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
               <div className="flex space-x-4 pt-4">
                 <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
                 <button onClick={handleUpdatePaymentStatus} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200">Update Status</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isInvoiceModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold mb-6">Generate Invoice</h3>
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
-                <div className="text-sm text-gray-500">{selectedBooking?.visitorName} | {selectedBooking?.eventDate}</div>
-                <div className="text-sm font-bold text-orange-600 mt-1">Base Amount: ₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-700">Payment Mode</label>
-                  <div className="flex space-x-4">
-                    {['Cash', 'Online'].map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => setPaymentMode(mode as any)}
-                        className={cn(
-                          "flex-1 py-2 px-4 rounded-xl font-bold border transition-all",
-                          paymentMode === mode ? "bg-orange-600 text-white border-orange-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        )}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold mb-2 text-gray-700">Additional Expenditure (INR)</label>
-                <input 
-                  type="number" 
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                  value={expenditure} 
-                  onChange={e => setExpenditure(parseFloat(e.target.value) || 0)}
-                  placeholder="Enter extra costs if any"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-bold text-gray-700">Extra Services & Charges</label>
-                  <button 
-                    onClick={() => setExtraServices([...extraServices, { name: '', amount: 0 }])}
-                    className="text-orange-600 text-sm font-bold flex items-center hover:text-orange-700"
-                  >
-                    <Plus size={16} className="mr-1" /> Add Another
-                  </button>
-                </div>
-                {extraServices.map((service, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
-                    <input 
-                      type="text" 
-                      placeholder="Service Name"
-                      className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                      value={service.name}
-                      onChange={e => {
-                        const newServices = [...extraServices];
-                        newServices[index].name = e.target.value;
-                        setExtraServices(newServices);
-                      }}
-                    />
-                    <div className="flex space-x-2">
-                      <input 
-                        type="number" 
-                        placeholder="Amount"
-                        className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500"
-                        value={service.amount || ''}
-                        onChange={e => {
-                          const newServices = [...extraServices];
-                          newServices[index].amount = parseFloat(e.target.value) || 0;
-                          setExtraServices(newServices);
-                        }}
-                      />
-                      <button 
-                        onClick={() => setExtraServices(extraServices.filter((_, i) => i !== index))}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                <div className="text-lg font-bold text-gray-900">
-                  Total: ₹{((selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0) + expenditure + extraServices.reduce((sum, s) => sum + s.amount, 0)).toLocaleString()}
-                </div>
-                <div className="flex space-x-3">
-                  <button onClick={() => setIsInvoiceModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-gray-600 hover:bg-gray-100">Cancel</button>
-                  <button onClick={confirmInvoice} className="bg-orange-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200">Generate & Send</button>
-                </div>
               </div>
             </div>
           </div>
@@ -7231,6 +7521,18 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
             </div>
           </div>
         </div>
+      )}
+
+      {isPaymentRecordModalOpen && (
+        <ManagePaymentModal 
+          isOpen={isPaymentRecordModalOpen}
+          onClose={() => setIsPaymentRecordModalOpen(false)}
+          booking={selectedBooking}
+          currentUserUid={user?.uid}
+          onUpdate={() => {
+            if (onUpdate) onUpdate();
+          }}
+        />
       )}
     </div>
   );
@@ -7320,7 +7622,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
         const { data: pData } = await db.from('subscription_plans').select('*').eq('role', profile.role).eq('is_active', true);
         if (pData) setPlans(pData.map(d => ({ id: d.id, name: d.name, price: d.price, duration: d.duration, role: d.role, isActive: d.is_active, createdAt: d.created_at } as SubscriptionPlan)));
 
-        const { data: sData } = await db.from('user_subscriptions').select('*').eq('user_id', user.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
+        const { data: sData } = await db.from('user_subscriptions').select('*').eq('user_id', user?.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
         if (sData && sData.length > 0) {
           const d = sData[0];
           setCurrentSub({ id: d.id, userId: d.user_id, planId: d.plan_id, startDate: d.start_date, endDate: d.end_date, status: d.status, amount: d.amount, createdAt: d.created_at });
@@ -7347,7 +7649,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
           currency: 'INR',
           receipt: `receipt_${Date.now()}`,
           notes: {
-            userId: user.uid,
+            userId: user?.uid,
             planId: plan.id,
             planName: plan.name
           }
@@ -7374,7 +7676,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
 
           try {
             const { error } = await db.from('user_subscriptions').insert([{
-              user_id: user.uid,
+              user_id: user?.uid,
               plan_id: plan.id,
               start_date: startDate.toISOString(),
               end_date: endDate.toISOString(),
@@ -7769,7 +8071,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         district: profile?.district || '',
         block: profile?.block || '',
         pincode: profile?.pincode || '',
-        provider_id: user.uid,
+        provider_id: user?.uid,
         rating: 0,
         review_count: 0
       }]);
@@ -7892,12 +8194,12 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <ImageUpload 
                 label="Add Service Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData({...formData, images: [...formData.images, url]})}
+                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev.images || []), url]}))}
               />
               <VideoUpload 
                 label="Add Service Video (Max 60s)" 
                 currentVideo={formData.video_url}
-                onUpload={(url) => setFormData({...formData, video_url: url})}
+                onUpload={(url) => setFormData(prev => ({...prev, video_url: url}))}
               />
             </div>
             {formData.images.length > 0 && (
@@ -7907,7 +8209,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
                     <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
-                      onClick={() => setFormData({...formData, images: formData.images.filter((_, i) => i !== idx)})}
+                      onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_, i) => i !== idx)}))}
                       className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
                     >
                       <X size={12} />
@@ -7941,7 +8243,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
       if (!id) return;
       const { data, error } = await db.from('service_providers').select('*').eq('id', id).single();
       if (!error && data) {
-        if (data.provider_id !== user.uid && profile?.role !== 'admin') {
+        if (data.provider_id !== user?.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
           navigate('/dashboard');
           return;
@@ -8077,12 +8379,12 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <ImageUpload 
                 label="Add Service Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData({...formData, images: [...(formData.images || []), url]})}
+                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev.images || []), url]}))}
               />
               <VideoUpload 
                 label="Add Service Video (Max 60s)" 
                 currentVideo={formData.video_url}
-                onUpload={(url) => setFormData({...formData, video_url: url})}
+                onUpload={(url) => setFormData(prev => ({...prev, video_url: url}))}
               />
             </div>
             {formData.images?.length > 0 && (
@@ -8092,7 +8394,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
                     <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
-                      onClick={() => setFormData({...formData, images: formData.images.filter((_: any, i: number) => i !== idx)})}
+                      onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_: any, i: number) => i !== idx)}))}
                       className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
                     >
                       <X size={12} />
@@ -8153,7 +8455,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
       if (!id) return;
       const { data, error } = await db.from('venues').select('*').eq('id', id).single();
       if (!error && data) {
-        if (data.owner_id !== user.uid && profile?.role !== 'admin') {
+        if (data.owner_id !== user?.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
           navigate('/dashboard');
           return;
@@ -8286,12 +8588,12 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               <ImageUpload 
                 label="Add Venue Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData({...formData, images: [...(formData.images || []), url]})}
+                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev?.images || []), url]}))}
               />
               <VideoUpload 
                 label="Add Venue Video (Max 60s)" 
                 currentVideo={formData.video_url}
-                onUpload={(url) => setFormData({...formData, video_url: url})}
+                onUpload={(url) => setFormData(prev => ({...prev, video_url: url}))}
               />
             </div>
             {formData.images?.length > 0 && (
@@ -8301,7 +8603,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
                     <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
-                      onClick={() => setFormData({...formData, images: formData.images.filter((_: any, i: number) => i !== idx)})}
+                      onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_: any, i: number) => i !== idx)}))}
                       className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
                     >
                       <X size={12} />
@@ -8399,7 +8701,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
           pincode: formData.pincode,
           venue_type: formData.venueType
         })
-        .eq('uid', user.uid);
+        .eq('uid', user?.uid);
 
       if (error) throw error;
       
@@ -8419,7 +8721,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
           <ImageUpload 
             label="Profile Photo" 
             currentImage={formData.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.registrationId}`}
-            onUpload={(url) => setFormData({...formData, photoURL: url})}
+            onUpload={(url) => setFormData(prev => ({...prev, photoURL: url}))}
           />
           <p className="text-sm text-gray-500 font-mono">ID: {profile?.registrationId}</p>
         </div>
@@ -8571,7 +8873,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         video_url: formData.video_url,
         facilities: formData.facilities,
         available_for: formData.availableFor,
-        owner_id: user.uid,
+        owner_id: user?.uid,
         rating: 0,
         review_count: 0
       }]);
@@ -8685,12 +8987,12 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               <ImageUpload 
                 label="Add Venue Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData({...formData, images: [...formData.images, url]})}
+                onUpload={(url) => setFormData(prev => ({...prev, images: [...prev.images, url]}))}
               />
               <VideoUpload 
                 label="Add Venue Video (Max 60s)" 
                 currentVideo={formData.video_url}
-                onUpload={(url) => setFormData({...formData, video_url: url})}
+                onUpload={(url) => setFormData(prev => ({...prev, video_url: url}))}
               />
             </div>
             {formData.images.length > 0 && (
@@ -8700,7 +9002,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
                     <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
-                      onClick={() => setFormData({...formData, images: formData.images.filter((_, i) => i !== idx)})}
+                      onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_, i) => i !== idx)}))}
                       className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-bl-lg"
                     >
                       <X size={12} />
@@ -8856,36 +9158,7 @@ const SearchResultsView = () => {
             Clear All Filters
           </button>
         </div>
-        <div className="flex flex-wrap gap-3">
-          {[
-            { name: 'Venues', link: '/venues', color: 'bg-blue-50 text-blue-600' },
-            { name: 'Catering', link: '/services?type=Caterer', color: 'bg-orange-50 text-orange-600' },
-            { name: 'DJ & Music', link: '/services?type=DJ and Sounds', color: 'bg-purple-50 text-purple-600' },
-            { name: 'Tent House', link: '/services?type=Tent House', color: 'bg-green-50 text-green-600' },
-            { name: 'Photography', link: '/services?type=Photo and Videographer', color: 'bg-pink-50 text-pink-600' },
-            { name: 'Makeup', link: '/services?type=Makeup Artist', color: 'bg-rose-50 text-rose-600' },
-            { name: 'Decoration', link: '/services?type=Light Decorator', color: 'bg-amber-50 text-amber-600' },
-            { name: 'Pandit Ji', link: '/services?type=Pandit Ji Brahman', color: 'bg-red-50 text-red-600' },
-            { name: 'Mehendi', link: '/services?type=Mehendi Service', color: 'bg-yellow-50 text-yellow-600' },
-            { name: 'Drone', link: '/services?type=Drone Camera', color: 'bg-sky-50 text-sky-600' },
-            { name: 'Rentals', link: '/services?type=Event Cloth and Jwellary on Rent', color: 'bg-cyan-50 text-cyan-600' },
-            { name: 'Halbai', link: '/services?type=Halbai', color: 'bg-emerald-50 text-emerald-600' },
-            { name: 'Waiters', link: '/services?type=Waiters', color: 'bg-slate-50 text-slate-600' },
-            { name: 'Dhol Bands', link: '/services?type=Dhol Bands', color: 'bg-orange-50 text-orange-600' },
-            { name: 'Flower Decor', link: '/services?type=Flower Decorator', color: 'bg-rose-50 text-rose-600' },
-          ].map((cat, idx) => (
-            <Link 
-              key={idx}
-              to={cat.link}
-              className={cn(
-                "px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 shadow-sm",
-                cat.color
-              )}
-            >
-              <span className="text-sm">{cat.name}</span>
-            </Link>
-          ))}
-        </div>
+        <CategoryDisplay />
       </div>
 
       <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-orange-100 mb-16 relative overflow-hidden">
@@ -9042,9 +9315,8 @@ export default function App() {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
-  const t = (key: string) => translations[lang][key] || key;
+  const t = React.useCallback((key: string) => translations[lang][key] || key, [lang]);
 
-  console.log('[APP] Rendering App component');
   const [user, setUser] = useState<any>(() => {
     const saved = localStorage.getItem('custom_user');
     try {
@@ -9061,6 +9333,9 @@ export default function App() {
       return null;
     }
   });
+  
+  const contextValue = React.useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
+
   const [loading, setLoading] = useState(true);
   const [isAppRatingOpen, setIsAppRatingOpen] = useState(false);
 
@@ -9298,8 +9573,7 @@ export default function App() {
   }
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
-      <ErrorBoundary>
+    <LanguageContext.Provider value={contextValue}>
         <Router>
         <div className="min-h-screen bg-white font-sans text-gray-900">
           <Toaster position="top-center" />
@@ -9414,8 +9688,7 @@ export default function App() {
           </footer>
         </div>
       </Router>
-    </ErrorBoundary>
-  </LanguageContext.Provider>
+    </LanguageContext.Provider>
   );
 }
 
@@ -9450,7 +9723,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
   const [newBanner, setNewBanner] = useState({ title: '', imageUrl: '' });
   const [isServicePhotoModalOpen, setIsServicePhotoModalOpen] = useState(false);
-  const [newServicePhoto, setNewServicePhoto] = useState({ serviceType: 'Caterer' as ServiceType, imageUrl: '' });
+  const [newServicePhoto, setNewServicePhoto] = useState({ serviceType: SERVICE_TYPES[0] as ServiceType, imageUrl: '' });
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -9962,7 +10235,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             email: adminProfile.email,
             password: adminProfile.password || profile.password
           })
-          .eq('uid', user.uid);
+          .eq('uid', user?.uid);
 
         const updatedProfile = {
           ...profile,
@@ -10265,9 +10538,65 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
               )}
 
               {activeTab === 'plans' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {plans.map(plan => (
-                    <div key={plan.id} className="border border-gray-100 rounded-3xl p-6 hover:shadow-md transition-all">
+                <div className="space-y-8">
+                  <div className="bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100 mb-8">
+                    <h3 className="text-xl font-bold text-gray-900 mb-6">Create New Subscription Plan</h3>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setLoading(true);
+                      const formData = new FormData(e.currentTarget);
+                      const newPlan = {
+                        name: formData.get('name') as string,
+                        role: formData.get('role') as string,
+                        price: parseFloat(formData.get('price') as string),
+                        duration: formData.get('duration') as string,
+                        is_active: true
+                      };
+                      
+                      try {
+                        const { error } = await db.from('subscription_plans').insert([newPlan]);
+                        if (error) throw error;
+                        toast.success('New plan created successfully');
+                        (e.target as HTMLFormElement).reset();
+                        fetchData();
+                      } catch (err: any) {
+                        toast.error('Failed to create plan: ' + err.message);
+                      } finally {
+                        setLoading(false);
+                      }
+                    }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Plan Name</label>
+                        <input name="name" required placeholder="e.g. Gold Plan" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">User Role</label>
+                        <select name="role" required className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none">
+                          <option value="owner">Venue Owner</option>
+                          <option value="provider">Service Provider</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Price (₹)</label>
+                        <input name="price" type="number" required placeholder="0.00" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Duration</label>
+                        <select name="duration" required className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none">
+                          <option value="1 Month">1 Month</option>
+                          <option value="3 Months">3 Months</option>
+                          <option value="6 Months">6 Months</option>
+                          <option value="1 Year">1 Year</option>
+                        </select>
+                      </div>
+                      <button type="submit" className="bg-orange-600 text-white py-3.5 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">
+                        Create Plan
+                      </button>
+                    </form>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {plans.map(plan => (
+                      <div key={plan.id} className="border border-gray-100 rounded-3xl p-6 hover:shadow-md transition-all bg-white relative group">
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
@@ -10316,6 +10645,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </div>
                   ))}
                 </div>
+                </div>
               )}
 
               {activeTab === 'notifications' && (
@@ -10330,7 +10660,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <div>
                           <h4 className="font-bold text-gray-900 mb-1">{n.title}</h4>
                           <p className="text-gray-600 text-sm">{n.message}</p>
-                          <div className="mt-4 text-xs text-gray-400">{new Date(n.createdAt).toLocaleString()}</div>
+                          <div className="mt-4 text-xs text-gray-400">{formatDateDDMMYYYY(n.createdAt)} {formatTime12h(n.createdAt)}</div>
                         </div>
                         <div className="flex space-x-2">
                           <button 
