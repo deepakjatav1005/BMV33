@@ -32,6 +32,7 @@ export interface SubscriptionPlan {
   price: number;
   duration: 'month' | 'year';
   isActive: boolean;
+  benefits?: string[];
 }
 
 export interface UserSubscription {

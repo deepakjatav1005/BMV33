@@ -8,16 +8,34 @@ const SESSION_KEY = 'APP_SESSION';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+// Add fallback check for common deployment mistakes (missing VITE_ prefix)
+const rawUrl = supabaseUrl && supabaseUrl !== 'undefined' ? supabaseUrl : undefined;
+const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnonKey : undefined;
+
 // Initialize real Supabase if keys are present
-export const supabase = (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined') 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = (rawUrl && rawKey) 
+  ? createClient(rawUrl, rawKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
   : null;
 
 if (supabase) {
-  console.log('✅ Supabase connected successfully to:', supabaseUrl);
+  console.log('✅ Supabase initialized successfully.');
+  // Add a simple connection check
+  supabase.from('users').select('count', { count: 'exact', head: true })
+    .then(({ error }) => {
+      if (error) {
+        console.error('❌ Supabase session check failed (Backend Connection Loss):', error.message);
+      } else {
+        console.log('📡 Live connection to Supabase active.');
+      }
+    });
 } else {
-  console.warn('⚠️ Supabase keys NOT found or invalid. Falling back to Mock Data (LocalStorage).');
-  console.log('Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your Environment/Secrets.');
+  console.warn('⚠️ Supabase keys NOT found. Falling back to Mock Data.');
 }
 
 const getLocalData = () => {

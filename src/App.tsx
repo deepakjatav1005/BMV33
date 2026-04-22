@@ -140,10 +140,13 @@
       is_active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMPTZ DEFAULT NOW()
   );
-  -- Remove potential restrictive constraint from manual setup
+  -- Ensure no restrictive constraints exist on duration
   ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS subscription_plans_duration_check;
   ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS plans_duration_check;
   ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS duration_check;
+  
+  -- Add benefits column if not exists
+  ALTER TABLE public.subscription_plans ADD COLUMN IF NOT EXISTS benefits JSONB DEFAULT '[]';
 
   -- 8. User Subscriptions
   CREATE TABLE IF NOT EXISTS public.user_subscriptions (
@@ -153,6 +156,10 @@
       start_date DATE,
       end_date DATE,
       status TEXT DEFAULT 'active',
+      amount NUMERIC,
+      payment_id TEXT,
+      order_id TEXT,
+      signature TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
@@ -282,11 +289,14 @@
   -- =============================================================================
   -- MIGRATIONS / PATCHES (Run these if your tables already exist but are missing columns)
   -- =============================================================================
-  -- Patch for Users table (Missing venue_type)
+  -- Patch for Users table (Missing venue_type or service_type)
   DO $$ 
   BEGIN 
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='venue_type') THEN
           ALTER TABLE public.users ADD COLUMN venue_type TEXT;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='service_type') THEN
+          ALTER TABLE public.users ADD COLUMN service_type TEXT;
       END IF;
   END $$;
 
@@ -373,8 +383,8 @@ import {
   Filter,
   Trash2,
   Edit2,
+  Image as LucideImage,
   Image as ImageIcon,
-  Image,
   Loader,
   Check,
   Phone,
@@ -1137,10 +1147,59 @@ export class ErrorBoundary extends Component<any, any> {
 const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: () => void, user: any }) => {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [visitorName, setVisitorName] = useState('');
-  const [visitorMobile, setVisitorMobile] = useState('');
+  const [visitorName, setVisitorName] = useState(user?.displayName || '');
+  const [visitorMobile, setVisitorMobile] = useState(user?.mobileNumber || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [existingFeedbackId, setExistingFeedbackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (user) {
+        setVisitorName(user.displayName || '');
+        setVisitorMobile(user.mobileNumber || '');
+      }
+      fetchExistingFeedback();
+    }
+  }, [isOpen, user]);
+
+  // Re-fetch if visitor manually changes mobile number
+  useEffect(() => {
+    if (isOpen && !user && visitorMobile.length === 10) {
+      fetchExistingFeedback();
+    }
+  }, [visitorMobile, isOpen, user]);
+
+  const fetchExistingFeedback = async () => {
+    try {
+      const vMobile = user?.mobileNumber || visitorMobile;
+      if (!vMobile && !user?.uid) return;
+
+      let query = db.from('app_feedback').select('*');
+      
+      if (user?.uid) {
+        query = query.or(`user_id.eq.${user.uid}${vMobile ? `,visitor_mobile.eq.${vMobile}` : ''}`);
+      } else if (vMobile) {
+        query = query.eq('visitor_mobile', vMobile);
+      } else {
+        return;
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (data && !error) {
+        setExistingFeedbackId(data.id);
+        setRating(data.rating || 5);
+        setComment(data.comment || '');
+        if (!user) {
+          setVisitorName(data.user_name || '');
+          setVisitorMobile(data.visitor_mobile || '');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching existing feedback:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1148,73 +1207,61 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
       toast.error('Please enter a comment');
       return;
     }
-    if (!user && !visitorName.trim()) {
+    const currentName = user?.displayName || visitorName;
+    const currentMobile = user?.mobileNumber || visitorMobile;
+
+    if (!currentName.trim()) {
       toast.error('Please enter your name');
       return;
     }
-    if (!user && !visitorMobile.trim()) {
-      toast.error('Please enter your mobile number');
-      return;
-    }
-    if (!user && !/^\d{10}$/.test(visitorMobile)) {
+    if (!currentMobile.trim() || !/^\d{10}$/.test(currentMobile)) {
       toast.error('Please enter a valid 10-digit mobile number');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const vMobile = user?.mobileNumber || visitorMobile;
-      const uId = user?.uid || 'visitor';
-
-      const query = db.from('app_feedback').select('id');
-      if (user?.uid && user.uid !== 'visitor') {
-        query.eq('user_id', user.uid);
-      } else {
-        query.eq('visitor_mobile', vMobile);
-      }
-
-      const { data: existingFeedback } = await query.maybeSingle();
-
       const feedbackData: any = {
-        user_id: uId,
-        user_name: user?.displayName || visitorName,
-        visitor_mobile: vMobile,
+        user_id: user?.uid || 'visitor',
+        user_name: currentName,
+        visitor_mobile: currentMobile,
         rating,
         comment,
         created_at: new Date().toISOString()
       };
 
-      if (existingFeedback) {
-        const { error } = await db.from('app_feedback').update(feedbackData).eq('id', existingFeedback.id);
+      if (existingFeedbackId) {
+        const { error } = await db.from('app_feedback').update(feedbackData).eq('id', existingFeedbackId);
         if (error) throw error;
         toast.success('Your app feedback has been updated!');
       } else {
-        const { error } = await db.from('app_feedback').insert([feedbackData]);
-        if (error) throw error;
-        toast.success('Thank you for your feedback!', {
-          duration: 5000,
-          icon: '🌟',
-          style: {
-            borderRadius: '10px',
-            background: '#333',
-            color: '#fff',
-          },
-        });
+        // Double check for existing by mobile/user_id just before insert to be safe
+        let checkQuery = db.from('app_feedback').select('id');
+        if (user?.uid) {
+          checkQuery = checkQuery.or(`user_id.eq.${user.uid},visitor_mobile.eq.${currentMobile}`);
+        } else {
+          checkQuery = checkQuery.eq('visitor_mobile', currentMobile);
+        }
+        
+        const { data: doubleCheck } = await checkQuery.maybeSingle();
+
+        if (doubleCheck) {
+          const { error } = await db.from('app_feedback').update(feedbackData).eq('id', doubleCheck.id);
+          if (error) throw error;
+          toast.success('Your app feedback has been updated!');
+        } else {
+          const { error } = await db.from('app_feedback').insert([feedbackData]);
+          if (error) throw error;
+          toast.success('Thank you for your feedback!');
+        }
       }
       
-      setComment('');
-      setVisitorName('');
-      setVisitorMobile('');
-      setRating(5);
       setIsSuccess(true);
-      console.log('App feedback updated or submitted successfully');
-      
       setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 5000);
+      }, 3000);
     } catch (err: any) {
-      console.error('App Feedback Error:', err);
       toast.error(`Failed to submit feedback: ${err.message}`);
     } finally {
       setIsSubmitting(false);
@@ -1365,7 +1412,6 @@ const ReviewSection = ({
   const fetchReviews = async () => {
     const { data } = await db.from('reviews').select('*').eq('target_id', targetId).order('created_at', { ascending: false });
     if (data) {
-      // Prevent duplicates by tracking IDs
       const uniqueReviews: Review[] = [];
       const seenIds = new Set();
       
@@ -1384,52 +1430,79 @@ const ReviewSection = ({
         }
       });
       setReviews(uniqueReviews);
+      
+      // Auto-populate for current user if they have a review
+      const myReview = data.find(r => 
+        (user?.uid && r.user_id === user.uid) || 
+        (visitorMobile && r.visitor_mobile === visitorMobile)
+      );
+      if (myReview) {
+        setRating(myReview.rating);
+        setComment(myReview.comment);
+        if (!user) {
+          setVisitorName(myReview.visitor_name);
+          setVisitorMobile(myReview.visitor_mobile);
+        }
+      }
     }
     setLoading(false);
   };
 
   useEffect(() => {
+    if (user) {
+      setVisitorName(user.displayName || '');
+      setVisitorMobile(user.mobileNumber || '');
+    }
     fetchReviews();
-  }, [targetId]);
+  }, [targetId, user]);
+
+  // Re-check for existing review if visitor manually changes mobile number
+  useEffect(() => {
+    if (!user && visitorMobile.length === 10) {
+      fetchReviews();
+    }
+  }, [visitorMobile, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (visitorMobile.length !== 10) {
+    const currentName = user?.displayName || visitorName;
+    const currentMobile = user?.mobileNumber || visitorMobile;
+
+    if (currentMobile.length !== 10) {
       toast.error('Mobile number must be 10 digits');
       return;
     }
     
     setIsSubmitting(true);
     try {
-      // Check if this visitor/user already reviewed this target
-      const query = db.from('reviews').select('id').eq('target_id', targetId);
+      // Check if this visitor/user already reviewed this target using OR condition
+      let query = db.from('reviews').select('id').eq('target_id', targetId);
+      
       if (user?.uid) {
-        query.eq('user_id', user.uid);
+        query = query.or(`user_id.eq.${user.uid},visitor_mobile.eq.${currentMobile}`);
       } else {
-        query.eq('visitor_mobile', visitorMobile);
+        query = query.eq('visitor_mobile', currentMobile);
       }
       
       const { data: existingReviewData } = await query.maybeSingle();
 
+      const reviewPayload = {
+        visitor_name: currentName,
+        visitor_mobile: currentMobile,
+        rating,
+        comment,
+        user_id: user?.uid || null,
+        created_at: new Date().toISOString()
+      };
+
       if (existingReviewData) {
-        // Update existing review
-        const { error } = await db.from('reviews').update({
-          visitor_name: visitorName,
-          rating,
-          comment,
-          created_at: new Date().toISOString()
-        }).eq('id', existingReviewData.id);
+        const { error } = await db.from('reviews').update(reviewPayload).eq('id', existingReviewData.id);
         if (error) throw error;
         toast.success('Your review has been updated!');
       } else {
-        // Insert new review
         const { error } = await db.from('reviews').insert([{
-          target_id: targetId,
-          visitor_name: visitorName,
-          visitor_mobile: visitorMobile,
-          rating,
-          comment,
-          user_id: user?.uid || null
+          ...reviewPayload,
+          target_id: targetId
         }]);
         if (error) throw error;
         toast.success('Review submitted successfully!');
@@ -2876,6 +2949,8 @@ const RegistrationView = () => {
 
       if (formData.role === 'owner') {
         profileData.venue_type = formData.venueType;
+      } else if (formData.role === 'provider') {
+        profileData.service_type = formData.serviceType;
       }
 
       const { error } = await db.from('users').insert([profileData]);
@@ -5632,17 +5707,25 @@ const BookingManagerView = ({
                           <CreditCard size={18} />
                           <span className="text-sm font-medium">Payment Status</span>
                         </button>
-                            <button 
-                              onClick={() => {
-                                setSelectedBooking(booking);
-                                setIsPaymentRecordModalOpen(true);
-                              }}
-                              className="flex items-center space-x-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
-                              title="Manage Payment Transactions"
-                            >
-                              <IndianRupee size={18} />
-                              <span className="text-sm font-medium">Manage Payments</span>
-                            </button>
+                             <button 
+                               disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
+                               onClick={() => {
+                                 if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
+                                   toast.error('Payment already completed - Records are locked');
+                                   return;
+                                 }
+                                 setSelectedBooking(booking);
+                                 setIsPaymentRecordModalOpen(true);
+                               }}
+                               className={cn(
+                                 "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
+                                 (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                               )}
+                               title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment completed - Lock Manage" : "Manage Payment Transactions"}
+                             >
+                               <IndianRupee size={18} />
+                               <span className="text-sm font-medium">Manage Payments</span>
+                             </button>
                             <button 
                               onClick={() => {
                                 try {
@@ -6247,9 +6330,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
           'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
           'Invoice Amount (Rs)': subTotal,
-          'Advance Paid (Rs)': advance,
-          'Balance Due (Rs)': balance,
-          'Payment Mode': b.paymentMode || 'N/A',
+          'Paid Amount (Rs)': advance,
+          'Pending Amount (Rs)': balance,
           'Payment Status': b.paymentStatus || 'Pending',
           'Booking Type': b.isManual ? 'Manual' : 'Order'
         };
@@ -6266,7 +6348,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
       
       const headers = [
-        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date & Time', 'Invoice No', 'Amount', 'Mode', 'P.Status', 'Type']
+        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date & Time', 'Invoice No', 'Amount', 'Paid', 'Pending', 'P.Status', 'Type']
       ];
       
       const data = filteredBookings.map((b, index) => [
@@ -6277,14 +6359,15 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         (b.partyAddress || 'N/A').substring(0, 20),
         `${b.eventDate} ${b.startTime || ''}`,
         `INV-${b.id.substring(0, 8).toUpperCase()}`,
-        `Rs.${(b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)}`,
-        b.paymentMode || 'N/A',
+        (b.updatedAmount || b.totalAmount || 0).toString(),
+        (b.advance_amount || 0).toString(),
+        ((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toString(),
         b.paymentStatus || 'Pending',
         b.isManual ? 'Manual' : 'Order'
       ]);
       
       const tableHeaders = [
-        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Adv.', 'Bal.', 'Mode', 'Type']
+        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Inv.Amt', 'Paid', 'Pending', 'Type']
       ];
       
       const pdfData = filteredBookings.map((b, index) => [
@@ -6295,9 +6378,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         (b.partyAddress || 'N/A').substring(0, 15),
         b.eventDate,
         b.id.substring(0, 5).toUpperCase(),
+        (b.updatedAmount || b.totalAmount || 0).toString(),
         (b.advance_amount || 0).toString(),
         ((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toString(),
-        b.paymentMode || 'N/A',
         b.isManual ? 'M' : 'O'
       ]);
 
@@ -7674,7 +7757,18 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       setLoading(true);
       try {
         const { data: pData } = await db.from('subscription_plans').select('*').eq('role', profile.role).eq('is_active', true);
-        if (pData) setPlans(pData.map(d => ({ id: d.id, name: d.name, price: d.price, duration: d.duration, role: d.role, isActive: d.is_active, createdAt: d.created_at } as SubscriptionPlan)));
+        if (pData) {
+          setPlans(pData.map(d => ({ 
+            id: d.id, 
+            name: d.name, 
+            price: d.price, 
+            duration: d.duration, 
+            role: d.role, 
+            isActive: d.is_active, 
+            benefits: d.benefits || [],
+            createdAt: d.created_at 
+          } as SubscriptionPlan)));
+        }
 
         const { data: sData } = await db.from('user_subscriptions').select('*').eq('user_id', user?.uid).eq('status', 'active').order('end_date', { ascending: false }).limit(1);
         if (sData && sData.length > 0) {
@@ -7725,8 +7819,17 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
           // 3. On success, update database
           const startDate = new Date();
           const endDate = new Date();
-          if (plan.duration === 'month') endDate.setMonth(endDate.getMonth() + 1);
-          else endDate.setFullYear(endDate.getFullYear() + 1);
+          const duration = plan.duration.toLowerCase();
+          
+          if (duration.includes('year')) {
+            endDate.setFullYear(endDate.getFullYear() + 1);
+          } else if (duration.includes('6 month') || duration.includes('half')) {
+            endDate.setMonth(endDate.getMonth() + 6);
+          } else if (duration.includes('3 month') || duration.includes('quarter')) {
+            endDate.setMonth(endDate.getMonth() + 3);
+          } else {
+            endDate.setMonth(endDate.getMonth() + 1);
+          }
 
           try {
             const { error } = await db.from('user_subscriptions').insert([{
@@ -7787,9 +7890,17 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
               <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
               <div className="text-3xl font-bold text-orange-600 mb-6">₹{plan.price}<span className="text-sm text-gray-500 font-normal">/{plan.duration}</span></div>
               <ul className="space-y-3 mb-8 text-sm text-gray-600">
-                <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Business Listing</li>
-                <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Booking Inquiries</li>
-                <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Catalogue Access</li>
+                {plan.benefits && plan.benefits.length > 0 ? (
+                  plan.benefits.map((benefit, i) => (
+                    <li key={i} className="flex items-start"><Check size={16} className="text-green-500 mr-2 mt-0.5" /> {benefit}</li>
+                  ))
+                ) : (
+                  <>
+                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Business Listing</li>
+                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Booking Inquiries</li>
+                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Catalogue Access</li>
+                  </>
+                )}
               </ul>
               <button 
                 onClick={() => handleSubscribe(plan)}
@@ -9111,85 +9222,138 @@ const SearchResultsView = () => {
   const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
 
   useEffect(() => {
+    let ignore = false;
     const fetchData = async () => {
       setLoading(true);
-      const [venuesRes, servicesRes] = await Promise.all([
+      const [venuesRes, servicesRes, usersRes] = await Promise.all([
         db.from('venues').select('*'),
-        db.from('service_providers').select('*')
+        db.from('service_providers').select('*'),
+        db.from('users').select('*')
       ]);
 
-      if (venuesRes.data) {
-        let vData = venuesRes.data.map(d => ({
-          id: d.id,
-          ownerId: d.owner_id,
-          name: d.name,
-          venueType: d.venue_type,
-          state: d.state,
-          district: d.district,
-          block: d.block,
-          pincode: d.pincode,
-          address: d.address,
-          capacity: d.capacity,
-          pricePerDay: d.price_per_day,
-          description: d.description,
-          images: d.images,
-          facilities: d.facilities,
-          rating: d.rating,
-          reviewCount: d.review_count,
-          catalogue: d.catalogue,
-          createdAt: d.created_at
+      const venuesData = venuesRes.data || [];
+      const servicesData = servicesRes.data || [];
+      const usersData = usersRes.data || [];
+
+      if (ignore) return;
+
+      // Process Venues including Synth
+      let vData = venuesData.map(d => ({
+        id: d.id,
+        ownerId: d.owner_id,
+        name: d.name,
+        venueType: d.venue_type,
+        state: d.state,
+        district: d.district,
+        block: d.block,
+        pincode: d.pincode,
+        address: d.address,
+        capacity: d.capacity,
+        pricePerDay: d.price_per_day,
+        description: d.description,
+        images: d.images,
+        facilities: d.facilities,
+        rating: d.rating,
+        reviewCount: d.review_count,
+        catalogue: d.catalogue,
+        createdAt: d.created_at
+      } as Venue));
+
+      const existingOwnerIds = new Set(venuesData.map(d => d.owner_id));
+      const synthVenues = usersData
+        .filter(u => u.role === 'owner' && !existingOwnerIds.has(u.uid))
+        .map(u => ({
+          id: 'synth_' + u.uid,
+          ownerId: u.uid,
+          name: (u.display_name || 'Business') + "'s Venue",
+          venueType: (u.venue_type || 'marriage garden') as VenueType,
+          state: u.state,
+          district: u.district,
+          block: u.block,
+          pincode: u.pincode,
+          address: `${u.block}, ${u.district}, ${u.state}`,
+          capacity: 0,
+          pricePerDay: 0,
+          description: `A registered ${u.venue_type || 'Venue'} on BVO. Professional and ready to host.`,
+          images: u.photo_url ? [u.photo_url] : ['https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'],
+          facilities: [],
+          rating: 0,
+          reviewCount: 0,
+          createdAt: u.created_at
         } as Venue));
+      
+      vData = [...vData, ...synthVenues];
 
-        const query = searchTerm.toLowerCase();
-        if (query) {
-          vData = vData.filter(v => 
-            v.name.toLowerCase().includes(query) || 
-            v.venueType.toLowerCase().includes(query) ||
-            v.description?.toLowerCase().includes(query)
-          );
-        }
-        if (selectedState) vData = vData.filter(v => v.state === selectedState);
-        if (selectedDistrict) vData = vData.filter(v => v.district === selectedDistrict);
-        if (selectedBlock) vData = vData.filter(v => v.block === selectedBlock);
-        
-        setVenues(vData);
+      const query = searchTerm.toLowerCase();
+      if (query) {
+        vData = vData.filter(v => 
+          (v.name?.toLowerCase() || '').includes(query) || 
+          (v.venueType?.toLowerCase() || '').includes(query) ||
+          (v.description?.toLowerCase() || '').includes(query)
+        );
       }
+      if (selectedState) vData = vData.filter(v => v.state === selectedState);
+      if (selectedDistrict) vData = vData.filter(v => v.district === selectedDistrict);
+      if (selectedBlock) vData = vData.filter(v => v.block === selectedBlock);
+      
+      setVenues(vData);
 
-      if (servicesRes.data) {
-        let sData = servicesRes.data.map(d => ({
-          id: d.id,
-          providerId: d.provider_id,
-          name: d.name,
-          serviceType: d.service_type,
-          state: d.state,
-          district: d.district,
-          block: d.block,
-          experience: d.experience,
-          priceRange: d.price_range,
-          description: d.description,
-          images: d.images,
-          rating: d.rating,
-          reviewCount: d.review_count,
-          createdAt: d.created_at
+      // Process Services including Synth
+      let sData = servicesData.map(d => ({
+        id: d.id,
+        providerId: d.provider_id,
+        name: d.name,
+        serviceType: d.service_type,
+        state: d.state,
+        district: d.district,
+        block: d.block,
+        experience: d.experience,
+        priceRange: d.price_range,
+        description: d.description,
+        images: d.images,
+        rating: d.rating,
+        reviewCount: d.review_count,
+        createdAt: d.created_at
+      } as ServiceProvider));
+
+      const existingProviderIds = new Set(servicesData.map(d => d.provider_id));
+      const synthServices = usersData
+        .filter(u => u.role === 'provider' && !existingProviderIds.has(u.uid))
+        .map(u => ({
+          id: 'synth_' + u.uid,
+          providerId: u.uid,
+          name: u.display_name,
+          serviceType: (u.service_type || 'dj and sound service') as ServiceType,
+          state: u.state,
+          district: u.district,
+          block: u.block,
+          experience: 'Professional',
+          priceRange: 'Contact for details',
+          description: `Registered ${u.service_type || 'service'} on BVO platform.`,
+          images: u.photo_url ? [u.photo_url] : ['https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=800'],
+          rating: 0,
+          reviewCount: 0,
+          createdAt: u.created_at
         } as ServiceProvider));
 
-        const query = searchTerm.toLowerCase();
-        if (query) {
-          sData = sData.filter(s => 
-            s.name.toLowerCase().includes(query) || 
-            s.serviceType.toLowerCase().includes(query) ||
-            s.description?.toLowerCase().includes(query)
-          );
-        }
-        if (selectedState) sData = sData.filter(s => s.state === selectedState);
-        if (selectedDistrict) sData = sData.filter(s => s.district === selectedDistrict);
-        if (selectedBlock) sData = sData.filter(s => s.block === selectedBlock);
-        
-        setServices(sData);
+      sData = [...sData, ...synthServices];
+
+      if (query) {
+        sData = sData.filter(s => 
+          (s.name?.toLowerCase() || '').includes(query) || 
+          (s.serviceType?.toLowerCase() || '').includes(query) ||
+          (s.description?.toLowerCase() || '').includes(query)
+        );
       }
+      if (selectedState) sData = sData.filter(s => s.state === selectedState);
+      if (selectedDistrict) sData = sData.filter(s => s.district === selectedDistrict);
+      if (selectedBlock) sData = sData.filter(s => s.block === selectedBlock);
+      
+      setServices(sData);
       setLoading(false);
     };
     fetchData();
+    return () => { ignore = true; };
   }, [searchTerm, selectedState, selectedDistrict, selectedBlock]);
 
   const clearFilters = () => {
@@ -9344,6 +9508,66 @@ const SearchResultsView = () => {
         </div>
       )}
     </div>
+  );
+};
+
+const DatabaseMonitor = () => {
+  const [status, setStatus] = useState<'checking' | 'connected' | 'disconnected' | 'mock'>('checking');
+  const [errorCount, setErrorCount] = useState(0);
+
+  useEffect(() => {
+    if (!isSupabaseConnected) {
+      setStatus('mock');
+      return;
+    }
+
+    const checkConnection = async () => {
+      try {
+        const { error } = await db.from('users').select('count', { count: 'exact', head: true });
+        if (error) {
+          console.error('[DB MONITOR] Health check failed:', error.message);
+          setStatus('disconnected');
+          setErrorCount(prev => prev + 1);
+        } else {
+          setStatus('connected');
+          setErrorCount(0);
+        }
+      } catch (err) {
+        console.error('[DB MONITOR] Critical error:', err);
+        setStatus('disconnected');
+        setErrorCount(prev => prev + 1);
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  if (status === 'connected' || status === 'mock') return null;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="fixed bottom-6 left-6 z-[9999] max-w-sm"
+    >
+      <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center space-x-4 border border-red-500/20 backdrop-blur-md bg-opacity-90">
+        <div className="bg-red-700 p-2 rounded-xl animate-pulse">
+          <AlertCircle size={20} />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-bold text-sm">Connection Warning</h3>
+          <p className="text-[10px] opacity-90 leading-tight">Supabase connection lost or intermittent. Data may not sync correctly.</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-white text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-50"
+        >
+          Reconnect
+        </button>
+      </div>
+    </motion.div>
   );
 };
 
@@ -9628,7 +9852,8 @@ export default function App() {
 
   return (
     <LanguageContext.Provider value={contextValue}>
-        <Router>
+      <DatabaseMonitor />
+      <Router>
         <div className="min-h-screen bg-white font-sans text-gray-900">
           <Toaster position="top-center" />
           
@@ -9885,7 +10110,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
           name: d.name,
           price: d.price,
           duration: d.duration,
-          isActive: d.is_active
+          isActive: d.is_active,
+          benefits: d.benefits || []
         } as SubscriptionPlan)));
       } else if (activeTab === 'notifications') {
         const { data } = await db.from('notifications').select('*').order('created_at', { ascending: false });
@@ -10338,7 +10564,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             { id: 'users', label: 'User Management', icon: Users },
             { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
             { id: 'notifications', label: 'Notifications', icon: Bell },
-            { id: 'banners', label: 'Banners', icon: Image },
+            { id: 'banners', label: 'Banners', icon: LucideImage },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
             { id: 'moments', label: 'Moments Photos', icon: Sparkles },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
@@ -10429,8 +10655,38 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <div className="bg-orange-600 text-white p-8 rounded-[2.5rem] shadow-xl shadow-orange-200">
+                      <div className="flex items-center space-x-4 mb-6">
+                        <div className="bg-white/20 p-3 rounded-2xl">
+                          <Globe size={24} />
+                        </div>
+                        <h4 className="text-xl font-bold">Custom Domain Checklist</h4>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+                          <p className="text-sm opacity-90">Verify <span className="font-bold underline">bookmyvanue.in</span> is added to Supabase Authentication &gt; URL Configuration &gt; Redirect URIs.</p>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+                          <p className="text-sm opacity-90">Ensure your build platform (GitHub/Vercel/etc) has <span className="font-bold">VITE_SUPABASE_URL</span> and <span className="font-bold">VITE_SUPABASE_ANON_KEY</span> set correctly.</p>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+                          <p className="text-sm opacity-90">SSL (HTTPS) is required for stable frontend-backend encryption.</p>
+                        </div>
+                        <div className="pt-4 mt-4 border-t border-white/20">
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-2">Server Info / DNS A Record</p>
+                          <div className="bg-white/10 p-3 rounded-xl flex items-center justify-between">
+                            <span className="font-mono text-xs">145.79.14.145</span>
+                            <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-md">Primary IP</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
                       <div className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -10616,6 +10872,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         role: formData.get('role') as string,
                         price: parseFloat(formData.get('price') as string),
                         duration: formData.get('duration') as string,
+                        benefits: (formData.get('benefits') as string).split('\n').filter(b => b.trim()),
                         is_active: true
                       };
                       
@@ -10646,18 +10903,29 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Price (₹)</label>
                         <input name="price" type="number" required placeholder="0.00" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" />
                       </div>
-                      <div>
+                      <div className="lg:col-span-1">
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Duration</label>
                         <select name="duration" required className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none">
-                          <option value="1 Month">1 Month</option>
-                          <option value="3 Months">3 Months</option>
-                          <option value="6 Months">6 Months</option>
-                          <option value="1 Year">1 Year</option>
+                          <option value="monthly">1 Month</option>
+                          <option value="quarterly">3 Months</option>
+                          <option value="half-yearly">6 Months</option>
+                          <option value="yearly">1 Year</option>
                         </select>
                       </div>
-                      <button type="submit" className="bg-orange-600 text-white py-3.5 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">
-                        Create Plan
-                      </button>
+                      <div className="lg:col-span-5">
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Plan Benefits (One per line)</label>
+                        <textarea 
+                          name="benefits" 
+                          rows={3} 
+                          placeholder="e.g. Premium Business Listing&#10;Unlimited Inquiries&#10;Featured Status"
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-[2rem] focus:ring-2 focus:ring-orange-500 outline-none"
+                        ></textarea>
+                      </div>
+                      <div className="lg:col-span-5 flex justify-end">
+                        <button type="submit" className="bg-orange-600 text-white px-10 py-3.5 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">
+                          Create Subscription Plan
+                        </button>
+                      </div>
                     </form>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -11019,16 +11287,18 @@ const VenueListView = () => {
   const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
 
   useEffect(() => {
+    let ignore = false;
     const fetchVenues = async () => {
-      const { data: venuesData, error } = await db
-        .from('venues')
-        .select('*');
+      setLoading(true);
+      const [venuesRes, usersRes] = await Promise.all([
+        db.from('venues').select('*'),
+        db.from('users').select('*').eq('role', 'owner')
+      ]);
       
-      if (error) {
-        console.error('Error fetching venues:', error);
-        setLoading(false);
-        return;
-      }
+      const venuesData = venuesRes.data || [];
+      const usersData = usersRes.data || [];
+
+      if (ignore) return;
 
       let data = venuesData.map(d => ({
         id: d.id,
@@ -11050,15 +11320,41 @@ const VenueListView = () => {
         catalogue: d.catalogue,
         createdAt: d.created_at
       } as Venue));
+
+      // Add users who don't have a venue record yet
+      const existingOwnerIds = new Set(venuesData.map(d => d.owner_id));
+      const synthVenues = usersData
+        .filter(u => !existingOwnerIds.has(u.uid))
+        .map(u => ({
+          id: 'synth_' + u.uid,
+          ownerId: u.uid,
+          name: (u.display_name || 'Business') + "'s Venue",
+          venueType: (u.venue_type || 'marriage garden') as VenueType,
+          state: u.state,
+          district: u.district,
+          block: u.block,
+          pincode: u.pincode,
+          address: `${u.block}, ${u.district}, ${u.state}`,
+          capacity: 0,
+          pricePerDay: 0,
+          description: `A registered ${u.venue_type || 'Venue'} on BVO. Professional and ready to host your event.`,
+          images: u.photo_url ? [u.photo_url] : ['https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'],
+          facilities: [],
+          rating: 0,
+          reviewCount: 0,
+          createdAt: u.created_at
+        } as Venue));
+
+      data = [...data, ...synthVenues];
       
       const type = searchParams.get('type')?.toLowerCase();
       const search = searchParams.get('search')?.toLowerCase();
 
-      if (type) data = data.filter(v => v.venueType?.toLowerCase() === type);
+      if (type) data = data.filter(v => (v.venueType?.toLowerCase() || '') === type);
       if (search) {
         data = data.filter(v => 
-          v.name.toLowerCase().includes(search) || 
-          v.venueType.toLowerCase().includes(search)
+          (v.name?.toLowerCase() || '').includes(search) || 
+          (v.venueType?.toLowerCase() || '').includes(search)
         );
       }
 
@@ -11070,6 +11366,7 @@ const VenueListView = () => {
       setLoading(false);
     };
     fetchVenues();
+    return () => { ignore = true; };
   }, [searchParams, selectedState, selectedDistrict, selectedBlock]);
 
   return (
@@ -11146,16 +11443,17 @@ const ServiceListView = ({ user }: { user: any }) => {
   const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
 
   useEffect(() => {
+    let ignore = false;
     const fetchServices = async () => {
-      const { data: servicesData, error } = await db
-        .from('service_providers')
-        .select('*');
+      const [providersRes, usersRes] = await Promise.all([
+        db.from('service_providers').select('*'),
+        db.from('users').select('*').eq('role', 'provider')
+      ]);
       
-      if (error) {
-        console.error('Error fetching services:', error);
-        setLoading(false);
-        return;
-      }
+      const servicesData = providersRes.data || [];
+      const usersData = usersRes.data || [];
+
+      if (ignore) return;
 
       let data = servicesData.map(d => ({
         id: d.id,
@@ -11173,15 +11471,38 @@ const ServiceListView = ({ user }: { user: any }) => {
         reviewCount: d.review_count,
         createdAt: d.created_at
       } as ServiceProvider));
+
+      // Add users who don't have a service record yet
+      const existingProviderIds = new Set(servicesData.map(d => d.provider_id));
+      const synthServices = usersData
+        .filter(u => !existingProviderIds.has(u.uid))
+        .map(u => ({
+          id: 'synth_' + u.uid,
+          providerId: u.uid,
+          name: u.display_name,
+          serviceType: (u.service_type || 'dj and sound service') as ServiceType,
+          state: u.state,
+          district: u.district,
+          block: u.block,
+          experience: 'Professional',
+          priceRange: 'Contact for details',
+          description: `Registered ${u.service_type || 'service provider'} on BVO platform. Contact for bookings and details.`,
+          images: u.photo_url ? [u.photo_url] : ['https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=800'],
+          rating: 0,
+          reviewCount: 0,
+          createdAt: u.created_at
+        } as ServiceProvider));
+
+      data = [...data, ...synthServices];
       
       const type = searchParams.get('type')?.toLowerCase();
       const search = searchParams.get('search')?.toLowerCase();
 
-      if (type) data = data.filter(s => s.serviceType?.toLowerCase() === type);
+      if (type) data = data.filter(s => (s.serviceType?.toLowerCase() || '') === type);
       if (search) {
         data = data.filter(s => 
-          s.name.toLowerCase().includes(search) || 
-          s.serviceType.toLowerCase().includes(search)
+          (s.name?.toLowerCase() || '').includes(search) || 
+          (s.serviceType?.toLowerCase() || '').includes(search)
         );
       }
 
@@ -11193,6 +11514,7 @@ const ServiceListView = ({ user }: { user: any }) => {
       setLoading(false);
     };
     fetchServices();
+    return () => { ignore = true; };
   }, [searchParams, selectedState, selectedDistrict, selectedBlock]);
 
   return (
