@@ -6289,9 +6289,10 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
-    if (isPaid) return 'PAID';
-    if (booking.status === 'confirmed' || booking.status === 'approved') return 'CONFIRMED';
-    return (booking.status || 'PENDING').toUpperCase();
+    const status = (booking.status || 'pending').toLowerCase();
+    if (status === 'completed') return 'COMPLETED';
+    if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
+    return status.toUpperCase();
   };
   
   // --- Letterhead Header ---
@@ -9940,6 +9941,11 @@ export default function App() {
   
   const contextValue = React.useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
 
+  const handleUpdateProfile = useCallback((p: UserProfile) => {
+    setProfile(p);
+    localStorage.setItem('custom_profile', JSON.stringify(p));
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [isAppRatingOpen, setIsAppRatingOpen] = useState(false);
 
@@ -9960,6 +9966,8 @@ export default function App() {
   };
 
   useEffect(() => {
+    let authSubscription: any = null;
+
     const initAndSeed = async () => {
       try {
         // Check local storage for custom session first
@@ -9978,7 +9986,7 @@ export default function App() {
               .from('users')
               .select('*')
               .eq('uid', session.user.id)
-              .single();
+              .maybeSingle();
             
             if (!profileError && profileData) {
               const rawProfile = profileData as any;
@@ -10013,11 +10021,11 @@ export default function App() {
               .from('users')
               .select('*')
               .eq('uid', session.user.id)
-              .single();
+              .maybeSingle();
             
             if (!profileError && profileData) {
               const rawProfile = profileData as any;
-              setProfile({
+              const freshProfile = {
                 uid: rawProfile.uid,
                 registrationId: rawProfile.registration_id,
                 displayName: rawProfile.display_name,
@@ -10032,94 +10040,19 @@ export default function App() {
                 pincode: rawProfile.pincode,
                 venueType: rawProfile.venue_type,
                 createdAt: rawProfile.created_at
-              } as UserProfile);
+              } as UserProfile;
+              setProfile(freshProfile);
+              localStorage.setItem('custom_user', JSON.stringify(session.user));
+              localStorage.setItem('custom_profile', JSON.stringify(freshProfile));
             }
           } else {
             setUser(null);
             setProfile(null);
+            localStorage.removeItem('custom_user');
+            localStorage.removeItem('custom_profile');
           }
         });
-
-        // Test connection and seed demo data if needed
-        /*
-        const ownerId = '00000000-0000-0000-0000-000000000001'; // Demo UUIDs for db
-        const providerId = '00000000-0000-0000-0000-000000000002';
-        
-        const { data: ownerProfile } = await db
-          .from('users')
-          .select('*')
-          .eq('uid', ownerId)
-          .single();
-
-        if (!ownerProfile) {
-          console.log('[INIT] Seeding demo data to db...');
-          
-          await db.from('users').insert([
-            {
-              uid: ownerId,
-              registration_id: 'UTSAV111111',
-              display_name: 'Demo Owner',
-              father_name: 'Mr. Owner Sr.',
-              mobile_number: '9876543210',
-              email: 'owner@example.com',
-              photo_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=owner',
-              role: 'owner',
-              state: 'Rajasthan',
-              district: 'Jaipur',
-              block: 'Jaipur',
-              pincode: '302001',
-              venue_type: 'Marriage Garden'
-            },
-            {
-              uid: providerId,
-              registration_id: 'UTSAV222222',
-              display_name: 'Demo Provider',
-              father_name: 'Mr. Provider Sr.',
-              mobile_number: '8765432109',
-              email: 'provider@example.com',
-              photo_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=provider',
-              role: 'provider',
-              state: 'Rajasthan',
-              district: 'Jaipur',
-              block: 'Jaipur',
-              pincode: '302001'
-            }
-          ]);
-
-          await db.from('venues').insert([{
-            id: '00000000-0000-0000-0000-000000000003',
-            owner_id: ownerId,
-            name: 'Royal Heritage Garden',
-            description: 'A beautiful marriage garden with lush green lawns and modern facilities.',
-            venue_type: 'Marriage Garden',
-            address: '123, Heritage Road, Jaipur',
-            state: 'Rajasthan',
-            district: 'Jaipur',
-            block: 'Jaipur',
-            pincode: '302001',
-            city: 'Jaipur',
-            capacity: 1000,
-            price_per_day: 50000,
-            images: ['https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=1200'],
-            facilities: ['AC Rooms', 'Parking', 'Catering', 'Power Backup'],
-            rating: 0
-          }]);
-
-          await db.from('service_providers').insert([{
-            id: '00000000-0000-0000-0000-000000000004',
-            provider_id: providerId,
-            name: 'Tasty Bites Catering',
-            service_type: 'Caterer',
-            description: 'Premium catering services for all types of events.',
-            price_range: '₹500 - ₹1500 per plate',
-            city: 'Jaipur',
-            images: ['https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1200'],
-            rating: 0
-          }]);
-          
-          console.log('Demo data seeded to db');
-        }
-        */
+        authSubscription = subscription;
       } catch (err) {
         console.error('Initialization error:', err);
       } finally {
@@ -10127,6 +10060,16 @@ export default function App() {
       }
     };
     initAndSeed();
+
+    return () => {
+      if (authSubscription) {
+        if (typeof authSubscription.unsubscribe === 'function') {
+           authSubscription.unsubscribe();
+        } else if (db.removeChannel) {
+           db.removeChannel(authSubscription);
+        }
+      }
+    };
   }, []);
 
   const [appRating, setAppRating] = useState(0);
@@ -10204,14 +10147,14 @@ export default function App() {
               <Route path="/services" element={<ServiceListView user={user} />} />
               <Route path="/search" element={<SearchResultsView />} />
               <Route path="/services/:id" element={<ServiceDetailView user={user} profile={profile} />} />
-              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={setProfile} />} />
-              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={(p) => { setProfile(p); localStorage.setItem('custom_profile', JSON.stringify(p)); }} />} />
+              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} />} />
+              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} />} />
               <Route path="/add-venue" element={<AddVenueView user={user} profile={profile} />} />
               <Route path="/edit-venue/:id" element={<EditVenueView user={user} profile={profile} />} />
               <Route path="/edit-service/:id" element={<EditServiceView user={user} profile={profile} />} />
               <Route path="/add-service" element={<AddServiceView user={user} profile={profile} />} />
-              <Route path="/profile" element={<ProfileEditView user={user} profile={profile} onUpdate={(p) => setProfile(p)} />} />
-      <Route path="/change-password" element={<ChangePasswordView user={user} profile={profile} onUpdateProfile={setProfile} />} />
+              <Route path="/profile" element={<ProfileEditView user={user} profile={profile} onUpdate={handleUpdateProfile} />} />
+      <Route path="/change-password" element={<ChangePasswordView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} />} />
       <Route path="/forgot-password" element={<ForgotPasswordView />} />
       <Route path="/registration" element={<RegistrationView />} />
               <Route path="/login" element={<LoginView onLogin={(u, p) => { 
@@ -11042,8 +10985,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                           <BarChart data={[
                             { name: 'Total', count: bookings.length },
-                            { name: 'Paid', count: bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid').length },
-                            { name: 'Pending', count: bookings.filter(b => b.paymentStatus === 'Pending' || b.status === 'pending').length },
+                            { name: 'Paid', count: bookings.filter(b => (b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed' || ((b.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0))).length },
+                            { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
                             { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
                           ]}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />

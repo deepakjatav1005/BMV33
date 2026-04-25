@@ -29,13 +29,28 @@ if (supabase) {
   supabase.from('users').select('count', { count: 'exact', head: true })
     .then(({ error }) => {
       if (error) {
-        console.error('❌ Supabase session check failed (Backend Connection Loss):', error.message);
+        console.error('❌ Supabase Connection Error:', error.message);
+        console.error('Check if the domain is allowed in Supabase -> Authentication -> URL Configuration');
+        console.error('Also verify that RLS (Row Level Security) policies allow reading the users table.');
       } else {
         console.log('📡 Live connection to Supabase active.');
       }
     });
 } else {
-  console.warn('⚠️ Supabase keys NOT found. Falling back to Mock Data.');
+  console.warn('⚠️ Supabase URL or Anon Key is missing!');
+  console.warn('VITE_SUPABASE_URL:', supabaseUrl ? 'Defined' : 'MISSING');
+  console.warn('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Defined' : 'MISSING');
+  console.info('Falling back to LocalStorage Mock Data Service.');
+  
+  if (typeof window !== 'undefined') {
+    // Expose keys status for debugging
+    (window as any).__SUPABASE_DEBUG__ = {
+      urlPresent: !!supabaseUrl,
+      keyPresent: !!supabaseAnonKey,
+      hostname: window.location.hostname,
+      protocol: window.location.protocol
+    };
+  }
 }
 
 const getLocalData = () => {
