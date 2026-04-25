@@ -341,9 +341,10 @@
   =============================================================================
 */
 
-import React, { Component, useState, useEffect, useMemo, useRef } from 'react';
+import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   HashRouter as Router, 
   Routes, 
@@ -500,17 +501,11 @@ const ManagePaymentModal = ({
   const [newPayment, setNewPayment] = useState({
     amount: 0,
     paymentMode: 'Cash' as any,
-    paymentDate: format(new Date(), 'yyyy-MM-dd'),
-    paymentType: 'Pending' as any
+    paymentType: 'Regular' as any,
+    paymentDate: format(new Date(), 'yyyy-MM-dd')
   });
 
-  useEffect(() => {
-    if (isOpen && booking) {
-      fetchPayments();
-    }
-  }, [isOpen, booking]);
-
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!booking) return;
     setLoading(true);
     try {
@@ -520,14 +515,32 @@ const ManagePaymentModal = ({
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setPayments(data || []);
+      
+      // Map database keys to camelCase
+      const mappedPayments: BookingPayment[] = (data || []).map((p: any) => ({
+        id: p.id,
+        bookingId: p.booking_id,
+        amount: p.amount,
+        paymentMode: p.payment_mode,
+        paymentDate: p.payment_date,
+        paymentType: p.payment_type || 'Regular',
+        createdAt: p.created_at
+      }));
+      
+      setPayments(mappedPayments);
     } catch (err) {
       console.error('Fetch payments error:', err);
       toast.error('Failed to fetch payment records');
     } finally {
       setLoading(false);
     }
-  };
+  }, [booking?.id]);
+
+  useEffect(() => {
+    if (isOpen && booking) {
+      fetchPayments();
+    }
+  }, [isOpen, booking?.id, fetchPayments]);
 
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -537,11 +550,26 @@ const ManagePaymentModal = ({
       return;
     }
 
+    const today = format(new Date(), 'yyyy-MM-dd');
+    if (newPayment.paymentDate < today) {
+      toast.error('Back date entry not allowed');
+      return;
+    }
+
+    // Verify overpayment
+    const targetAmount = booking.updatedAmount || booking.totalAmount || 0;
+    const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    // Use a small epsilon to avoid floating point issues
+    if (currentTotal + parseFloat(newPayment.amount.toString()) > targetAmount + 0.01) {
+      toast.error(`Overpayment not allowed. Due amount is ₹${Math.max(0, targetAmount - currentTotal).toLocaleString()}`);
+      return;
+    }
+
     setLoading(true);
     try {
       const { error: payError } = await db.from('booking_payments').insert([{
         booking_id: booking.id,
-        amount: newPayment.amount,
+        amount: Number(newPayment.amount),
         payment_mode: newPayment.paymentMode,
         payment_date: newPayment.paymentDate,
         payment_type: newPayment.paymentType
@@ -549,27 +577,40 @@ const ManagePaymentModal = ({
 
       if (payError) throw payError;
 
-      const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0) + newPayment.amount;
+      // Re-fetch latest payments from DB to calculate true total across all records
+      const { data: latestPayments, error: fetchErr } = await db.from('booking_payments')
+        .select('amount')
+        .eq('booking_id', booking.id);
+      
+      if (fetchErr) throw fetchErr;
+
+      const totalCredited = (latestPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
       const targetAmount = booking.updatedAmount || booking.totalAmount || 0;
       
-      // Update booking status if fully paid
-      if (totalReceived >= targetAmount) {
-        await db.from('bookings').update({ 
-          payment_status: 'Paid',
-          status: 'paid'
-        }).eq('id', booking.id);
+      const isNowPaid = totalCredited >= targetAmount && targetAmount > 0;
+      const updateData: any = {
+        advance_amount: totalCredited,
+        payment_status: isNowPaid ? 'Paid' : 'Pending'
+      };
+
+      if (isNowPaid && (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'paid' || booking.status === 'approved')) {
+        updateData.status = 'completed';
       }
+
+      await db.from('bookings').update(updateData).eq('id', booking.id);
 
       toast.success('Payment registered successfully');
       setIsRegistering(false);
       setNewPayment({
         amount: 0,
         paymentMode: 'Cash',
-        paymentDate: format(new Date(), 'yyyy-MM-dd'),
-        paymentType: 'Pending'
+        paymentType: 'Regular',
+        paymentDate: format(new Date(), 'yyyy-MM-dd')
       });
-      fetchPayments();
-      onUpdate();
+      // First refresh parent so UI data is updated
+      if (onUpdate) onUpdate(); 
+      // Then refresh local list
+      await fetchPayments();
     } catch (err) {
       console.error('Register payment error:', err);
       toast.error('Failed to register payment');
@@ -581,15 +622,19 @@ const ManagePaymentModal = ({
   if (!isOpen || !booking) return null;
 
   const totalAmount = (booking.updatedAmount || booking.totalAmount || 0);
-  const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0);
-  const pendingAmount = Math.max(0, totalAmount - totalReceived);
+  const totalRegular = payments.filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + p.amount, 0);
+  const totalAdvance = payments.filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + p.amount, 0);
+  const totalDiscount = payments.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0);
+  
+  const totalCredited = totalRegular + totalAdvance + totalDiscount;
+  const pendingAmount = Math.max(0, totalAmount - totalCredited);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col"
       >
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
@@ -602,18 +647,26 @@ const ManagePaymentModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
-              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Booking</span>
-              <span className="text-2xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100">
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Book.</span>
+              <span className="text-xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
             </div>
-            <div className="bg-green-50/50 p-6 rounded-3xl border border-green-100">
-              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid Amount</span>
-              <span className="text-2xl font-black text-green-900">₹{totalReceived.toLocaleString()}</span>
+            <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100">
+              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid</span>
+              <span className="text-xl font-black text-green-900">₹{totalCredited.toLocaleString()}</span>
             </div>
-            <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100">
-              <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">Pending Balance</span>
-              <span className="text-2xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
+            <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
+              <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest block mb-1">Advance</span>
+              <span className="text-xl font-black text-orange-900">₹{totalAdvance.toLocaleString()}</span>
+            </div>
+            <div className="bg-purple-50/50 p-4 rounded-3xl border border-purple-100">
+              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest block mb-1">Discount</span>
+              <span className="text-xl font-black text-purple-900">₹{totalDiscount.toLocaleString()}</span>
+            </div>
+            <div className="bg-red-50/50 p-4 rounded-3xl border border-red-100">
+              <span className="text-[9px] font-black text-red-600 uppercase tracking-widest block mb-1">Pending</span>
+              <span className="text-xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
             </div>
           </div>
 
@@ -623,7 +676,7 @@ const ManagePaymentModal = ({
                 <Clock className="mr-2 text-orange-600" size={20} />
                 Transaction History
               </h4>
-              {pendingAmount > 0 && !isRegistering && currentUserUid === booking.ownerId && (
+              {pendingAmount > 0.01 && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
                 <button 
                   onClick={() => setIsRegistering(true)}
                   className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
@@ -663,16 +716,16 @@ const ManagePaymentModal = ({
                         setNewPayment({
                           ...newPayment, 
                           paymentType: type,
-                          paymentMode: type === 'Round off' ? 'Other' : newPayment.paymentMode
+                          paymentMode: type === 'Discount' ? 'Adjustment' : 'Cash'
                         });
                       }}
                     >
-                      <option value="Advance">Advance</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Round off">Round off (Concession)</option>
+                      <option value="Regular">Regular Payment</option>
+                      <option value="Advance">Advance Payment</option>
+                      <option value="Discount">Discount / Adj.</option>
                     </select>
                   </div>
-                  {newPayment.paymentType !== 'Round off' && (
+                  {newPayment.paymentType !== 'Discount' && (
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">Payment Mode</label>
                       <select 
@@ -744,14 +797,14 @@ const ManagePaymentModal = ({
                           <span className="font-black text-xl text-gray-900">₹{p.amount.toLocaleString()}</span>
                           <span className={cn(
                             "text-[10px] uppercase font-black px-2.5 py-1 rounded-full tracking-wider",
-                            p.paymentType === 'Advance' ? "bg-blue-100 text-blue-600" : 
-                            p.paymentType === 'Round off' ? "bg-purple-100 text-purple-600" : "bg-orange-100 text-orange-600"
+                            p.paymentType === 'Discount' ? "bg-purple-100 text-purple-600" : 
+                            p.paymentType === 'Advance' ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-600"
                           )}>
-                            {p.paymentType === 'Round off' ? 'Concession' : p.paymentType}
+                            {p.paymentType || 'Regular'}
                           </span>
                         </div>
                         <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                          {p.paymentType === 'Round off' ? 'Adjustment' : p.paymentMode} • {formatDateDDMMYYYY(p.paymentDate)}
+                          {p.paymentMode} • {formatDateDDMMYYYY(p.paymentDate)}
                         </p>
                       </div>
                     </div>
@@ -875,6 +928,17 @@ import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole,
 declare var Razorpay: any;
 
 // --- Constants ---
+const VENUE_FACILITIES = [
+  'ROOMS(AC)', 'ROOMS(NON AC)', 'DINNER HALL', 'WEDDING HALL', 'STAGE SITE', 
+  'CATTERING HALL', 'PARKING SIDE', 'PARTY HALL', 'MEETING HALL', 'RESHORT SITE', 
+  'RECEPTION SITE', 'GARDEN SITE', 'GROUND', 'INDOOR SITE', 'OUTDOOR SITE'
+];
+
+const EVENT_TYPES = [
+  'WEDDING', 'SANGEET', 'ENGAGEMENT', 'HALDI', 'BIRTHDAY PARTY', 'ANIVVIVERSARY', 
+  'CORPORATE EVENTS', 'SEMINAR', 'WORKSHOP', 'EXHIBITION', 'MUSIC CONCERT', 'SPECIAL OCCASION'
+];
+
 const VENUE_TYPES = [
   'marriage garden', 
   'hotel', 
@@ -1408,6 +1472,7 @@ const ReviewSection = ({
   const [comment, setComment] = useState('');
   const [visitorName, setVisitorName] = useState(user?.displayName || '');
   const [visitorMobile, setVisitorMobile] = useState(user?.mobileNumber || '');
+  const [hasExistingReview, setHasExistingReview] = useState(false);
   
   const fetchReviews = async () => {
     const { data } = await db.from('reviews').select('*').eq('target_id', targetId).order('created_at', { ascending: false });
@@ -1432,17 +1497,21 @@ const ReviewSection = ({
       setReviews(uniqueReviews);
       
       // Auto-populate for current user if they have a review
+      const currentMobile = user?.mobileNumber || visitorMobile;
       const myReview = data.find(r => 
         (user?.uid && r.user_id === user.uid) || 
-        (visitorMobile && r.visitor_mobile === visitorMobile)
+        (currentMobile && r.visitor_mobile === currentMobile)
       );
       if (myReview) {
+        setHasExistingReview(true);
         setRating(myReview.rating);
         setComment(myReview.comment);
         if (!user) {
           setVisitorName(myReview.visitor_name);
           setVisitorMobile(myReview.visitor_mobile);
         }
+      } else {
+        setHasExistingReview(false);
       }
     }
     setLoading(false);
@@ -1542,7 +1611,16 @@ const ReviewSection = ({
   return (
     <div className="mt-12 space-y-8">
       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6">Rate & Review {targetName}</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-gray-900">
+            {hasExistingReview ? 'Edit Your Review' : `Rate & Review ${targetName}`}
+          </h3>
+          {hasExistingReview && (
+            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+              Existing Review Found
+            </span>
+          )}
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-center space-x-2 mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -1596,7 +1674,7 @@ const ReviewSection = ({
               isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-orange-700"
             )}
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Review'}
+            {isSubmitting ? 'Submitting...' : hasExistingReview ? 'Update My Review' : 'Submit Review'}
           </button>
         </form>
       </div>
@@ -1609,30 +1687,45 @@ const ReviewSection = ({
           </div>
         ) : reviews.length > 0 ? (
           <div className="space-y-4">
-            {reviews.map((review) => (
-              <div key={review.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="font-bold text-gray-900">{review.userName}</h4>
-                    <div className="flex items-center mt-1">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          size={14}
-                          className={cn(
-                            s <= review.rating ? "text-yellow-500 fill-yellow-500" : "text-gray-200"
+            {reviews.map((review) => {
+              const currentMobile = user?.mobileNumber || visitorMobile;
+              const isMyReview = (user?.uid && review.userId === user.uid) || 
+                                 (currentMobile && review.visitorMobile === currentMobile);
+              return (
+                <div key={review.id} className={cn(
+                  "bg-white p-6 rounded-3xl border shadow-sm transition-all",
+                  isMyReview ? "border-orange-500 ring-2 ring-orange-500/10" : "border-gray-100"
+                )}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-gray-900">{review.userName}</h4>
+                          {isMyReview && (
+                            <span className="bg-orange-600 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter">Your Review</span>
                           )}
-                        />
-                      ))}
+                        </div>
+                        <div className="flex items-center mt-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              size={14}
+                              className={cn(
+                                s <= review.rating ? "text-yellow-500 fill-yellow-500" : "text-gray-200"
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
+                    <span className="text-xs text-gray-400">
+                      {formatDateDDMMYYYY(review.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {formatDateDDMMYYYY(review.createdAt)}
-                  </span>
+                  <p className="text-gray-600 italic">"{review.comment}"</p>
                 </div>
-                <p className="text-gray-600 italic">"{review.comment}"</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
@@ -2418,13 +2511,12 @@ const CategoryDisplay = () => {
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-                  <h3 className="text-xl font-black text-white uppercase tracking-widest drop-shadow-lg text-center px-4">{cat.name}</h3>
-                  <div className="w-10 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                <div className="p-6 bg-white border-t border-gray-100 flex flex-col items-center justify-center">
+                  <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest text-center px-2">{cat.name}</h3>
+                  <div className="w-8 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
                 </div>
                 {cat.isUploaded && (
-                  <div className="absolute top-4 right-4 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter">
+                  <div className="absolute top-4 right-4 bg-orange-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter z-20">
                     Pro
                   </div>
                 )}
@@ -2854,31 +2946,13 @@ const RegistrationView = () => {
     state: '',
     district: '',
     block: '',
-    pincode: '',
-    venueType: 'marriage garden' as VenueType,
-    serviceType: 'dj and sound service' as ServiceType
+    pincode: ''
   });
 
   useEffect(() => {
     const role = searchParams.get('role') as UserRole;
-    const type = searchParams.get('type');
-    
     if (role && (role === 'owner' || role === 'provider')) {
-      setFormData(prev => {
-        const newData = { ...prev, role };
-        if (type) {
-          if (role === 'owner') {
-            // Find case-insensitive match for venue type
-            const match = VENUE_TYPES.find(vt => vt.toLowerCase() === type.toLowerCase());
-            if (match) newData.venueType = match as VenueType;
-          } else {
-            // Find case-insensitive match for service type
-            const match = SERVICE_TYPES.find(st => st.toLowerCase() === type.toLowerCase());
-            if (match) newData.serviceType = match as ServiceType;
-          }
-        }
-        return newData;
-      });
+      setFormData(prev => ({ ...prev, role }));
     }
   }, [searchParams]);
 
@@ -2927,7 +3001,7 @@ const RegistrationView = () => {
       }
       
       // We'll use a dummy UID for this custom auth system or just a random one
-      const uid = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      const uid = 'custom_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       
       const profileData: any = {
         uid,
@@ -2946,12 +3020,6 @@ const RegistrationView = () => {
       };
 
       console.log('Attempting registration with data:', profileData);
-
-      if (formData.role === 'owner') {
-        profileData.venue_type = formData.venueType;
-      } else if (formData.role === 'provider') {
-        profileData.service_type = formData.serviceType;
-      }
 
       const { error } = await db.from('users').insert([profileData]);
       if (error) {
@@ -3053,30 +3121,6 @@ const RegistrationView = () => {
               </select>
             </div>
             
-            {formData.role === 'owner' && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Venue Type</label>
-                <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500"
-                  value={formData.venueType} onChange={e => setFormData({...formData, venueType: e.target.value as VenueType})}>
-                  {VENUE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {formData.role === 'provider' && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Service Type</label>
-                <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500"
-                  value={formData.serviceType} onChange={e => setFormData({...formData, serviceType: e.target.value as ServiceType})}>
-                  {SERVICE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">State</label>
@@ -4134,19 +4178,19 @@ const TestimonialsSection = () => {
 };
 
 const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
-  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookedDates, setBookedDates] = useState<{date: string, status: string}[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     const fetchBookings = async () => {
       const { data, error } = await db
         .from('bookings')
-        .select('event_date')
+        .select('event_date, status')
         .eq('target_id', targetId)
-        .eq('status', 'confirmed');
+        .in('status', ['confirmed', 'paid']);
       
       if (!error && data) {
-        setBookedDates(data.map(d => d.event_date));
+        setBookedDates(data.map(d => ({ date: d.event_date, status: d.status })));
       }
     };
 
@@ -4200,18 +4244,24 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
           <div key={`empty-${i}`} />
         ))}
         {days.map(date => {
-          const isBooked = bookedDates.includes(date);
+          const booking = bookedDates.find(d => d.date === date);
+          const isBooked = !!booking;
           const isToday = date === format(new Date(), 'yyyy-MM-dd');
           return (
             <div 
               key={date} 
               className={cn(
-                "aspect-square flex items-center justify-center rounded-xl text-sm font-medium transition-all",
+                "aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-all relative overflow-hidden",
                 isBooked ? "bg-red-50 text-red-600 border border-red-100" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
                 isToday && !isBooked && "border-2 border-orange-500"
               )}
             >
-              {date.split('-')[2]}
+              <span className={isBooked ? "text-[10px] mb-1" : ""}>{date.split('-')[2]}</span>
+              {isBooked && (
+                <span className="text-[7px] font-black uppercase leading-none text-center px-1">
+                  Booked
+                </span>
+              )}
             </div>
           );
         })}
@@ -4235,6 +4285,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     const [venue, setVenue] = useState<Venue | null>(null);
     const [loading, setLoading] = useState(true);
     const [bookingDate, setBookingDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('21:00');
     const [visitorName, setVisitorName] = useState(profile?.displayName || '');
@@ -4313,8 +4364,21 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       return;
     }
 
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (bookingDate < todayStr) {
+      toast.error('Back date booking not allowed');
+      return;
+    }
+
     setBookingStatus('loading');
     try {
+      // Calculate days if endDate is provided
+      const start = new Date(bookingDate);
+      const end = endDate ? new Date(endDate) : start;
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const totalAmount = (venue?.pricePerDay || 0) * diffDays;
+
       // Check for existing pending booking from this visitor for this venue
       const { data: existingPending, error: pendingError } = await db
         .from('bookings')
@@ -4337,19 +4401,19 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         .select('id, start_time, end_time')
         .eq('target_id', venue?.id)
         .eq('event_date', bookingDate)
-        .eq('status', 'confirmed');
+        .in('status', ['confirmed', 'paid']);
 
       if (conflictError) throw conflictError;
 
       const hasConflict = existingBookings?.some(b => {
-        if (!b.start_time || !b.end_time) return true; // Assume conflict if no timing (full day)
-        const bStart = b.start_time;
-        const bEnd = b.end_time;
-        return (startTime >= bStart && startTime < bEnd) || (endTime > bStart && endTime <= bEnd) || (startTime <= bStart && endTime >= bEnd);
+        if (!b.start_time || !b.end_time || !startTime || !endTime) return true; 
+        return (startTime >= b.start_time && startTime < b.end_time) || 
+               (endTime > b.start_time && endTime <= b.end_time) || 
+               (startTime <= b.start_time && endTime >= b.end_time);
       });
 
       if (hasConflict) {
-        const proceed = true;
+        const proceed = window.confirm('Warning: This venue already has a confirmed booking for the selected date and time. Do you still want to send a booking request?');
         if (!proceed) {
           setBookingStatus('idle');
           return;
@@ -4380,10 +4444,11 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         target_name: venue?.name,
         owner_id: venue?.ownerId,
         event_date: bookingDate,
+        end_date: endDate || bookingDate,
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: Number(venue?.pricePerDay) || 0,
+        total_amount: totalAmount,
         message: message || '',
         party_address: visitorAddress,
         transaction_id: tid
@@ -4425,82 +4490,93 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         </Link>
       </div>
 
-      {/* Profile Header */}
-      <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mb-8 flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-        <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-xl border-4 border-white shrink-0">
+      {/* Gallery Section - Full width and clean */}
+      <div className="mb-10">
+        <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl relative group h-[300px] md:h-[500px]">
           <img 
-            src={ownerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.display_name || venue.name}`} 
-            alt={ownerProfile?.display_name || venue.name} 
-            className="w-full h-full object-cover"
+            src={venue.images?.[0]} 
+            alt={venue.name} 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
             referrerPolicy="no-referrer"
           />
-        </div>
-        <div className="flex-1 text-center md:text-left">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">{venue.name}</h1>
-              <div className="flex items-center justify-center md:justify-start text-gray-500">
-                <MapPin size={18} className="mr-1 text-orange-500" />
-                <span>{venue.address}, {venue.district}, {venue.state}</span>
-              </div>
-              {ownerProfile && (
-                <div className="flex flex-col space-y-1 mt-2">
-                  <div className="flex items-center justify-center md:justify-start text-gray-500 text-sm font-medium">
-                    <User size={14} className="mr-1 text-orange-600" />
-                    <span>Owner: {ownerProfile.display_name}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-center space-x-2 bg-orange-50 px-6 py-3 rounded-2xl border border-orange-100">
-              <Star size={24} className="text-yellow-500 fill-yellow-500" />
-              <div className="flex flex-col items-start">
-                <span className="text-2xl font-bold text-orange-700 leading-none">{venue.rating > 0 ? venue.rating : 'No Rating'}</span>
-                <span className="text-xs text-orange-400 font-bold uppercase tracking-wider">{venue.reviewCount || 0} reviews</span>
-              </div>
-            </div>
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 space-y-8">
-          {/* Gallery */}
-          <div className="grid grid-cols-2 gap-4 h-[400px]">
-            <img 
-              src={venue.images?.[0]} 
-              alt={venue.name} 
-              className="w-full h-full object-cover rounded-3xl col-span-2 md:col-span-1" 
-              referrerPolicy="no-referrer"
-            />
-            <div className="hidden md:grid grid-rows-2 gap-4">
+      {/* Venue Info Header - Below Gallery */}
+      <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm mb-10 flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
+        <div className="flex-1 text-center md:text-left min-w-0">
+          <h1 className="text-3xl md:text-5xl font-black text-gray-900 mb-4 break-words leading-[1.1]">{venue.name}</h1>
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 md:gap-4 text-gray-500 mb-6">
+            <div className="flex items-center bg-gray-50 px-4 py-2 rounded-xl">
+              <MapPin size={18} className="mr-2 text-orange-500 shrink-0" />
+              <span className="font-bold text-sm md:text-base">{venue.address}, {venue.district}, {venue.state}</span>
+            </div>
+            <div className="flex items-center bg-orange-50 px-4 py-2 rounded-xl border border-orange-100">
+              <Star size={18} className="mr-2 text-yellow-500 fill-yellow-500" />
+              <span className="font-bold text-orange-700 text-sm md:text-base">{venue.rating > 0 ? venue.rating : 'New'} ({venue.reviewCount || 0} reviews)</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-center md:justify-start space-x-4">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-white shrink-0">
               <img 
-                src={venue.images?.[1] || venue.images?.[0]} 
-                alt={venue.name} 
-                className="w-full h-full object-cover rounded-3xl" 
-                referrerPolicy="no-referrer"
-              />
-              <img 
-                src={venue.images?.[2] || venue.images?.[0]} 
-                alt={venue.name} 
-                className="w-full h-full object-cover rounded-3xl" 
+                src={ownerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.display_name || venue.name}`} 
+                alt={ownerProfile?.display_name || venue.name} 
+                className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
+            <div className="text-left">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Managed By</p>
+              <p className="font-bold text-gray-900">{ownerProfile?.display_name || 'Venue Manager'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="shrink-0 flex flex-col items-center justify-center space-y-2">
+           <div className="bg-gradient-to-br from-orange-500 to-pink-600 text-white p-6 md:p-8 rounded-[2rem] shadow-xl shadow-orange-100 text-center min-w-[200px]">
+              <span className="block text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-80 underline underline-offset-4">Starting From</span>
+              <span className="text-3xl md:text-4xl font-black">₹{(venue.pricePerDay || 0).toLocaleString()}</span>
+              <span className="block text-xs font-bold mt-1 opacity-80">per event day</span>
+           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2 space-y-12">
+          {/* Main Highlights Bar */}
+          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-wrap gap-8 justify-around">
+             <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
+                   <Users size={24} />
+                </div>
+                <div>
+                   <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Capacity</span>
+                   <span className="text-xl font-black text-gray-900">{venue.capacity} Guests</span>
+                </div>
+             </div>
+             <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shadow-sm">
+                   <Home size={24} />
+                </div>
+                <div>
+                   <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Venue Type</span>
+                   <span className="text-xl font-black text-gray-900">{venue.venueType}</span>
+                </div>
+             </div>
+             <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center shadow-sm">
+                   <CheckCircle size={24} />
+                </div>
+                <div>
+                   <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Availability</span>
+                   <span className="text-xl font-black text-gray-900">Immediate</span>
+                </div>
+             </div>
           </div>
 
           <div>
-            <div className="flex flex-wrap gap-4 mb-8">
-              <div className="bg-gray-100 px-4 py-2 rounded-xl flex items-center space-x-2">
-                <Users size={18} className="text-gray-600" />
-                <span className="text-sm font-medium">{venue.capacity} Guests</span>
-              </div>
-              <div className="bg-gray-100 px-4 py-2 rounded-xl flex items-center space-x-2">
-                <Home size={18} className="text-gray-600" />
-                <span className="text-sm font-medium">Indoor & Outdoor</span>
-              </div>
-            </div>
-
             <div className="prose max-w-none text-gray-600 leading-relaxed">
               <h3 className="text-xl font-bold text-gray-900 mb-4">About this Venue</h3>
               <p>{venue.description}</p>
@@ -4683,18 +4759,32 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                         onChange={(e) => setVisitorAddress(e.target.value)}
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Event Date</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                          required
-                          type="date" 
-                          className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                          value={bookingDate}
-                          onChange={(e) => setBookingDate(e.target.value)}
-                          min={format(new Date(), 'yyyy-MM-dd')}
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date Start From</label>
+                        <div className="relative">
+                          <input 
+                            required
+                            type="date" 
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none text-sm"
+                            value={bookingDate}
+                            onChange={(e) => setBookingDate(e.target.value)}
+                            min={format(new Date(), 'yyyy-MM-dd')}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date To</label>
+                        <div className="relative">
+                          <input 
+                            required
+                            type="date" 
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none text-sm"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            min={bookingDate || format(new Date(), 'yyyy-MM-dd')}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -4758,6 +4848,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   const [service, setService] = useState<ServiceProvider | null>(null);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('21:00');
   const [message, setMessage] = useState('');
@@ -4835,6 +4926,13 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       toast.error('Please fill all required fields');
       return;
     }
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (date < todayStr) {
+      toast.error('Back date booking not allowed');
+      setBookingStatus('idle');
+      return;
+    }
     if (!/^\d{10}$/.test(visitorMobile)) {
       toast.error('Please enter a valid 10-digit mobile number');
       return;
@@ -4864,19 +4962,19 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         .select('id, start_time, end_time')
         .eq('target_id', service?.id)
         .eq('event_date', date)
-        .eq('status', 'confirmed');
+        .in('status', ['confirmed', 'paid']);
 
       if (conflictError) throw conflictError;
 
       const hasConflict = existingBookings?.some(b => {
-        if (!b.start_time || !b.end_time) return true; // Assume conflict if no timing (full day)
-        const bStart = b.start_time;
-        const bEnd = b.end_time;
-        return (startTime >= bStart && startTime < bEnd) || (endTime > bStart && endTime <= bEnd) || (startTime <= bStart && endTime >= bEnd);
+        if (!b.start_time || !b.end_time || !startTime || !endTime) return true;
+        return (startTime >= b.start_time && startTime < b.end_time) || 
+               (endTime > b.start_time && endTime <= b.end_time) || 
+               (startTime <= b.start_time && endTime >= b.end_time);
       });
 
       if (hasConflict) {
-        const proceed = true;
+        const proceed = window.confirm('Warning: This service provider already has a confirmed booking for the selected date and time. Do you still want to send a booking request?');
         if (!proceed) {
           setBookingStatus('idle');
           return;
@@ -4897,6 +4995,10 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       const providerRegId = providerProfile?.registration_id || providerProfile?.registrationId || 'BVO';
       const tid = generateTransactionId(providerRegId, count || 0);
 
+      // Extract first numeric price from priceRange if possible
+      const priceMatch = service?.priceRange?.match(/\d+/);
+      const basePrice = priceMatch ? parseInt(priceMatch[0]) : 0;
+
       const bookingData = {
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
@@ -4904,10 +5006,12 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         target_name: service?.name,
         owner_id: service?.providerId,
         event_date: date,
+        end_date: endDate || date,
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: 0,
+        total_amount: basePrice,
+        updated_amount: basePrice,
         message: message || '',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
@@ -4952,64 +5056,94 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         </Link>
       </div>
 
-      {/* Profile Header */}
-      <div className="max-w-7xl mx-auto px-4 mt-6">
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-          <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-xl border-4 border-white shrink-0">
-            <img 
-              src={providerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerProfile?.display_name || service.name}`} 
-              alt={providerProfile?.display_name || service.name} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+      {/* Gallery Section */}
+      <div className="max-w-7xl mx-auto px-4 mt-8">
+        <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl relative group h-[300px] md:h-[500px]">
+          <img 
+            src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
+            alt={service.name} 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        </div>
+      </div>
+
+      {/* Service Info Header */}
+      <div className="max-w-7xl mx-auto px-4 mt-10">
+        <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
+          <div className="flex-1 text-center md:text-left min-w-0">
+             <span className="bg-purple-100 text-purple-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] mb-4 inline-block">
+               {service.serviceType}
+             </span>
+             <h1 className="text-3xl md:text-5xl font-black text-gray-900 mb-4 break-words leading-[1.1]">{service.name}</h1>
+             
+             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 md:gap-4 text-gray-500 mb-6">
+               <div className="flex items-center bg-gray-50 px-4 py-2 rounded-xl">
+                 <MapPin size={18} className="mr-2 text-orange-500 shrink-0" />
+                 <span className="font-bold text-sm md:text-base">{service.district}, {service.state}</span>
+               </div>
+               <div className="flex items-center bg-purple-50 px-4 py-2 rounded-xl border border-purple-100">
+                 <Star size={18} className="mr-2 text-yellow-500 fill-yellow-500" />
+                 <span className="font-bold text-purple-700 text-sm md:text-base">{service.rating > 0 ? service.rating : 'New'} ({service.reviewCount || 0} reviews)</span>
+               </div>
+             </div>
+
+             <div className="flex items-center justify-center md:justify-start space-x-4">
+               <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-white shrink-0">
+                 <img 
+                   src={providerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerProfile?.display_name || service.name}`} 
+                   alt={providerProfile?.display_name || service.name} 
+                   className="w-full h-full object-cover"
+                   referrerPolicy="no-referrer"
+                 />
+               </div>
+               <div className="text-left">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Provider</p>
+                 <p className="font-bold text-gray-900">{providerProfile?.display_name || 'Service Partner'}</p>
+               </div>
+             </div>
           </div>
-          <div className="flex-1 text-center md:text-left">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 inline-block">
-                  {service.serviceType}
-                </span>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">{service.name}</h1>
-                <div className="flex items-center justify-center md:justify-start text-gray-500">
-                  <MapPin size={18} className="mr-1 text-orange-500" />
-                  <span>{service.district}, {service.state}</span>
-                </div>
-                {providerProfile && (
-                  <div className="flex flex-col space-y-1 mt-2">
-                    <div className="flex items-center justify-center md:justify-start text-gray-500 text-sm font-medium">
-                      <User size={14} className="mr-1 text-purple-600" />
-                      <span>Provider: {providerProfile.display_name}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-center space-x-2 bg-purple-50 px-6 py-3 rounded-2xl border border-purple-100">
-                <Star size={24} className="text-yellow-500 fill-yellow-500" />
-                <div className="flex flex-col items-start">
-                  <span className="text-2xl font-bold text-purple-700 leading-none">{service.rating > 0 ? service.rating : 'No Rating'}</span>
-                  <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">{service.reviewCount || 0} reviews</span>
-                </div>
-              </div>
-            </div>
+          
+          <div className="shrink-0">
+             <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-6 md:p-8 rounded-[2rem] shadow-xl shadow-purple-100 text-center min-w-[220px]">
+                <span className="block text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-80 underline underline-offset-4">Package Starts</span>
+                <span className="text-2xl md:text-3xl font-black">{service.priceRange}</span>
+                <span className="block text-xs font-bold mt-1 opacity-80">customizable pricing</span>
+             </div>
           </div>
         </div>
       </div>
 
-      <div className="h-[400px] relative mt-8 max-w-7xl mx-auto px-4">
-        <img 
-          src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
-          alt={service.name} 
-          className="w-full h-full object-cover rounded-3xl"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-3xl" />
-        <div className="absolute bottom-8 left-8 right-8">
-          <div className="flex items-end justify-between">
-            <div className="text-white">
-              <p className="text-lg opacity-90 font-medium">Starting from</p>
-              <p className="text-4xl font-bold">{service.priceRange}</p>
-            </div>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 mt-10">
+        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-wrap gap-8 justify-around">
+           <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shadow-sm">
+                 <Star size={24} />
+              </div>
+              <div>
+                 <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Experience</span>
+                 <span className="text-xl font-black text-gray-900">{service.rating > 0 ? service.rating : 'New'} Stars</span>
+              </div>
+           </div>
+           <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center shadow-sm">
+                 <MessageSquare size={24} />
+              </div>
+              <div>
+                 <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Reviews</span>
+                 <span className="text-xl font-black text-gray-900">{service.reviewCount || 0} Total</span>
+              </div>
+           </div>
+           <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm">
+                 <User size={24} />
+              </div>
+              <div>
+                 <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Expertise</span>
+                 <span className="text-xl font-black text-gray-900">{service.serviceType}</span>
+              </div>
+           </div>
         </div>
       </div>
 
@@ -5034,6 +5168,22 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
               <h3 className="text-2xl font-bold mb-6 text-gray-900">About this Service</h3>
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{service.description}</p>
             </section>
+
+            {service.facilities && service.facilities.length > 0 && (
+              <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900">Facilities Offered</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {service.facilities.map((facility, idx) => (
+                    <div key={idx} className="flex items-center space-x-3 text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                      <div className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center shrink-0">
+                        <Check size={14} strokeWidth={3} />
+                      </div>
+                      <span className="font-bold text-sm uppercase">{facility}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {service.catalogue && service.catalogue.length > 0 && (
               <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
@@ -5177,16 +5327,29 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                       onChange={(e) => setVisitorAddress(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Event Date</label>
-                    <input 
-                      required
-                      type="date" 
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      min={format(new Date(), 'yyyy-MM-dd')}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date Start From</label>
+                      <input 
+                        required
+                        type="date" 
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none text-sm"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        min={format(new Date(), 'yyyy-MM-dd')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date To</label>
+                      <input 
+                        required
+                        type="date" 
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none text-sm"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        min={date || format(new Date(), 'yyyy-MM-dd')}
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -5280,7 +5443,8 @@ const BookingManagerView = ({
     endTime: '21:00',
     eventType: 'Wedding',
     targetId: '',
-    targetName: ''
+    targetName: '',
+    totalAmount: 0
   });
   const [venues, setVenues] = useState<Venue[]>(parentVenues || []);
   const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
@@ -5292,6 +5456,14 @@ const BookingManagerView = ({
   useEffect(() => {
     if (parentBookings) setBookings(parentBookings);
   }, [parentBookings]);
+
+  // Sync selectedBooking with updated bookings list for live level updates
+  useEffect(() => {
+    if (selectedBooking) {
+      const fresh = bookings.find(b => b.id === selectedBooking.id);
+      if (fresh) setSelectedBooking(fresh);
+    }
+  }, [bookings]);
 
   useEffect(() => {
     if (parentVenues) setVenues(parentVenues);
@@ -5407,10 +5579,13 @@ const BookingManagerView = ({
   const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
   const handleStatusUpdate = async (id: string, status: 'confirmed' | 'cancelled') => {
-    if (status === 'confirmed' && !isCallSatisfied) {
-      toast.error('Please confirm that you have called the visitor');
-      return;
+    if (status === 'confirmed') {
+      if (!isCallSatisfied) {
+        toast.error('Caller verification is required before confirming');
+        return;
+      }
     }
+    
     try {
       const { error } = await db.from('bookings').update({ status }).eq('id', id);
       if (error) throw error;
@@ -5425,15 +5600,31 @@ const BookingManagerView = ({
       setIsAcceptModalOpen(false);
       setIsCallSatisfied(false);
       if (onUpdate) onUpdate();
-      fetchBookings();
+      await fetchBookings();
     } catch (err) {
+      console.error('Update status error:', err);
       toast.error('Failed to update booking status');
     }
   };
 
   const handleUpdateAmount = async () => {
     if (!selectedBooking) return;
-    const { error } = await db.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
+    
+    // Check if new amount is already covered by existing payments
+    const paymentsTotal = (selectedBooking.payments || []).reduce((acc, p) => acc + p.amount, 0);
+    const isNowPaid = paymentsTotal >= newAmount && newAmount > 0;
+    
+    const updateData: any = { 
+      updated_amount: newAmount,
+      is_invoice_generated: false 
+    };
+    
+    if (isNowPaid) {
+      updateData.payment_status = 'Paid';
+      updateData.status = 'paid';
+    }
+
+    const { error } = await db.from('bookings').update(updateData).eq('id', selectedBooking.id);
     if (!error) {
       toast.success('Booking amount updated');
       setIsAmountModalOpen(false);
@@ -5498,6 +5689,12 @@ const BookingManagerView = ({
       return;
     }
 
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (manualBooking.eventDate < todayStr) {
+      toast.error('Back date entry not allowed');
+      return;
+    }
+
     setLoading(true);
     try {
       // Get current year start date (January 1st)
@@ -5527,10 +5724,12 @@ const BookingManagerView = ({
         party_name: manualBooking.partyName,
         party_address: manualBooking.partyAddress,
         visitor_mobile: manualBooking.mobileNumber,
-        status: 'confirmed',
+        status: (manualBooking.totalAmount > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
         is_manual: true,
         payment_mode: 'Cash',
-        total_amount: 0,
+        payment_status: paymentStatus || 'Pending',
+        total_amount: manualBooking.totalAmount || 0,
+        updated_amount: manualBooking.totalAmount || 0,
         transaction_id: tid
       }]);
       if (error) throw error;
@@ -5555,7 +5754,8 @@ const BookingManagerView = ({
         endTime: '21:00',
         eventType: 'Wedding',
         targetId: '',
-        targetName: ''
+        targetName: '',
+        totalAmount: 0
       });
       setManualCallSatisfied(false);
       if (onUpdate) onUpdate();
@@ -5662,17 +5862,17 @@ const BookingManagerView = ({
                   <div className="flex items-center space-x-2">
                     <span className={cn(
                       "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
-                      (booking.status === 'confirmed' || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                      (booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
-                      {(booking.status === 'paid' || booking.paymentStatus === 'Paid') ? 'PAID' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
+                      {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
                     </span>
-                    {(booking.status === 'confirmed' || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? (
+                    {(booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? (
                       <>
                         <button 
-                          disabled={booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid'}
+                          disabled={booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid'}
                           onClick={() => {
-                            if (booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') {
-                              toast.error('Amount cannot be updated after invoice generation or payment');
+                            if (booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') {
+                              toast.error('Amount cannot be updated after first payment or invoice generation');
                               return;
                             }
                             setSelectedBooking(booking);
@@ -5681,51 +5881,31 @@ const BookingManagerView = ({
                           }}
                           className={cn(
                             "p-2 rounded-xl transition-all",
-                            (booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                            (booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
                           )}
-                          title={(booking.is_invoice_generated || booking.status === 'paid' || booking.paymentStatus === 'Paid') ? "Amount locked after invoice or payment" : "Update Amount"}
+                          title={(booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "Locked after payment or invoice" : "Update Amount"}
                         >
                           <Edit2 size={18} />
                         </button>
                         <button 
-                          disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
+                          disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)}
                           onClick={() => {
-                            if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
-                              toast.error('Payment status is already marked as PAID');
+                            if (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) {
+                              toast.error('Payment already completed - Records are locked');
                               return;
                             }
                             setSelectedBooking(booking);
-                            setPaymentStatus(booking.paymentStatus || 'Pending');
-                            setIsPaymentModalOpen(true);
+                            setIsPaymentRecordModalOpen(true);
                           }}
                           className={cn(
                             "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
-                            (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-50 text-green-600 hover:bg-green-100"
+                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100 shadow-sm"
                           )}
-                          title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment already completed" : "Update Payment Status"}
+                          title={(booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "Payment completed - Lock Manage" : "Manage Payment Transactions"}
                         >
-                          <CreditCard size={18} />
-                          <span className="text-sm font-medium">Payment Status</span>
+                          <IndianRupee size={18} />
+                          <span className="text-sm font-medium">Manage Payments</span>
                         </button>
-                             <button 
-                               disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid'}
-                               onClick={() => {
-                                 if (booking.paymentStatus === 'Paid' || booking.status === 'paid') {
-                                   toast.error('Payment already completed - Records are locked');
-                                   return;
-                                 }
-                                 setSelectedBooking(booking);
-                                 setIsPaymentRecordModalOpen(true);
-                               }}
-                               className={cn(
-                                 "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
-                                 (booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                               )}
-                               title={(booking.paymentStatus === 'Paid' || booking.status === 'paid') ? "Payment completed - Lock Manage" : "Manage Payment Transactions"}
-                             >
-                               <IndianRupee size={18} />
-                               <span className="text-sm font-medium">Manage Payments</span>
-                             </button>
                             <button 
                               onClick={() => {
                                 try {
@@ -5739,6 +5919,12 @@ const BookingManagerView = ({
                                   document.body.removeChild(link);
                                   URL.revokeObjectURL(url);
                                   toast.success('Invoice downloaded successfully');
+                                  
+                                  // Mark as generated
+                                  db.from('bookings').update({ is_invoice_generated: true }).eq('id', booking.id).then(() => {
+                                    if (onUpdate) onUpdate();
+                                    fetchBookings();
+                                  });
                                 } catch (err) {
                                   console.error('Download error:', err);
                                   toast.error('Failed to generate invoice');
@@ -5922,6 +6108,9 @@ const BookingManagerView = ({
                         ))}
                       </select>
                     </div>
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Removed Payment Status and Total Amount as per request */}
+                    </div>
                   </div>
 
                   <div className="md:col-span-2">
@@ -5986,29 +6175,10 @@ const BookingManagerView = ({
         </div>
       )}
 
-      {isPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Update Payment Status</h3>
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.partyName || selectedBooking?.visitorName}</div>
-                <div className="text-sm text-gray-500">{selectedBooking?.targetName}</div>
-              </div>
-
-              <div className="flex space-x-4 pt-4">
-                <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isAcceptModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Confirm Booking</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[110] p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-gray-100">
+            <h3 className="text-2xl font-black mb-6 text-gray-900 tracking-tight">Confirm Booking</h3>
             <div className="space-y-6">
               <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">
                 <p className="text-sm text-orange-800">Please ensure you have discussed the event details and pricing with the visitor before confirming.</p>
@@ -6108,10 +6278,21 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   const subTotal = baseAmount + expenditure + extraServicesTotal;
   const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
   const totalAdvanceLegacy = (booking.advance_amount || 0);
-  const totalReceived = totalPayments + totalAdvanceLegacy;
-  const balanceDue = subTotal - totalReceived;
+  // Fix double counting: If we have individual payments, advance_amount is likely synced to the sum.
+  // We should take the total as the maximum of payments sum and legacy advance amount, or better:
+  // if payments exist, trust them.
+  const totalReceived = totalPayments > 0 ? totalPayments : totalAdvanceLegacy;
+  const balanceDue = Math.max(0, subTotal - totalReceived);
+  const isPaid = (balanceDue <= 0.01 && subTotal > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid';
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
   const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
+  
+  // Helper for display status on invoice
+  const getDisplayStatus = () => {
+    if (isPaid) return 'PAID';
+    if (booking.status === 'confirmed' || booking.status === 'approved') return 'CONFIRMED';
+    return (booking.status || 'PENDING').toUpperCase();
+  };
   
   // --- Letterhead Header ---
   // Venue/Service Name as Heading
@@ -6167,9 +6348,10 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
     doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 108);
   }
 
-  // Payment Status
+  // Booking Status
   doc.setFont("helvetica", "bold");
-  doc.text(`Payment Status: ${(booking.status || 'pending').toUpperCase()}`, 140, 75);
+  doc.text(`Booking Status: ${getDisplayStatus()}`, 140, 75);
+  doc.text(`Payment Status: ${(isPaid ? 'paid' : 'pending').toUpperCase()}`, 140, 81);
   doc.setFont("helvetica", "normal");
 
   // Table Header
@@ -6251,7 +6433,7 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setTextColor(234, 88, 12);
   doc.setFont("helvetica", "bold");
   doc.text("Balance Due (Total Due):", 110, currentY);
-  doc.text(`INR ${balanceDue.toLocaleString()}`, 185, currentY, { align: 'right' });
+  doc.text(`INR ${balanceDue.toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 12;
 
   // Amount in words
@@ -6299,8 +6481,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     startDate: '',
     endDate: '',
     paymentMode: '',
-    paymentStatus: '',
-    bookingType: ''
+    bookingType: '',
+    year: new Date().getFullYear().toString()
   });
 
   const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
@@ -6308,32 +6490,35 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
       const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
       const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
-      const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
       const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
       const bDate = new Date(b.eventDate);
       const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
       const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-      return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd && matchesType;
+      return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType;
     });
 
     if (type === 'excel') {
       const data = filteredBookings.map((b, index) => {
         const subTotal = (b.updatedAmount || b.totalAmount || 0);
-        const advance = b.advance_amount || 0;
-        const balance = subTotal - advance;
+        const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+        const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+        
+        // Total credited = regular + advance + discount
+        const totalCredited = paymentsTotal + discountTotal;
+        const pending = Math.max(0, subTotal - totalCredited);
+        
         return {
           'S.No': index + 1,
-          'Request Status': b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
-          'Customer Name': b.partyName || b.visitorName || 'N/A',
-          'Mobile Number': b.visitorMobile || 'N/A',
-          'Address': b.partyAddress || 'N/A',
-          'Booking Date & Time': `${b.eventDate} ${b.startTime || ''}`,
-          'Invoice Number': `INV-${b.id.substring(0, 8).toUpperCase()}`,
-          'Invoice Amount (Rs)': subTotal,
-          'Paid Amount (Rs)': advance,
-          'Pending Amount (Rs)': balance,
-          'Payment Status': b.paymentStatus || 'Pending',
-          'Booking Type': b.isManual ? 'Manual' : 'Order'
+          'Status': (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : (b.status || 'Pending'),
+          'Party Name': b.partyName || b.visitorName || 'N/A',
+          'Mobile': b.visitorMobile || 'N/A',
+          'Date': b.eventDate,
+          'Invoice No': `INV-${(b.id || '').substring(0, 8).toUpperCase()}`,
+          'Actual Amount': subTotal,
+          'Received Amount': paymentsTotal,
+          'Discount': discountTotal,
+          'Pending Amount': pending,
+          'Type': b.isManual ? 'Manual' : 'Order'
         };
       });
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -6347,44 +6532,33 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       doc.setFontSize(10);
       doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
       
-      const headers = [
-        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date & Time', 'Invoice No', 'Amount', 'Paid', 'Pending', 'P.Status', 'Type']
-      ];
-      
-      const data = filteredBookings.map((b, index) => [
-        (index + 1).toString(),
-        b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
-        b.partyName || b.visitorName || 'N/A',
-        b.visitorMobile || 'N/A',
-        (b.partyAddress || 'N/A').substring(0, 20),
-        `${b.eventDate} ${b.startTime || ''}`,
-        `INV-${b.id.substring(0, 8).toUpperCase()}`,
-        (b.updatedAmount || b.totalAmount || 0).toString(),
-        (b.advance_amount || 0).toString(),
-        ((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toString(),
-        b.paymentStatus || 'Pending',
-        b.isManual ? 'Manual' : 'Order'
-      ]);
-      
       const tableHeaders = [
         ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Inv.Amt', 'Paid', 'Pending', 'Type']
       ];
       
-      const pdfData = filteredBookings.map((b, index) => [
-        (index + 1).toString(),
-        b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : b.status,
-        b.partyName || b.visitorName || 'N/A',
-        b.visitorMobile || 'N/A',
-        (b.partyAddress || 'N/A').substring(0, 15),
-        b.eventDate,
-        b.id.substring(0, 5).toUpperCase(),
-        (b.updatedAmount || b.totalAmount || 0).toString(),
-        (b.advance_amount || 0).toString(),
-        ((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toString(),
-        b.isManual ? 'M' : 'O'
-      ]);
+      const pdfData = filteredBookings.map((b, index) => {
+        const subTotal = (b.updatedAmount || b.totalAmount || 0);
+        const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+        const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+        const totalCredited = paymentsTotal + discountTotal;
+        const pending = Math.max(0, subTotal - totalCredited);
+        
+        return [
+          (index + 1).toString(),
+          (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : 'Pending',
+          (b.partyName || b.visitorName || 'N/A').substring(0, 15),
+          b.visitorMobile || 'N/A',
+          (b.partyAddress || 'N/A').substring(0, 10),
+          b.eventDate,
+          (b.id || '').substring(0, 5).toUpperCase(),
+          subTotal.toString(),
+          paymentsTotal.toString(),
+          pending.toString(),
+          b.isManual ? 'M' : 'O'
+        ];
+      });
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         head: tableHeaders,
         body: pdfData,
         startY: 40,
@@ -6462,7 +6636,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     setIsMobileMenuOpen(false);
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user?.uid) return;
     try {
       let bQuery = db.from('bookings').select('*, booking_payments(*)');
@@ -6553,7 +6727,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.uid, profile?.role]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -6613,12 +6787,28 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     return !item.roles || item.roles.includes(profile?.role || '');
   });
 
-  const stats = useMemo(() => ({
-    total: bookings.length,
-    pending: bookings.filter(b => b.status === 'pending' || b.paymentStatus === 'Pending').length,
-    approved: bookings.filter(b => b.status === 'confirmed').length,
-    paid: bookings.filter(b => b.status === 'paid' || b.paymentStatus === 'Paid').length
-  }), [bookings]);
+  const stats = useMemo(() => {
+    const isPaidFunc = (b: Booking) => {
+      const base = b.updatedAmount || b.totalAmount || 0;
+      const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
+      const totalRec = paymentsTotal > 0 ? paymentsTotal : (b.advance_amount || 0);
+      // We check for full payment or explicit status
+      return (totalRec >= base && base > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+    };
+
+    return {
+      total: bookings.length,
+      pending: bookings.filter(b => !b.isManual && b.status === 'pending').length,
+      approved: bookings.filter(b => (b.isManual || b.status === 'confirmed') && !isPaidFunc(b)).length,
+      paid: bookings.filter(b => isPaidFunc(b)).length
+    };
+  }, [bookings]);
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayBookings = useMemo(() => 
+    bookings.filter(b => b.eventDate === todayStr && b.status !== 'cancelled'),
+    [bookings, todayStr]
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
@@ -6764,6 +6954,45 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                     </span>
                   </div>
 
+                  {/* Today's Booking Alert */}
+                  {todayBookings.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-orange-50 border-l-4 border-orange-500 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center animate-pulse">
+                          <Clock size={24} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-orange-900 text-lg">Today's Bookings Alert</h3>
+                          <p className="text-orange-700 text-sm">
+                            You have <span className="font-black underline">{todayBookings.length}</span> booking(s) scheduled for today.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex -space-x-2">
+                        {todayBookings.slice(0, 3).map((b, i) => (
+                          <div key={b.id} className="w-10 h-10 rounded-full border-2 border-white bg-orange-200 flex items-center justify-center text-[10px] font-bold text-orange-700 shadow-sm overflow-hidden">
+                            {b.partyName?.charAt(0) || b.visitorName?.charAt(0) || '?'}
+                          </div>
+                        ))}
+                        {todayBookings.length > 3 && (
+                          <div className="w-10 h-10 rounded-full border-2 border-white bg-orange-600 text-white flex items-center justify-center text-[10px] font-bold shadow-sm">
+                            +{todayBookings.length - 3}
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => handleTabChange('orders')}
+                          className="ml-4 bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-orange-700 transition shadow-lg"
+                        >
+                          View All
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* Profile Card */}
                   <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
@@ -6875,8 +7104,67 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    {/* Aggregate Stats Section */}
+                    {(() => {
+                      const yearFiltered = bookings.filter(b => {
+                        if (!reportFilters.year) return true;
+                        return b.eventDate.startsWith(reportFilters.year);
+                      });
+
+                      const years = Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a));
+                      
+                      const aggregates = yearFiltered.reduce((acc, b) => {
+                        const total = b.updatedAmount || b.totalAmount || 0;
+                        const paidTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
+                        const discTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
+                        const totalCredited = paidTotal + discTotal;
+                        const pending = Math.max(0, total - totalCredited);
+                        
+                        return {
+                          total: acc.total + total,
+                          paid: acc.paid + paidTotal,
+                          discount: acc.discount + discTotal,
+                          pending: acc.pending + pending
+                        };
+                      }, { total: 0, paid: 0, discount: 0, pending: 0 });
+
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                          <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 flex flex-col items-center">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Booking</span>
+                            <span className="text-xl font-black text-blue-900">₹{aggregates.total.toLocaleString()}</span>
+                          </div>
+                          <div className="bg-green-50/70 p-5 rounded-3xl border border-green-100 flex flex-col items-center">
+                            <span className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Total Paid</span>
+                            <span className="text-xl font-black text-green-900">₹{aggregates.paid.toLocaleString()}</span>
+                          </div>
+                          <div className="bg-purple-50/70 p-5 rounded-3xl border border-purple-100 flex flex-col items-center">
+                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Total Discount</span>
+                            <span className="text-xl font-black text-purple-900">₹{aggregates.discount.toLocaleString()}</span>
+                          </div>
+                          <div className="bg-red-50/70 p-5 rounded-3xl border border-red-100 flex flex-col items-center">
+                            <span className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Total Pending</span>
+                            <span className="text-xl font-black text-red-900">₹{aggregates.pending.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
                       <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Year</label>
+                        <select 
+                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold"
+                          value={reportFilters.year}
+                          onChange={(e) => setReportFilters({...reportFilters, year: e.target.value})}
+                        >
+                          <option value="">All Years</option>
+                          {Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a)).map(y => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="lg:col-span-1">
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Search Name</label>
                         <input 
                           type="text" 
@@ -6927,18 +7215,6 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Payment Status</label>
-                        <select 
-                          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                          value={reportFilters.paymentStatus}
-                          onChange={(e) => setReportFilters({...reportFilters, paymentStatus: e.target.value})}
-                        >
-                          <option value="">All Status</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Pending">Pending</option>
-                        </select>
-                      </div>
-                      <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Booking Type</label>
                         <select 
                           className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm"
@@ -6965,10 +7241,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Date & Time</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Invoice No</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Total</th>
-                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-orange-600">Advance</th>
-                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-blue-600">Balance</th>
-                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Mode</th>
-                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">P.Status</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-orange-600">Paid Amount</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-green-600">Discount</th>
+                              <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider text-blue-600">Pending Amount</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Type</th>
                               <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Action</th>
                             </tr>
@@ -6978,71 +7253,79 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
                               const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
                               const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
-                              const matchesStatus = !reportFilters.paymentStatus || b.paymentStatus === reportFilters.paymentStatus;
                               const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
                               const bDate = new Date(b.eventDate);
                               const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
                               const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-                              return matchesName && matchesMobile && matchesMode && matchesStatus && matchesStart && matchesEnd && matchesType;
-                            }).map((b, index) => (
-                              <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="py-4 text-sm text-gray-500">{index + 1}</td>
-                                <td className="py-4">
-                                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                    b.status === 'confirmed' || b.status === 'paid' ? 'bg-green-100 text-green-600' : 
-                                    b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
-                                  }`}>
-                                    {b.status === 'confirmed' ? 'Approved' : b.status === 'paid' ? 'Completed' : b.status}
-                                  </span>
-                                </td>
-                                <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName}</td>
-                                <td className="py-4 text-sm text-gray-600">{b.visitorMobile}</td>
-                                <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">{b.partyAddress || 'N/A'}</td>
-                                <td className="py-4 text-sm text-gray-600">
-                                  {formatDateDDMMYYYY(b.eventDate)} {formatTime12h(b.startTime)}
-                                </td>
-                                <td className="py-4 text-xs font-mono text-gray-500">
-                                  {b.transaction_id || ('INV-' + b.id.substring(0, 8).toUpperCase())}
-                                </td>
-                                <td className="py-4 font-bold text-gray-900">₹{(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</td>
-                                <td className="py-4 font-bold text-orange-600">₹{(b.advance_amount || 0).toLocaleString()}</td>
-                                <td className="py-4 font-black text-blue-600">₹{((b.updatedAmount || b.totalAmount || 0) - (b.advance_amount || 0)).toLocaleString()}</td>
-                                <td className="py-4 text-sm text-gray-600">{b.paymentMode || 'N/A'}</td>
-                                <td className="py-4">
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                    b.paymentStatus === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                                  }`}>
-                                    {b.paymentStatus || 'Pending'}
-                                  </span>
-                                </td>
-                                <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
-                                <td className="py-4">
-                                  <button 
-                                    onClick={() => {
-                                      try {
-                                        const pdfBlob = generateInvoice(b, 0, profile);
-                                        const url = URL.createObjectURL(pdfBlob);
-                                        const link = document.createElement('a');
-                                        link.href = url;
-                                        link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        URL.revokeObjectURL(url);
-                                        toast.success('Invoice downloaded successfully');
-                                      } catch (err) {
-                                        console.error('Download error:', err);
-                                        toast.error('Failed to generate invoice');
-                                      }
-                                    }}
-                                    className="p-2 text-orange-600 hover:bg-orange-100 rounded-xl transition-all"
-                                    title="Download PDF Invoice"
-                                  >
-                                    <Download size={18} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                              const matchesYear = !reportFilters.year || b.eventDate.startsWith(reportFilters.year);
+                              return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
+                            }).map((b, index) => {
+                              const subTotal = (b.updatedAmount || b.totalAmount || 0);
+                              const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+                              const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
+                              const totalCredited = paymentsTotal + discountTotal;
+                              const totalRec = totalCredited > 0 ? totalCredited : (b.advance_amount || 0);
+                              const pending = Math.max(0, subTotal - totalRec);
+                              const isPaid = (pending <= 0.01 && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+                              
+                              return (
+                                <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="py-4 text-sm text-gray-500">{index + 1}</td>
+                                  <td className="py-4">
+                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                      isPaid || b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
+                                      b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
+                                    }`}>
+                                      {isPaid ? 'Completed' : b.status === 'confirmed' ? 'Approved' : b.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName}</td>
+                                  <td className="py-4 text-sm text-gray-600">{b.visitorMobile}</td>
+                                  <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">{b.partyAddress || 'N/A'}</td>
+                                  <td className="py-4 text-sm text-gray-600">
+                                    {formatDateDDMMYYYY(b.eventDate)} {formatTime12h(b.startTime)}
+                                  </td>
+                                  <td className="py-4 text-xs font-mono text-gray-500">
+                                    {b.transaction_id || ('INV-' + b.id.substring(0, 8).toUpperCase())}
+                                  </td>
+                                  <td className="py-4 font-bold text-gray-900">₹{subTotal.toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-orange-600">₹{paymentsTotal.toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-green-600">₹{discountTotal.toLocaleString()}</td>
+                                  <td className="py-4 font-black text-blue-600">₹{pending.toLocaleString()}</td>
+                                  <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
+                                  <td className="py-4">
+                                    <button 
+                                      onClick={() => {
+                                        try {
+                                          const pdfBlob = generateInvoice(b, 0, profile);
+                                          const url = URL.createObjectURL(pdfBlob);
+                                          const link = document.createElement('a');
+                                          link.href = url;
+                                          link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
+                                          document.body.appendChild(link);
+                                          link.click();
+                                          document.body.removeChild(link);
+                                          URL.revokeObjectURL(url);
+                                          toast.success('Invoice downloaded successfully');
+                                          
+                                          // Mark as generated
+                                          db.from('bookings').update({ is_invoice_generated: true }).eq('id', b.id).then(() => {
+                                             fetchDashboardData();
+                                          });
+                                        } catch (err) {
+                                          console.error('Download error:', err);
+                                          toast.error('Failed to generate invoice');
+                                        }
+                                      }}
+                                      className="p-2 text-orange-600 hover:bg-orange-100 rounded-xl transition-all"
+                                      title="Download PDF Invoice"
+                                    >
+                                      <Download size={18} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -7180,9 +7463,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
 
-  const visitorBookings = bookings.filter(b => !b.isManual);
+  const visitorBookings = useMemo(() => bookings.filter(b => !b.isManual), [bookings]);
   
-  const filteredBookings = visitorBookings.filter(b => {
+  const filteredBookings = useMemo(() => visitorBookings.filter(b => {
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
@@ -7192,39 +7475,66 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     
     return matchesStatus && matchesDate;
-  });
+  }), [visitorBookings, statusFilter, dateFilter]);
 
-  const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const sortedBookings = useMemo(() => [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [filteredBookings]);
   
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
   const [newAmount, setNewAmount] = useState(0);
 
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
 
   const handleStatus = async (id: string, status: string) => {
-    if (status === 'confirmed' && !isCallSatisfied) {
-      toast.error('Please confirm that you have called the visitor');
-      return;
+    if (status === 'confirmed') {
+      if (!isCallSatisfied) {
+        toast.error('Checking call confirmation is required');
+        return;
+      }
     }
-    const { error } = await db.from('bookings').update({ status }).eq('id', id);
-    if (!error) {
+    
+    try {
+      const { error } = await db.from('bookings').update({ status }).eq('id', id);
+      if (error) throw error;
+      
       toast.success('Status updated to ' + status);
       setIsAcceptModalOpen(false);
       setIsCallSatisfied(false);
       if (onUpdate) onUpdate();
-    } else {
-      toast.error('Failed to update status');
+    } catch (err) {
+      console.error('Update status error:', err);
+      toast.error('Failed to update booking status');
     }
   };
 
+  // Live Synchronize selectedBooking with prop changes
+  useEffect(() => {
+    if (selectedBooking) {
+      const fresh = bookings.find(b => b.id === selectedBooking.id);
+      if (fresh) setSelectedBooking(fresh);
+    }
+  }, [bookings]);
+
   const handleUpdateAmount = async () => {
     if (!selectedBooking) return;
-    const { error } = await db.from('bookings').update({ updated_amount: newAmount }).eq('id', selectedBooking.id);
+    
+    // Check if new amount is already covered by existing payments
+    const paymentsTotal = (selectedBooking.payments || []).reduce((acc, p) => acc + p.amount, 0);
+    const isNowPaid = paymentsTotal >= newAmount && newAmount > 0;
+    
+    const updateData: any = { 
+      updated_amount: newAmount,
+      is_invoice_generated: false 
+    };
+    
+    if (isNowPaid) {
+      updateData.payment_status = 'Paid';
+      updateData.status = 'paid';
+    }
+
+    const { error } = await db.from('bookings').update(updateData).eq('id', selectedBooking.id);
     if (!error) {
       toast.success('Booking amount updated');
       setIsAmountModalOpen(false);
@@ -7232,76 +7542,6 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       if (onUpdate) onUpdate();
     } else {
       toast.error('Failed to update amount');
-    }
-  };
-
-  const handleGenerateInvoice = async (booking: Booking) => {
-    try {
-      const pdfBlob = generateInvoice(booking, 0, profile);
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      // Still update base metadata if needed
-      await db.from('bookings').update({ 
-        is_invoice_generated: true
-      }).eq('id', booking.id);
-      
-      if (onUpdate) onUpdate();
-      toast.success('Invoice generated and downloaded');
-    } catch (err) {
-      console.error('Invoice error:', err);
-      toast.error('Failed to generate invoice');
-    }
-  };
-
-  const handleUpdatePaymentStatus = async () => {
-    if (!selectedBooking) {
-      console.error('No booking selected for payment update (OrderManage)');
-      return;
-    }
-    
-    if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
-      toast.error('This booking is already marked as PAID and cannot be updated.');
-      setIsPaymentModalOpen(false);
-      return;
-    }
-
-    try {
-      console.log('Attempting to update payment status (OrderManage):', {
-        bookingId: selectedBooking.id,
-        newPaymentStatus: paymentStatus,
-        currentStatus: selectedBooking.status
-      });
-
-      const { error } = await db.from('bookings').update({ 
-        payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
-      }).eq('id', selectedBooking.id);
-
-      if (error) {
-        console.error('Database Payment Update Error (OrderManage):', error);
-        if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
-          toast.error('Database schema error: payment_status column missing or cache stale.');
-        } else {
-          toast.error(`Error: ${error.message}`);
-        }
-        throw error;
-      }
-
-      if (onUpdate) onUpdate();
-      
-      toast.success(`Payment status updated to ${paymentStatus}${paymentStatus === 'Paid' ? ' and marked as Completed' : ''}`);
-      setIsPaymentModalOpen(false);
-      setSelectedBooking(null);
-    } catch (err: any) {
-      console.error('Payment status update failed (OrderManage):', err);
-      toast.error(`Failed to update payment status: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -7339,9 +7579,22 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
         handler: async function (response: any) {
           // 3. On success, update database
           try {
+            const amountPaid = order.amount / 100;
+            
+            // Record payment
+            await db.from('booking_payments').insert([{
+              booking_id: booking.id,
+              amount: amountPaid,
+              payment_mode: 'Online',
+              payment_date: format(new Date(), 'yyyy-MM-dd'),
+              payment_type: 'Regular',
+              transaction_id: response.razorpay_payment_id
+            }]);
+
             const { error } = await db.from('bookings').update({ 
-              status: 'paid',
-              payment_status: 'Paid'
+               status: 'paid',
+               payment_status: 'Paid',
+               advance_amount: amountPaid // For first payment usually, but since it marks as PAID it assumes full payment
             }).eq('id', booking.id);
             
             if (error) {
@@ -7403,29 +7656,29 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       </div>
 
       <div className="space-y-4">
-        {sortedBookings.map(b => (
+        {sortedBookings.map(b => {
+           const subTotal = (b.updatedAmount || b.totalAmount || 0);
+           const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
+           const totalRec = paymentsTotal > 0 ? paymentsTotal : (b.advance_amount || 0);
+           const isActuallyPaid = (totalRec >= subTotal && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+
+           return (
           <div key={b.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <div className="flex items-center space-x-2 mb-1">
                 <span className="font-bold text-lg">{b.targetName}</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                  (b.status === 'confirmed' || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-green-100 text-green-700" : 
+                  isActuallyPaid ? "bg-green-100 text-green-700" : 
+                  b.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
                   b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
                 )}>
-                  {(b.status === 'paid' || b.paymentStatus === 'Paid') ? 'PAID' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
+                  {isActuallyPaid ? 'Completed' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2 mt-2">
                 <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={14} className="mr-1 text-orange-600" /> {b.eventDate}</span>
                 <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={14} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
-                <span className={cn(
-                  "flex items-center px-3 py-1 rounded-lg border font-bold text-xs",
-                  (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-green-50 text-green-700 border-green-100" : "bg-orange-50 text-orange-700 border-orange-100"
-                )}>
-                  <CreditCard size={12} className="mr-1" />
-                  {(b.paymentStatus || 'Pending').toUpperCase()}
-                </span>
                 {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-lg border border-orange-100 font-bold"><Clock size={14} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
               </div>
               
@@ -7474,13 +7727,13 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                 </>
               )}
 
-              {(b.status === 'confirmed' || b.status === 'paid') && b.ownerId === user?.uid && (
+              {(b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid') && b.ownerId === user?.uid && (
                 <>
                   <button 
-                    disabled={b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid'}
+                    disabled={b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid'}
                     onClick={() => {
-                      if (b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid') {
-                        toast.error('Amount cannot be updated after invoice generation or payment');
+                      if (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') {
+                        toast.error('Amount cannot be updated after first payment or invoice generation');
                         return;
                       }
                       setSelectedBooking(b);
@@ -7489,62 +7742,58 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     }}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      (b.is_invoice_generated || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                      (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
                     )}
                   >
                     <Edit2 size={16} />
                     <span>Update Amount</span>
                   </button>
                   <button 
-                    disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
+                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)}
                     onClick={() => {
-                      if (b.paymentStatus === 'Paid' || b.status === 'paid') {
-                        toast.error('Invoice cannot be re-generated after payment is completed');
+                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) {
+                        toast.error('Payment is already completed');
                         return;
                       }
-                      handleGenerateInvoice(b);
+                      setSelectedBooking(b);
+                      setIsPaymentRecordModalOpen(true);
                     }}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"
+                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
                     )}
+                  >
+                    <IndianRupee size={16} />
+                    <span>Manage Payments</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      try {
+                        const pdfBlob = generateInvoice(b, 0, profile);
+                        const url = URL.createObjectURL(pdfBlob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        toast.success('Invoice downloaded successfully');
+                        
+                        // Mark as generated
+                        db.from('bookings').update({ is_invoice_generated: true }).eq('id', b.id).then(() => {
+                           if (onUpdate) onUpdate();
+                        });
+                      } catch (err) {
+                        console.error('Download error:', err);
+                        toast.error('Failed to generate invoice');
+                      }
+                    }}
+                    className="px-4 py-2 bg-purple-50 text-purple-600 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all hover:bg-purple-100"
                   >
                     <Download size={16} />
                     <span>Invoice</span>
                   </button>
-                  {(b.paymentStatus || b.is_invoice_generated || b.status === 'confirmed' || b.status === 'paid') && (
-                    <>
-                      <button 
-                        disabled={b.paymentStatus === 'Paid' || b.status === 'paid'}
-                        onClick={() => {
-                          if (b.paymentStatus === 'Paid' || b.status === 'paid') {
-                            toast.error('Payment status is already marked as PAID');
-                            return;
-                          }
-                          setSelectedBooking(b);
-                          setPaymentStatus(b.paymentStatus || 'Pending');
-                          setIsPaymentModalOpen(true);
-                        }}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                          (b.paymentStatus === 'Paid' || b.status === 'paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
-                        )}
-                      >
-                        <CreditCard size={16} />
-                        <span>Payment Status</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedBooking(b);
-                          setIsPaymentRecordModalOpen(true);
-                        }}
-                        className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all hover:bg-blue-100"
-                      >
-                        <IndianRupee size={16} />
-                        <span>Manage Payments</span>
-                      </button>
-                    </>
-                  )}
                 </>
               )}
               
@@ -7560,33 +7809,14 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
               )}
             </div>
           </div>
-        ))}
+        )})}
         {sortedBookings.length === 0 && <p className="text-gray-500 text-center py-10">No matching orders found.</p>}
       </div>
 
-      {isPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Update Payment Status</h3>
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Booking Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.targetName}</div>
-                <div className="text-sm text-gray-500">{selectedBooking?.visitorName}</div>
-              </div>
-
-              <div className="flex space-x-4 pt-4">
-                <button onClick={() => setIsPaymentModalOpen(false)} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isAcceptModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold mb-6">Confirm Booking</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[110] p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-gray-100">
+            <h3 className="text-2xl font-black mb-6 text-gray-900 tracking-tight">Confirm Booking</h3>
             <div className="space-y-6">
               <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">
                 <p className="text-sm text-orange-800">Please ensure you have discussed the event details and pricing with the visitor before confirming.</p>
@@ -8384,13 +8614,44 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               </div>
             )}
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">1. Service Available For (Select Events)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {EVENT_TYPES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-purple-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                    checked={formData.availableFor?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.availableFor || [];
+                      if (e.target.checked) setFormData({...formData, availableFor: [...current, option]});
+                      else setFormData({...formData, availableFor: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Facilities Offered (Manual Entry)</label>
+            <textarea 
+              rows={3}
+              placeholder="Enter facilities offered (e.g. High Quality Sound, Experienced Team, Latest Equipment)"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none uppercase"
+              value={formData.facilities?.join(', ')}
+              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')})}
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Separate multiple facilities with commas (,)</p>
+          </div>
         </div>
         <button 
           type="submit"
           disabled={loading}
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg disabled:opacity-50"
+          className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg disabled:opacity-50"
         >
-          {loading ? 'Registering...' : 'Register Service'}
+          {loading ? 'Processing...' : 'Register Service'}
         </button>
       </form>
     </div>
@@ -8420,7 +8681,8 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           priceRange: data.price_range,
           priceLevel: data.price_level || 'per day',
           video_url: data.video_url || '',
-          availableFor: data.available_for || []
+          availableFor: data.available_for || [],
+          facilities: data.facilities || []
         });
       }
       setLoading(false);
@@ -8440,11 +8702,12 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         price_level: formData.priceLevel,
         images: formData.images,
         video_url: formData.video_url,
-        available_for: formData.availableFor
+        available_for: formData.availableFor,
+        facilities: formData.facilities
       }).eq('id', id);
       if (error) throw error;
       toast.success('Service updated successfully!');
-      navigate('/dashboard');
+      navigate('/dashboard?tab=services');
     } catch (err: any) {
       console.error('Edit Service Error:', err);
       toast.error(`Failed to update service: ${err.message || 'Unknown error'}`);
@@ -8456,7 +8719,16 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Edit Service</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Edit Service</h1>
+        <button 
+          onClick={() => navigate('/dashboard?tab=services')}
+          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+          title="Close"
+        >
+          <X size={28} />
+        </button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -8570,39 +8842,49 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
             )}
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {[
-                'Weddings', 'Sangeet', 'Engagement', 'Haldi', 'Birthday Party', 'Anniversary', 
-                'Corporate Event', 'Seminar', 'Workshop', 'Exhibition', 'Music Concert', 
-                'Product Launch', 'School Event', 'Cultural Program', 'Special Occasion',
-                'work sample', 'portfolio'
-              ].map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">1. Service Available For (Select Events)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {EVENT_TYPES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-purple-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
                     checked={formData.availableFor?.includes(option)}
                     onChange={(e) => {
                       const current = formData.availableFor || [];
-                      if (e.target.checked) {
-                        setFormData({...formData, availableFor: [...current, option]});
-                      } else {
-                        setFormData({...formData, availableFor: current.filter(o => o !== option)});
-                      }
+                      if (e.target.checked) setFormData({...formData, availableFor: [...current, option]});
+                      else setFormData({...formData, availableFor: current.filter(o => o !== option)});
                     }}
                   />
-                  <span className="text-xs font-bold text-gray-700">{option}</span>
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
                 </label>
               ))}
             </div>
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Facilities Offered (Manual Entry)</label>
+            <textarea 
+              rows={3}
+              placeholder="Enter facilities offered (e.g. High Quality Sound, Experienced Team, Latest Equipment)"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none uppercase"
+              value={formData.facilities?.join(', ')}
+              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')})}
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Separate multiple facilities with commas (,)</p>
+          </div>
         </div>
         <button 
           type="submit"
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg"
+          className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg"
         >
           Update Service
+        </button>
+        <button 
+          type="button"
+          onClick={() => navigate('/dashboard?tab=services')}
+          className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl font-bold hover:bg-gray-200 transition-all mt-4"
+        >
+          Cancel & Exit
         </button>
       </form>
     </div>
@@ -8631,7 +8913,8 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           venueType: data.venue_type,
           pricePerDay: data.price_per_day,
           video_url: data.video_url || '',
-          availableFor: data.available_for || []
+          availableFor: data.available_for || [],
+          facilities: data.facilities || []
         });
       }
       setLoading(false);
@@ -8670,7 +8953,16 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Edit Venue</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Edit Venue</h1>
+        <button 
+          onClick={() => navigate('/dashboard?tab=venues')}
+          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+          title="Close"
+        >
+          <X size={28} />
+        </button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -8779,26 +9071,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             )}
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Facilities (Comma separated)</label>
-            <input 
-              type="text" 
-              placeholder="AC, Parking, Catering, DJ, etc."
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-              value={formData.facilities.join(', ')}
-              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Available For (Multiple Selection)</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[300px] overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {[
-                'Weddings', 'Sangeet', 'Engagement', 'Haldi', 'Birthday Party', 'Anniversary', 
-                'Corporate Event', 'Seminar', 'Workshop', 'Exhibition', 'Music Concert', 
-                'Product Launch', 'School Event', 'Cultural Program', 'Special Occasion',
-                'rooms(ac)', 'rooms(non ac)', 'dinner hall', 'wedding hall', 'stage site', 
-                'cattering hall', 'parking site', 'party hall', 'meeting hall', 
-                'reshort site', 'counter site', 'garden site', 'ground', 'Indoor', 'Outdoor'
-              ].map(option => (
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">1. Venue Available For (Select Events)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {EVENT_TYPES.map(option => (
                 <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
@@ -8806,14 +9081,31 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
                     checked={formData.availableFor?.includes(option)}
                     onChange={(e) => {
                       const current = formData.availableFor || [];
-                      if (e.target.checked) {
-                        setFormData({...formData, availableFor: [...current, option]});
-                      } else {
-                        setFormData({...formData, availableFor: current.filter(o => o !== option)});
-                      }
+                      if (e.target.checked) setFormData({...formData, availableFor: [...current, option]});
+                      else setFormData({...formData, availableFor: current.filter(o => o !== option)});
                     }}
                   />
-                  <span className="text-xs font-bold text-gray-700">{option}</span>
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Facilities Offered (Select Amenities)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {VENUE_FACILITIES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.facilities?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.facilities || [];
+                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
+                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
                 </label>
               ))}
             </div>
@@ -8821,9 +9113,13 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         </div>
         <button 
           type="submit"
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all shadow-lg"
+          disabled={loading}
+          className={cn(
+            "w-full bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg",
+            loading ? "opacity-70 cursor-not-allowed" : "hover:bg-orange-700"
+          )}
         >
-          Update Venue
+          {loading ? 'Updating Venue...' : 'Update Venue Detail'}
         </button>
       </form>
     </div>
@@ -9178,14 +9474,44 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             )}
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Facilities (Comma separated)</label>
-            <input 
-              type="text" 
-              placeholder="AC, Parking, Catering, DJ, etc."
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
-              value={formData.facilities.join(', ')}
-              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim())})}
-            />
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">1. Venue Available For (Select Events)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {EVENT_TYPES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.availableFor?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.availableFor || [];
+                      if (e.target.checked) setFormData({...formData, availableFor: [...current, option]});
+                      else setFormData({...formData, availableFor: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Facilities Offered (Select Amenities)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {VENUE_FACILITIES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.facilities?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.facilities || [];
+                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
+                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
         <button 
@@ -9993,7 +10319,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     startDate: '',
     endDate: '',
     paymentMode: '',
-    paymentStatus: ''
+    paymentStatus: '',
+    year: new Date().getFullYear().toString()
   });
 
   // Modal states for adding notification/banner/servicePhoto
@@ -10318,7 +10645,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       } else {
         const doc = new jsPDF();
         doc.text("Registered Users Report", 14, 15);
-        (doc as any).autoTable({
+        autoTable(doc, {
           startY: 20,
           head: [['Reg ID', 'Name', 'Mobile', 'Email', 'Role', 'Status']],
           body: users.map(u => [u.registrationId, u.displayName, u.mobileNumber, u.email, u.role, u.status]),
@@ -10649,7 +10976,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Paid Bookings</span>
                       </div>
                       <div className="text-3xl font-black text-gray-900">
-                        {bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid').length}
+                        {bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed').length}
                       </div>
                       <div className="mt-2 text-sm text-gray-500">Successfully completed</div>
                     </div>

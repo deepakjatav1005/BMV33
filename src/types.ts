@@ -168,6 +168,7 @@ export interface ServiceProvider {
   rateChart?: { item: string; price: number }[];
   catalogue?: CatalogueItem[];
   availableFor?: string[];
+  facilities?: string[];
   createdAt: any;
 }
 
@@ -192,7 +193,7 @@ export interface Booking {
   endDate?: string; // For periods
   startTime?: string; // e.g., "10:00 AM"
   endTime?: string; // e.g., "02:00 PM"
-  status: 'pending' | 'confirmed' | 'cancelled' | 'paid';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'paid' | 'completed' | 'approved';
   totalAmount: number;
   updatedAmount?: number; // For manual updates by owner
   message?: string;
@@ -216,6 +217,6 @@ export interface BookingPayment {
   amount: number;
   paymentMode: 'Cash' | 'Online' | 'PhonePe' | 'GPay' | 'Other';
   paymentDate: string;
-  paymentType: 'Advance' | 'Pending' | 'Round off';
+  paymentType: 'Advance' | 'Regular' | 'Discount' | 'Pending' | 'Round off';
   createdAt: any;
 }
