@@ -953,17 +953,17 @@ const SERVICE_TYPES = [
   'photo and videography',
   'drone photo and videography',
   'stage decorator',
-  'catrors',
-  'halbai',
+  'caterers',
+  'halwai',
   'flower decorators',
   'dhol and bands',
   'ghoda gadi',
   'light decorators',
-  'mehandi artits',
-  'makup artits',
+  'mehendi artist',
+  'makeup artist',
   'fast foods service',
   'laundry services',
-  'event cloth and jwelary',
+  'event cloth and jewelry',
   'musical group',
   'vehicle on rent',
   'pujari ji',
@@ -2316,22 +2316,6 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
           </Link>
         </motion.div>
 
-        <motion.h1 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-7xl font-black text-white mb-6 drop-shadow-2xl tracking-tight"
-        >
-          {t('heroTitle')}
-        </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-xl md:text-2xl text-gray-200 mb-12 font-medium max-w-3xl mx-auto"
-        >
-          {t('heroTagline')}
-        </motion.p>
-
         <motion.form 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -2400,9 +2384,9 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
   );
 };
 
-const CategorySection = () => {
+const CategorySection = ({ onInteraction }: { onInteraction?: () => void }) => {
   return (
-    <section className="py-24 bg-white overflow-hidden relative">
+    <section className="py-24 bg-white overflow-hidden relative" onClick={onInteraction}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-6">
@@ -2422,18 +2406,18 @@ const CategoryDisplay = () => {
   
   const defaultCategories = [
     { name: 'Venues', image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=400', link: '/venues' },
-    { name: 'Catering', image: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=400', link: '/services?type=catrors', serviceType: 'catrors' },
+    { name: 'Catering', image: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=400', link: '/services?type=caterers', serviceType: 'caterers' },
     { name: 'DJ & Music', image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400', link: '/services?type=dj and sound service', serviceType: 'dj and sound service' },
     { name: 'Tent House', image: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80&w=400', link: '/services?type=tent house', serviceType: 'tent house' },
     { name: 'Photography', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=400', link: '/services?type=photo and videography', serviceType: 'photo and videography' },
-    { name: 'Makeup', image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=400', link: '/services?type=makup artits', serviceType: 'makup artits' },
+    { name: 'Makeup', image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=400', link: '/services?type=makeup artist', serviceType: 'makeup artist' },
     { name: 'Decoration', image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=400', link: '/services?type=light decorators', serviceType: 'light decorators' },
     { name: 'Event Manager', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80&w=400', link: '/services?type=event managers', serviceType: 'event managers' },
     { name: 'Pandit Ji', image: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&q=80&w=400', link: '/services?type=pujari ji', serviceType: 'pujari ji' },
-    { name: 'Mehendi', image: 'https://images.unsplash.com/photo-1542642837-739074a911c0?auto=format&fit=crop&q=80&w=400', link: '/services?type=mehandi artits', serviceType: 'mehandi artits' },
+    { name: 'Mehendi', image: 'https://images.unsplash.com/photo-1542642837-739074a911c0?auto=format&fit=crop&q=80&w=400', link: '/services?type=mehendi artist', serviceType: 'mehendi artist' },
     { name: 'Drone', image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&q=80&w=400', link: '/services?type=drone photo and videography', serviceType: 'drone photo and videography' },
-    { name: 'Rentals', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&q=80&w=400', link: '/services?type=event cloth and jwelary', serviceType: 'event cloth and jwelary' },
-    { name: 'Halbai', image: 'https://images.unsplash.com/photo-1589676062352-b19035222f5f?auto=format&fit=crop&q=80&w=400', link: '/services?type=halbai', serviceType: 'halbai' },
+    { name: 'Rentals', image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&q=80&w=400', link: '/services?type=event cloth and jewelry', serviceType: 'event cloth and jewelry' },
+    { name: 'Halwai', image: 'https://images.unsplash.com/photo-1589676062352-b19035222f5f?auto=format&fit=crop&q=80&w=400', link: '/services?type=halwai', serviceType: 'halwai' },
     { name: 'Waiters', image: 'https://images.unsplash.com/photo-1590650153855-d9e808231d41?auto=format&fit=crop&q=80&w=400', link: '/services?type=helpers', serviceType: 'helpers' },
     { name: 'Dhol Bands', image: 'https://images.unsplash.com/photo-1514525253344-f814d074358a?auto=format&fit=crop&q=80&w=400', link: '/services?type=dhol and bands', serviceType: 'dhol and bands' },
     { name: 'Flower Decor', image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=400', link: '/services?type=flower decorators', serviceType: 'flower decorators' },
@@ -2447,21 +2431,17 @@ const CategoryDisplay = () => {
       if (data && data.length > 0) {
         setAllUploadedPhotos(data);
         
-        // ONLY show uploaded photos as distinct cards
         const uploadedCategories = data.map((p: any) => ({
           name: p.service_type || 'Special Service',
           image: p.image_url,
-          link: `/services?type=${encodeURIComponent(p.service_type)}`,
           serviceType: p.service_type,
           isUploaded: true
         }));
         
         setDisplayCategories(uploadedCategories);
       } else {
-        // If nothing uploaded, maybe show defaults but the user requested ONLY uploaded
-        // For a better UX if empty, we might want to keep the defaults or show a message
-        // But user said "ONLY show uploaded", so we'll strictly follow that.
-        setDisplayCategories([]);
+        // Keep keeping defaults if nothing uploaded
+        setDisplayCategories(defaultCategories);
       }
     };
     fetchPhotos();
@@ -2473,13 +2453,25 @@ const CategoryDisplay = () => {
     return () => { db.removeChannel(channel); };
   }, []);
 
-  const getNavigatePath = (type: string) => {
-    const venueTypesMatch = ['Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Party Plot', ...VENUE_TYPES];
-    const isVenue = venueTypesMatch.some(vt => vt.toLowerCase() === type.toLowerCase());
+  const getNavigatePath = (type: string, name: string) => {
+    const searchType = (type || name).toLowerCase();
+    
+    // Exact match list for venues
+    const venueMatches = ['venues', 'marriage garden', 'marriage hall', 'hotel', 'resort', 'party plot', 'community halls', 'restorent'];
+    
+    // Check common variants
+    const isVenue = venueMatches.includes(searchType) || 
+                   searchType.includes('garden') || 
+                   searchType.includes('hall') || 
+                   searchType.includes('hotel') ||
+                   VENUE_TYPES.map(vt => vt.toLowerCase()).includes(searchType);
+    
     if (isVenue) {
-      return `/venues?type=${encodeURIComponent(type)}`;
+      if (searchType === 'venues') return '/venues';
+      return `/venues?type=${encodeURIComponent(type || name)}`;
     }
-    return `/services?type=${encodeURIComponent(type)}`;
+    
+    return `/services?type=${encodeURIComponent(type || name)}`;
   };
 
   return (
@@ -2489,15 +2481,18 @@ const CategoryDisplay = () => {
           {[...displayCategories, ...displayCategories].map((cat: any, idx) => (
             <motion.div
               key={idx}
-              whileHover={{ scale: 1.05, rotateY: 15 }}
-              className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
-              onClick={() => navigate(getNavigatePath(cat.serviceType || ''))}
+              whileHover={{ scale: 1.02 }}
+              className="flex-shrink-0 w-64 h-80 relative rounded-[2rem] overflow-hidden group cursor-pointer shadow-xl border border-gray-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(getNavigatePath(cat.serviceType || '', cat.name));
+              }}
             >
               <div className="block w-full h-full text-left">
                 {(cat.image && (cat.image.includes('.mp4') || cat.image.includes('video'))) ? (
                   <video 
                     src={cat.image} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     autoPlay 
                     muted 
                     loop 
@@ -2507,13 +2502,12 @@ const CategoryDisplay = () => {
                   <img 
                     src={cat.image} 
                     alt={cat.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <div className="p-6 bg-white border-t border-gray-100 flex flex-col items-center justify-center">
-                  <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest text-center px-2">{cat.name}</h3>
-                  <div className="w-8 h-1 bg-orange-500 mt-2 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                <div className="absolute inset-x-0 bottom-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 flex items-center justify-center">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.2em] text-center line-clamp-1">{cat.name}</h3>
                 </div>
                 {cat.isUploaded && (
                   <div className="absolute top-4 right-4 bg-orange-500/90 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter z-20">
@@ -3614,9 +3608,87 @@ const ServiceInfoStickers = () => {
   );
 };
 
-const ServiceTypePhotosScroll = () => {
+const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) => {
+  const [moments, setMoments] = useState<any[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchMoments = async () => {
+      const { data } = await db.from('moments').select('*').order('created_at', { ascending: false }).limit(10);
+      if (data) setMoments(data);
+    };
+    fetchMoments();
+
+    const channel = db.channel('moments_home_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moments' }, fetchMoments)
+      .subscribe();
+      
+    return () => { db.removeChannel(channel); };
+  }, []);
+
+  if (moments.length === 0) {
+    // If no moments, show a fun placeholder to keep the section visible for the user/admin to see where it is
+    return (
+      <div className="bg-gray-50 py-16 border-b border-gray-100" onClick={onInteraction}>
+        <div className="max-w-7xl mx-auto px-4 text-center">
+           <Camera className="mx-auto text-gray-300 mb-4" size={48} />
+           <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest">Our Moments Gallery</h2>
+           <p className="text-gray-400 mt-2 text-sm italic">Admin highlight photos will appear here</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-50 py-16 overflow-hidden border-b border-gray-100" onClick={onInteraction}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+        <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
+          <Camera className="mr-4 text-orange-600" size={32} />
+          OUR <span className="text-orange-600 ml-2">MOMENTS</span>
+        </h2>
+        <p className="text-gray-500 mt-2">Beautiful celebrations captured on our platform</p>
+      </div>
+      <div className="relative">
+        <div className="flex animate-marquee-ltr space-x-6 py-4 w-max">
+          {[...moments, ...moments].map((m, idx) => (
+            <motion.div 
+              key={`${m.id}-${idx}`} 
+              whileHover={{ scale: 1.05 }}
+              className="flex-shrink-0 w-80 h-64 relative rounded-[2rem] overflow-hidden group cursor-pointer shadow-xl bg-gray-100"
+            >
+              {m.type === 'video' || (m.media_url && m.media_url.includes('.mp4')) ? (
+                <video 
+                  src={m.media_url} 
+                  className="w-full h-full object-cover" 
+                  autoPlay 
+                  muted 
+                  loop 
+                  playsInline 
+                />
+              ) : (
+                <img 
+                  src={m.media_url} 
+                  alt="Moment" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: () => void }) => {
   const [photos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
   const navigate = useNavigate();
+
+  const handleInteraction = () => {
+    if (onInteraction) onInteraction();
+  };
 
   useEffect(() => {
     const fetchPhotos = async () => {
@@ -3646,7 +3718,7 @@ const ServiceTypePhotosScroll = () => {
   if (photos.length === 0) return null;
 
   return (
-    <div className="bg-white py-16 overflow-hidden border-b border-gray-100">
+    <div className="bg-white py-16 overflow-hidden border-b border-gray-100" onClick={handleInteraction}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
           <Sparkles className="mr-4 text-orange-600" size={32} />
@@ -3668,11 +3740,8 @@ const ServiceTypePhotosScroll = () => {
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-                <div className="bg-white/90 backdrop-blur-sm px-6 py-2 rounded-full shadow-lg">
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">{p.serviceType}</h3>
-                </div>
+              <div className="absolute inset-x-0 bottom-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-100/50 flex items-center justify-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.2em] text-center line-clamp-1">{p.serviceType}</h3>
               </div>
             </motion.div>
           ))}
@@ -3738,15 +3807,16 @@ const HomeView = ({ user }: { user: any }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
 
   useEffect(() => {
-    if (banners.length > 1) {
+    if (banners.length > 1 && isAutoScrollEnabled) {
       const interval = setInterval(() => {
         setCurrentBannerIndex(prev => (prev + 1) % banners.length);
       }, 5000);
       return () => clearInterval(interval);
     }
-  }, [banners]);
+  }, [banners, isAutoScrollEnabled]);
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -3859,43 +3929,31 @@ const HomeView = ({ user }: { user: any }) => {
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentBannerIndex}
-                initial={{ opacity: 0, x: -100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 100 }}
-                transition={{ duration: 1, ease: "easeInOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.2, ease: "easeInOut" }}
                 className="absolute inset-0"
+                onMouseEnter={() => setIsAutoScrollEnabled(false)}
+                onMouseLeave={() => setIsAutoScrollEnabled(true)}
               >
                 <img 
                   src={banners[currentBannerIndex].imageUrl} 
                   alt={banners[currentBannerIndex].title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover brightness-[0.7]"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent flex items-center">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end pb-24">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-                    <div className="max-w-2xl">
-                      <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-                        {banners[currentBannerIndex].title}
-                      </h1>
-                      <p className="text-xl text-gray-200 mb-10 leading-relaxed">
-                        {t('heroTagline')}
-                      </p>
-                      <div className="flex flex-wrap gap-4">
-                        <Link to="/venues" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
-                          {t('searchNow')}
-                          <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Link>
-                        <Link to="/login" className="bg-white text-orange-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-100 transition-all shadow-xl flex items-center">
-                          <LogIn className="mr-2" />
-                          {t('loginNow')}
-                        </Link>
-                        <Link to="/registration?role=owner" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">
-                          {t('joinAsOwner')}
-                        </Link>
-                        <Link to="/registration?role=provider" className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">
-                          {t('joinAsProvider')}
-                        </Link>
-                      </div>
+                    <div className="flex flex-wrap gap-4">
+                      <Link to="/venues" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
+                        {t('searchNow')}
+                        <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                      <Link to="/login" className="bg-white text-orange-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-100 transition-all shadow-xl flex items-center">
+                        <LogIn className="mr-2" />
+                        {t('loginNow')}
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -3907,12 +3965,26 @@ const HomeView = ({ user }: { user: any }) => {
         )}
       </div>
 
-      {/* Dynamic Service & Venue Types Text */}
-      <div className="bg-white py-12 border-b border-gray-100">
+      {/* Dynamic Service & Venue Types Text & Tagline */}
+      <div className="bg-white py-14 border-b border-gray-100 text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-12"
+          >
+            <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 tracking-tighter uppercase">
+              {t('heroTitle')}
+            </h1>
+            <p className="text-lg md:text-xl text-gray-500 max-w-3xl mx-auto italic font-medium leading-relaxed">
+              {t('heroTagline')}
+            </p>
+          </motion.div>
+          
+          <div className="flex flex-wrap justify-center gap-x-12 gap-y-6">
             {['Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Party Plot', 'Catering', 'Decoration', 'Photography', 'DJ & Music', 'Makeup Artist', 'Mehendi Artist', 'Tent House', 'Security'].map((type, idx) => (
-              <span key={idx} className="text-sm md:text-lg font-bold text-gray-400 hover:text-orange-500 transition-colors cursor-default uppercase tracking-widest">
+              <span key={idx} className="text-xs md:text-sm font-black text-gray-400 hover:text-orange-500 transition-colors cursor-default uppercase tracking-[0.3em]">
                 {type}
               </span>
             ))}
@@ -3920,8 +3992,9 @@ const HomeView = ({ user }: { user: any }) => {
         </div>
       </div>
 
-      <ServiceTypePhotosScroll />
-      <CategorySection />
+      <MomentsHomeSection onInteraction={() => setIsAutoScrollEnabled(false)} />
+      <ServiceTypePhotosScroll onInteraction={() => setIsAutoScrollEnabled(false)} />
+      <CategorySection onInteraction={() => setIsAutoScrollEnabled(false)} />
       <ServiceInfoStickers />
       
       <section className="py-16 bg-gray-50">
@@ -5864,7 +5937,7 @@ const BookingManagerView = ({
                       "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
                       (booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
-                      {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
+                      {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed Successfully' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
                     </span>
                     {(booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? (
                       <>
@@ -6510,7 +6583,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         
         return {
           'S.No': index + 1,
-          'Status': (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : (b.status || 'Pending'),
+          'Status': (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed Successfully' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : (b.status || 'Pending'),
           'Party Name': b.partyName || b.visitorName || 'N/A',
           'Mobile': b.visitorMobile || 'N/A',
           'Date': b.eventDate,
@@ -6546,7 +6619,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         
         return [
           (index + 1).toString(),
-          (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : 'Pending',
+          (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed Successfully' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : 'Pending',
           (b.partyName || b.visitorName || 'N/A').substring(0, 15),
           b.visitorMobile || 'N/A',
           (b.partyAddress || 'N/A').substring(0, 10),
@@ -8521,28 +8594,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               value={formData.serviceType}
               onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
             >
-              <option value="Caterer">Caterer</option>
-              <option value="DJ and Sounds">DJ and Sounds</option>
-              <option value="Tent House">Tent House</option>
-              <option value="Photo and Videographer">Photo and Videographer</option>
-              <option value="Stage Decorator">Stage Decorator</option>
-              <option value="Flower Decorator">Flower Decorator</option>
-              <option value="Makeup Artist">Makeup Artist</option>
-              <option value="Halbai">Halbai</option>
-              <option value="Event Manager">Event Manager</option>
-              <option value="Waiters">Waiters</option>
-              <option value="Dhol Bands">Dhol Bands</option>
-              <option value="Light Decorator">Light Decorator</option>
-              <option value="Drone Camera">Drone Camera</option>
-              <option value="Mehendi Service">Mehendi Service</option>
-              <option value="Event Cloth and Jwellary on Rent">Event Cloth and Jwellary on Rent</option>
-              <option value="Fast food stalls">Fast food stalls</option>
-              <option value="Loundry service">Loundry service</option>
-              <option value="Helper">Helper</option>
-              <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
-              <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
-              <option value="Ghoda Bagghi">Ghoda Bagghi</option>
-              <option value="Other Related Services">Other Related Services</option>
+              <option value="">Select Service Type</option>
+              {SERVICE_TYPES.map(type => (
+                <option key={type} value={type} className="capitalize">{type}</option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -8749,28 +8804,10 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               value={formData.serviceType}
               onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
             >
-              <option value="Caterer">Caterer</option>
-              <option value="DJ and Sounds">DJ and Sounds</option>
-              <option value="Tent House">Tent House</option>
-              <option value="Photo and Videographer">Photo and Videographer</option>
-              <option value="Stage Decorator">Stage Decorator</option>
-              <option value="Flower Decorator">Flower Decorator</option>
-              <option value="Makeup Artist">Makeup Artist</option>
-              <option value="Halbai">Halbai</option>
-              <option value="Event Manager">Event Manager</option>
-              <option value="Waiters">Waiters</option>
-              <option value="Dhol Bands">Dhol Bands</option>
-              <option value="Light Decorator">Light Decorator</option>
-              <option value="Drone Camera">Drone Camera</option>
-              <option value="Mehendi Service">Mehendi Service</option>
-              <option value="Event Cloth and Jwellary on Rent">Event Cloth and Jwellary on Rent</option>
-              <option value="Fast food stalls">Fast food stalls</option>
-              <option value="Loundry service">Loundry service</option>
-              <option value="Helper">Helper</option>
-              <option value="Pandit Ji Brahman">Pandit Ji Brahman</option>
-              <option value="SPARKS AND Firecrackers">SPARKS AND Firecrackers</option>
-              <option value="Ghoda Bagghi">Ghoda Bagghi</option>
-              <option value="Other Related Services">Other Related Services</option>
+              <option value="">Select Service Type</option>
+              {SERVICE_TYPES.map(type => (
+                <option key={type} value={type} className="capitalize">{type}</option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -10916,12 +10953,12 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <div className="bg-green-50 p-3 rounded-2xl text-green-600">
                           <CheckCircle size={24} />
                         </div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Paid Bookings</span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Completed Successfully</span>
                       </div>
                       <div className="text-3xl font-black text-gray-900">
                         {bookings.filter(b => b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed').length}
                       </div>
-                      <div className="mt-2 text-sm text-gray-500">Successfully completed</div>
+                      <div className="mt-2 text-sm text-gray-500">All paid bookings confirmed</div>
                     </div>
                   </div>
 
@@ -10985,7 +11022,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                           <BarChart data={[
                             { name: 'Total', count: bookings.length },
-                            { name: 'Paid', count: bookings.filter(b => (b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed' || ((b.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0))).length },
+                            { name: 'Completed', count: bookings.filter(b => (b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed' || ((b.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0))).length },
                             { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
                             { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
                           ]}>
@@ -11620,7 +11657,13 @@ const VenueListView = () => {
       const type = searchParams.get('type')?.toLowerCase();
       const search = searchParams.get('search')?.toLowerCase();
 
-      if (type) data = data.filter(v => (v.venueType?.toLowerCase() || '') === type);
+      if (type) {
+        const lowerType = type.toLowerCase();
+        data = data.filter(v => {
+          const vType = (v.venueType?.toLowerCase() || '');
+          return vType === lowerType || vType.includes(lowerType) || lowerType.includes(vType);
+        });
+      }
       if (search) {
         data = data.filter(v => 
           (v.name?.toLowerCase() || '').includes(search) || 
@@ -11768,7 +11811,13 @@ const ServiceListView = ({ user }: { user: any }) => {
       const type = searchParams.get('type')?.toLowerCase();
       const search = searchParams.get('search')?.toLowerCase();
 
-      if (type) data = data.filter(s => (s.serviceType?.toLowerCase() || '') === type);
+      if (type) {
+        const lowerType = type.toLowerCase();
+        data = data.filter(s => {
+          const sType = (s.serviceType?.toLowerCase() || '');
+          return sType === lowerType || sType.includes(lowerType) || lowerType.includes(sType);
+        });
+      }
       if (search) {
         data = data.filter(s => 
           (s.name?.toLowerCase() || '').includes(search) || 
