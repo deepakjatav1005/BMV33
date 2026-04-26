@@ -2384,9 +2384,15 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
   );
 };
 
-const CategorySection = ({ onInteraction }: { onInteraction?: () => void }) => {
+const CategorySection = ({ onInteraction }: { onInteraction?: (enabled: boolean) => void }) => {
   return (
-    <section className="py-24 bg-white overflow-hidden relative" onClick={onInteraction}>
+    <section 
+      className="py-16 md:py-24 bg-white overflow-hidden relative group/section" 
+      onMouseEnter={() => onInteraction?.(false)}
+      onMouseLeave={() => onInteraction?.(true)}
+      onFocus={() => onInteraction?.(false)}
+      onBlur={() => onInteraction?.(true)}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-6xl font-black text-gray-900 mb-6">
@@ -2477,7 +2483,7 @@ const CategoryDisplay = () => {
   return (
     <div className="relative overflow-hidden min-h-[200px] flex items-center justify-center">
       {displayCategories.length > 0 ? (
-        <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
+        <div className="flex animate-marquee-ltr space-x-8 py-10 w-max hover:[animation-play-state:paused]">
           {[...displayCategories, ...displayCategories].map((cat: any, idx) => (
             <motion.div
               key={idx}
@@ -3608,7 +3614,7 @@ const ServiceInfoStickers = () => {
   );
 };
 
-const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) => {
+const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boolean) => void }) => {
   const [moments, setMoments] = useState<any[]>([]);
   const navigate = useNavigate();
 
@@ -3629,7 +3635,13 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) =
   if (moments.length === 0) {
     // If no moments, show a fun placeholder to keep the section visible for the user/admin to see where it is
     return (
-      <div className="bg-gray-50 py-16 border-b border-gray-100" onClick={onInteraction}>
+      <div 
+        className="bg-gray-50 py-16 border-b border-gray-100" 
+        onMouseEnter={() => onInteraction?.(false)}
+        onMouseLeave={() => onInteraction?.(true)}
+        onFocus={() => onInteraction?.(false)}
+        onBlur={() => onInteraction?.(true)}
+      >
         <div className="max-w-7xl mx-auto px-4 text-center">
            <Camera className="mx-auto text-gray-300 mb-4" size={48} />
            <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest">Our Moments Gallery</h2>
@@ -3640,7 +3652,13 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) =
   }
 
   return (
-    <div className="bg-gray-50 py-16 overflow-hidden border-b border-gray-100" onClick={onInteraction}>
+    <div 
+      className="bg-gray-50 py-16 overflow-hidden border-b border-gray-100"
+      onMouseEnter={() => onInteraction?.(false)}
+      onMouseLeave={() => onInteraction?.(true)}
+      onFocus={() => onInteraction?.(false)}
+      onBlur={() => onInteraction?.(true)}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
           <Camera className="mr-4 text-orange-600" size={32} />
@@ -3649,7 +3667,7 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) =
         <p className="text-gray-500 mt-2">Beautiful celebrations captured on our platform</p>
       </div>
       <div className="relative">
-        <div className="flex animate-marquee-ltr space-x-6 py-4 w-max">
+        <div className="flex animate-marquee-ltr space-x-6 py-4 w-max hover:[animation-play-state:paused]">
           {[...moments, ...moments].map((m, idx) => (
             <motion.div 
               key={`${m.id}-${idx}`} 
@@ -3682,12 +3700,12 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: () => void }) =
   );
 };
 
-const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: () => void }) => {
+const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: boolean) => void }) => {
   const [photos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
   const navigate = useNavigate();
 
-  const handleInteraction = () => {
-    if (onInteraction) onInteraction();
+  const handleInteraction = (enabled: boolean) => {
+    if (onInteraction) onInteraction(enabled);
   };
 
   useEffect(() => {
@@ -3718,7 +3736,13 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: () => void
   if (photos.length === 0) return null;
 
   return (
-    <div className="bg-white py-16 overflow-hidden border-b border-gray-100" onClick={handleInteraction}>
+    <div 
+      className="bg-white py-16 overflow-hidden border-b border-gray-100"
+      onMouseEnter={() => handleInteraction(false)}
+      onMouseLeave={() => handleInteraction(true)}
+      onFocus={() => handleInteraction(false)}
+      onBlur={() => handleInteraction(true)}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
           <Sparkles className="mr-4 text-orange-600" size={32} />
@@ -3726,7 +3750,7 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: () => void
         </h2>
       </div>
       <div className="relative">
-        <div className="flex animate-marquee-ltr space-x-8 py-10 w-max">
+        <div className="flex animate-marquee-ltr space-x-8 py-10 w-max hover:[animation-play-state:paused]">
           {[...photos, ...photos].map((p, idx) => (
             <motion.div 
               key={`${p.id}-${idx}`} 
@@ -3992,9 +4016,9 @@ const HomeView = ({ user }: { user: any }) => {
         </div>
       </div>
 
-      <MomentsHomeSection onInteraction={() => setIsAutoScrollEnabled(false)} />
-      <ServiceTypePhotosScroll onInteraction={() => setIsAutoScrollEnabled(false)} />
-      <CategorySection onInteraction={() => setIsAutoScrollEnabled(false)} />
+      <MomentsHomeSection onInteraction={setIsAutoScrollEnabled} />
+      <ServiceTypePhotosScroll onInteraction={setIsAutoScrollEnabled} />
+      <CategorySection onInteraction={setIsAutoScrollEnabled} />
       <ServiceInfoStickers />
       
       <section className="py-16 bg-gray-50">
@@ -5848,15 +5872,15 @@ const BookingManagerView = ({
   if (loading) return <div className="h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Booking Manager</h1>
-          <p className="text-gray-500 mt-1">Manage your venue and service bookings</p>
+    <div className="space-y-6 md:space-y-10 px-4 md:px-0">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+        <div className="w-full">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Booking Manager</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your venue and service bookings</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:items-center gap-3 w-full lg:w-auto">
           <select 
-            className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -5868,51 +5892,51 @@ const BookingManagerView = ({
           </select>
           <input 
             type="date" 
-            className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
           />
           <button 
             onClick={() => setIsManualModalOpen(true)}
-            className="bg-orange-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center space-x-2 hover:bg-orange-700 transition-all shadow-lg shadow-orange-200"
+            className="col-span-2 sm:col-span-1 bg-orange-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-base flex items-center justify-center space-x-2 hover:bg-orange-700 transition-all shadow-lg shadow-orange-200"
           >
-            <Plus size={20} />
-            <span>Manual Booking</span>
+            <Plus size={18} />
+            <span>Manual Entry</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:gap-6">
         {currentBookings.length > 0 ? (
           currentBookings.map(booking => (
-            <div key={booking.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-start space-x-4">
+            <div key={booking.id} className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+              <div className="flex items-start space-x-3 md:space-x-4">
                 <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center",
+                  "flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center",
                   booking.status === 'pending' ? "bg-yellow-100 text-yellow-600" :
                   booking.status === 'confirmed' ? "bg-green-100 text-green-600" :
                   "bg-red-100 text-red-600"
                 )}>
-                  <Calendar size={24} />
+                  <Calendar size={isDesktop ? 24 : 20} />
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-bold text-lg text-gray-900">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center flex-wrap gap-2">
+                    <h3 className="font-bold text-base md:text-lg text-gray-900 truncate">
                       {booking.isManual ? booking.partyName : booking.visitorName}
                     </h3>
                     {booking.isManual && (
-                      <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Manual</span>
+                      <span className="bg-gray-100 text-gray-500 text-[8px] md:text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Manual</span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 font-medium">{booking.targetName} • {booking.eventType}</p>
-                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-400">
-                    <span className="flex items-center"><Calendar size={14} className="mr-1" /> {booking.eventDate} {booking.endDate && `to ${booking.endDate}`}</span>
-                    <span className="flex items-center"><Phone size={14} className="mr-1" /> {booking.visitorMobile}</span>
+                  <p className="text-xs md:text-sm text-gray-500 font-medium truncate">{booking.targetName} • {booking.eventType}</p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] md:text-sm text-gray-400">
+                    <span className="flex items-center"><Calendar size={12} className="mr-1" /> {booking.eventDate}</span>
+                    <span className="flex items-center"><Phone size={12} className="mr-1" /> {booking.visitorMobile}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3 border-t border-gray-50 pt-3 md:border-none md:pt-0">
                 {booking.status === 'pending' ? (
                   <>
                     <button 
@@ -7705,12 +7729,15 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-10 px-4 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Manage Orders</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="w-full">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Orders</h2>
+          <p className="text-sm text-gray-500 mt-1">Guest inquiries and booking requests</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <select 
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="flex-1 md:flex-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -7722,7 +7749,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           </select>
           <input 
             type="date" 
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="flex-1 md:flex-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
           />
@@ -7737,12 +7764,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
            const isActuallyPaid = (totalRec >= subTotal && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
 
            return (
-          <div key={b.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="font-bold text-lg">{b.targetName}</span>
+          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="w-full md:w-auto">
+              <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
+                <span className="font-bold text-base md:text-lg truncate max-w-[200px] md:max-w-none">{b.targetName}</span>
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                  "px-2 py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase",
                   isActuallyPaid ? "bg-green-100 text-green-700" : 
                   b.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
                   b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
@@ -7750,13 +7777,13 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   {isActuallyPaid ? 'Completed' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4 gap-y-2 mt-2">
-                <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={14} className="mr-1 text-orange-600" /> {b.eventDate}</span>
-                <span className="flex items-center bg-white px-3 py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={14} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
-                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-lg border border-orange-100 font-bold"><Clock size={14} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
+              <div className="flex flex-wrap items-center text-[10px] md:text-sm text-gray-500 gap-2 md:gap-x-4 md:gap-y-2 mt-2">
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={12} className="mr-1 text-orange-600" /> {b.eventDate}</span>
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={12} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
+                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={12} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
               </div>
               
-              <div className="mt-4 p-4 bg-white rounded-2xl border border-gray-100 space-y-2">
+              <div className="mt-3 md:mt-4 p-3 md:p-4 bg-white rounded-2xl border border-gray-100 space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center space-x-2">
                     <User size={14} className="text-gray-400" />
