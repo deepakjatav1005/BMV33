@@ -353,6 +353,7 @@ import {
   useNavigate, 
   useParams,
   useSearchParams,
+  useLocation,
   Navigate
 } from 'react-router-dom';
 import { 
@@ -397,6 +398,7 @@ import {
   ShieldCheck,
   ArrowRight,
   Download,
+  RotateCcw,
   BarChart2,
   XCircle,
   Info,
@@ -424,7 +426,8 @@ import {
   HandHelping,
   Layout,
   Users2,
-  Globe
+  Globe,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
@@ -2460,24 +2463,8 @@ const CategoryDisplay = () => {
   }, []);
 
   const getNavigatePath = (type: string, name: string) => {
-    const searchType = (type || name).toLowerCase();
-    
-    // Exact match list for venues
-    const venueMatches = ['venues', 'marriage garden', 'marriage hall', 'hotel', 'resort', 'party plot', 'community halls', 'restorent'];
-    
-    // Check common variants
-    const isVenue = venueMatches.includes(searchType) || 
-                   searchType.includes('garden') || 
-                   searchType.includes('hall') || 
-                   searchType.includes('hotel') ||
-                   VENUE_TYPES.map(vt => vt.toLowerCase()).includes(searchType);
-    
-    if (isVenue) {
-      if (searchType === 'venues') return '/venues';
-      return `/venues?type=${encodeURIComponent(type || name)}`;
-    }
-    
-    return `/services?type=${encodeURIComponent(type || name)}`;
+    const searchTerm = (type || name).toLowerCase();
+    return `/search?q=${encodeURIComponent(searchTerm)}`;
   };
 
   return (
@@ -2681,6 +2668,23 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             </p>
           </div>
 
+          <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-100 space-y-3">
+            <h4 className="font-bold text-yellow-800 flex items-center">
+              <Star size={18} className="mr-2 fill-yellow-500 text-yellow-500" />
+              Unlock Premium Features
+            </h4>
+            <p className="text-sm text-yellow-700">
+              Get full access to the booking manager, unlimited venue listings, and smart analytics by subscribing to a professional plan.
+            </p>
+            <Link 
+              to="/pricing" 
+              className="inline-block bg-yellow-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-yellow-700 transition-colors shadow-lg shadow-yellow-200"
+              onClick={onClose}
+            >
+              View Subscription Plans
+            </Link>
+          </div>
+
           <div className="flex flex-col gap-3">
             <button 
               onClick={() => {
@@ -2694,9 +2698,9 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
 
             <button 
               onClick={onClose}
-              className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all"
+              className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all"
             >
-              Got it, Proceed to Login
+              Skip, Proceed to Login
             </button>
           </div>
         </div>
@@ -2931,6 +2935,7 @@ const RegistrationView = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [successData, setSuccessData] = useState<{ isOpen: boolean, regId: string, mobileNumber: string }>({
     isOpen: false,
     regId: '',
@@ -3164,11 +3169,24 @@ const RegistrationView = () => {
             </div>
           </div>
 
-          <div className="md:col-span-2 pt-6">
+          <div className="md:col-span-2 space-y-4 pt-6">
+            <div className="flex items-start space-x-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+              <input 
+                id="terms"
+                type="checkbox" 
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-1 w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500" 
+              />
+              <label htmlFor="terms" className="text-sm text-gray-600 font-medium">
+                I agree to the <Link to="/terms" state={{ fromRegistration: true }} className="text-orange-600 font-bold hover:underline">Terms & Conditions</Link> and <Link to="/privacy" state={{ fromRegistration: true }} className="text-orange-600 font-bold hover:underline">Privacy Policy</Link> of Best Venue Option.
+              </label>
+            </div>
+
             <button 
-              disabled={loading}
+              disabled={loading || !termsAccepted}
               type="submit" 
-              className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all disabled:opacity-50"
+              className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all disabled:opacity-50 disabled:bg-gray-400"
             >
               {loading ? 'Registering...' : 'Register Now'}
             </button>
@@ -3776,9 +3794,22 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: 
 };
 
 const TermsView = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromRegistration = location.state?.fromRegistration;
+
   return (
     <div className="min-h-screen bg-gray-50 pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {fromRegistration && (
+          <button 
+            onClick={() => navigate(-1)}
+            className="mb-8 flex items-center text-orange-600 font-bold hover:text-orange-700 transition-colors"
+          >
+            <ArrowLeft size={20} className="mr-2" />
+            Go Back to Registration
+          </button>
+        )}
         <div className="bg-white rounded-[3rem] p-8 md:p-12 shadow-sm border border-gray-100">
           <h1 className="text-4xl font-black text-gray-900 mb-8">Terms & Conditions</h1>
           <div className="prose prose-orange max-w-none text-gray-600 space-y-6">
@@ -5549,6 +5580,13 @@ const BookingManagerView = ({
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
   const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (parentBookings) setBookings(parentBookings);
@@ -5872,19 +5910,19 @@ const BookingManagerView = ({
   if (loading) return <div className="h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-6 md:space-y-10 px-4 md:px-0">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+    <div className="space-y-6 md:space-y-10 px-0">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 md:mb-10">
         <div className="w-full">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Booking Manager</h1>
           <p className="text-sm text-gray-500 mt-1">Manage your venue and service bookings</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:items-center gap-3 w-full lg:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:items-center gap-2 md:gap-3 w-full lg:w-auto">
           <select 
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All Status</option>
+            <option value="all">Status</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Approved</option>
             <option value="cancelled">Rejected</option>
@@ -5892,15 +5930,15 @@ const BookingManagerView = ({
           </select>
           <input 
             type="date" 
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] sm:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
           />
           <button 
             onClick={() => setIsManualModalOpen(true)}
-            className="col-span-2 sm:col-span-1 bg-orange-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-base flex items-center justify-center space-x-2 hover:bg-orange-700 transition-all shadow-lg shadow-orange-200"
+            className="col-span-2 sm:col-span-1 bg-orange-600 text-white px-3 py-2 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-base flex items-center justify-center space-x-1 sm:space-x-2 hover:bg-orange-700 transition-all shadow-lg shadow-orange-200 whitespace-nowrap"
           >
-            <Plus size={18} />
+            <Plus size={14} className="sm:size-[18px]" />
             <span>Manual Entry</span>
           </button>
         </div>
@@ -5909,39 +5947,40 @@ const BookingManagerView = ({
       <div className="grid grid-cols-1 gap-4 md:gap-6">
         {currentBookings.length > 0 ? (
           currentBookings.map(booking => (
-            <div key={booking.id} className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
-              <div className="flex items-start space-x-3 md:space-x-4">
+            <div key={booking.id} className="bg-white rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+              <div className="flex items-start space-x-3 md:space-x-4 min-w-0">
                 <div className={cn(
-                  "flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center",
+                  "flex-shrink-0 w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl flex items-center justify-center",
                   booking.status === 'pending' ? "bg-yellow-100 text-yellow-600" :
                   booking.status === 'confirmed' ? "bg-green-100 text-green-600" :
                   "bg-red-100 text-red-600"
                 )}>
-                  <Calendar size={isDesktop ? 24 : 20} />
+                  <Calendar size={isDesktop ? 24 : 16} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center flex-wrap gap-2">
-                    <h3 className="font-bold text-base md:text-lg text-gray-900 truncate">
+                  <div className="flex items-center flex-wrap gap-1 md:gap-2">
+                    <h3 className="font-bold text-sm md:text-lg text-gray-900 truncate max-w-[140px] md:max-w-none">
                       {booking.isManual ? booking.partyName : booking.visitorName}
                     </h3>
                     {booking.isManual && (
-                      <span className="bg-gray-100 text-gray-500 text-[8px] md:text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Manual</span>
+                      <span className="bg-gray-100 text-gray-500 text-[6px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Manual</span>
                     )}
                   </div>
-                  <p className="text-xs md:text-sm text-gray-500 font-medium truncate">{booking.targetName} • {booking.eventType}</p>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] md:text-sm text-gray-400">
-                    <span className="flex items-center"><Calendar size={12} className="mr-1" /> {booking.eventDate}</span>
-                    <span className="flex items-center"><Phone size={12} className="mr-1" /> {booking.visitorMobile}</span>
+                  <p className="text-[10px] md:text-sm text-gray-500 font-medium truncate">{booking.targetName} • {booking.eventType}</p>
+                  <div className="flex flex-wrap items-center gap-x-2 md:gap-x-4 gap-y-1 mt-1.5 md:mt-2 text-[9px] md:text-sm text-gray-400">
+                    <span className="flex items-center whitespace-nowrap"><Calendar size={10} className="mr-0.5 md:mr-1" /> {booking.eventDate}</span>
+                    <span className="flex items-center whitespace-nowrap"><Phone size={10} className="mr-0.5 md:mr-1" /> {booking.visitorMobile}</span>
+                    {booking.partyAddress && <span className="flex items-center col-span-2 md:col-span-1"><MapPin size={10} className="mr-0.5 md:mr-1" /> {booking.partyAddress}</span>}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3 border-t border-gray-50 pt-3 md:border-none md:pt-0">
+              <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 md:gap-3 border-t border-gray-50 pt-3 md:border-none md:pt-0">
                 {booking.status === 'pending' ? (
                   <>
                     <button 
                       onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                      className="px-6 py-2 rounded-xl font-bold text-red-600 hover:bg-red-50 transition-all"
+                      className="px-4 py-1.5 md:px-6 md:py-2 rounded-lg md:rounded-xl font-bold text-xs md:text-base text-red-600 hover:bg-red-50 transition-all border border-red-100 md:border-none"
                     >
                       Deny
                     </button>
@@ -5950,21 +5989,21 @@ const BookingManagerView = ({
                         setSelectedBooking(booking);
                         setIsAcceptModalOpen(true);
                       }}
-                      className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-100"
+                      className="px-4 py-1.5 md:px-6 md:py-2 bg-green-600 text-white rounded-lg md:rounded-xl font-bold text-xs md:text-base hover:bg-green-700 transition-all shadow-lg shadow-green-100"
                     >
                       Accept
                     </button>
                   </>
                 ) : (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={cn(
-                      "px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider",
+                      "px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl font-bold text-[9px] md:text-sm uppercase tracking-wider",
                       (booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
                     )}>
-                      {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed Successfully' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
+                      {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
                     </span>
                     {(booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? (
-                      <>
+                      <div className="flex items-center gap-2">
                         <button 
                           disabled={booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid'}
                           onClick={() => {
@@ -5995,44 +6034,42 @@ const BookingManagerView = ({
                             setIsPaymentRecordModalOpen(true);
                           }}
                           className={cn(
-                            "flex items-center space-x-2 px-3 py-2 rounded-xl transition-all",
-                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100 shadow-sm"
+                            "p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all border",
+                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
                           )}
-                          title={(booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "Payment completed - Lock Manage" : "Manage Payment Transactions"}
+                          title="Manage Payments"
                         >
-                          <IndianRupee size={18} />
-                          <span className="text-sm font-medium">Manage Payments</span>
+                          <IndianRupee size={16} className="md:size-[18px]" />
                         </button>
-                            <button 
-                              onClick={() => {
-                                try {
-                                  const pdfBlob = generateInvoice(booking, 0, profile);
-                                  const url = URL.createObjectURL(pdfBlob);
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                  URL.revokeObjectURL(url);
-                                  toast.success('Invoice downloaded successfully');
-                                  
-                                  // Mark as generated
-                                  db.from('bookings').update({ is_invoice_generated: true }).eq('id', booking.id).then(() => {
-                                    if (onUpdate) onUpdate();
-                                    fetchBookings();
-                                  });
-                                } catch (err) {
-                                  console.error('Download error:', err);
-                                  toast.error('Failed to generate invoice');
-                                }
-                              }}
-                              className="p-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-xl transition-all border border-orange-100"
-                              title="Download PDF Invoice"
-                            >
-                              <Download size={18} />
-                            </button>
-                          </>
+                        <button 
+                          onClick={() => {
+                            try {
+                              const pdfBlob = generateInvoice(booking, 0, profile);
+                              const url = URL.createObjectURL(pdfBlob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(url);
+                              toast.success('Invoice downloaded successfully');
+                              
+                              db.from('bookings').update({ is_invoice_generated: true }).eq('id', booking.id).then(() => {
+                                if (onUpdate) onUpdate();
+                                fetchBookings();
+                              });
+                            } catch (err) {
+                              console.error('Download error:', err);
+                              toast.error('Failed to generate invoice');
+                            }
+                          }}
+                          className="p-1.5 md:p-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-lg md:rounded-xl hover:bg-purple-100 transition-all"
+                          title="Download Invoice"
+                        >
+                          <Download size={16} className="md:size-[18px]" />
+                        </button>
+                      </div>
                         ) : null}
                       </div>
                     )}
@@ -7041,7 +7078,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="bg-white rounded-3xl shadow-xl border border-orange-100 p-8 min-h-[600px]"
+              className="bg-white rounded-3xl shadow-xl border border-orange-100 p-3 md:p-8 min-h-[500px] md:min-h-[600px] overflow-hidden"
             >
               {activeTab === 'overview' && (
                 <div className="space-y-8">
@@ -7729,7 +7766,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   };
 
   return (
-    <div className="space-y-6 md:space-y-10 px-4 md:px-0">
+    <div className="space-y-6 md:space-y-10 px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="w-full">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Orders</h2>
@@ -7737,11 +7774,11 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <select 
-            className="flex-1 md:flex-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="flex-1 md:flex-none px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All Status</option>
+            <option value="all">Status</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Approved</option>
             <option value="cancelled">Rejected</option>
@@ -7749,7 +7786,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           </select>
           <input 
             type="date" 
-            className="flex-1 md:flex-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="flex-1 md:flex-none px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
           />
@@ -7764,12 +7801,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
            const isActuallyPaid = (totalRec >= subTotal && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
 
            return (
-          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="w-full md:w-auto">
+          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="w-full">
               <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
-                <span className="font-bold text-base md:text-lg truncate max-w-[200px] md:max-w-none">{b.targetName}</span>
+                <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.targetName}</span>
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase",
+                  "px-2 py-0.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase",
                   isActuallyPaid ? "bg-green-100 text-green-700" : 
                   b.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
                   b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
@@ -7777,41 +7814,48 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   {isActuallyPaid ? 'Completed' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center text-[10px] md:text-sm text-gray-500 gap-2 md:gap-x-4 md:gap-y-2 mt-2">
-                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={12} className="mr-1 text-orange-600" /> {b.eventDate}</span>
-                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={12} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
-                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={12} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
+              <div className="flex flex-wrap items-center text-[9px] md:text-sm text-gray-500 gap-1.5 md:gap-x-4 md:gap-y-2 mt-2">
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={10} className="mr-1 text-orange-600" /> {b.eventDate}</span>
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={10} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
+                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={10} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
               </div>
               
               <div className="mt-3 md:mt-4 p-3 md:p-4 bg-white rounded-2xl border border-gray-100 space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <User size={14} className="text-gray-400" />
-                    <span className="text-gray-500">Sender:</span>
-                    <span className="font-bold text-gray-900">{b.visitorName}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-xs md:text-sm">
+                  <div className="flex items-center space-x-2 overflow-hidden">
+                    <User size={12} className="text-gray-400 shrink-0" />
+                    <span className="text-gray-500 shrink-0">Sender:</span>
+                    <span className="font-bold text-gray-900 truncate">{b.visitorName}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Phone size={14} className="text-gray-400" />
-                    <span className="text-gray-500">Mobile:</span>
-                    <span className="font-bold text-gray-900">{b.visitorMobile}</span>
+                  <div className="flex items-center space-x-2 overflow-hidden">
+                    <Phone size={12} className="text-gray-400 shrink-0" />
+                    <span className="text-gray-500 shrink-0">Mobile:</span>
+                    <span className="font-bold text-gray-900 truncate">{b.visitorMobile}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Tag size={14} className="text-gray-400" />
-                    <span className="text-gray-500">Event:</span>
-                    <span className="font-bold text-gray-900">{b.eventType || 'N/A'}</span>
+                  <div className="flex items-center space-x-2 overflow-hidden">
+                    <Tag size={12} className="text-gray-400 shrink-0" />
+                    <span className="text-gray-500 shrink-0">Event:</span>
+                    <span className="font-bold text-gray-900 truncate">{b.eventType || 'N/A'}</span>
                   </div>
+                  {b.partyAddress && (
+                    <div className="flex items-center space-x-2 overflow-hidden md:col-span-2">
+                      <MapPin size={12} className="text-gray-400 shrink-0" />
+                      <span className="text-gray-500 shrink-0">Address:</span>
+                      <span className="font-bold text-gray-900 truncate">{b.partyAddress}</span>
+                    </div>
+                  )}
                 </div>
                 {b.message && (
                   <div className="pt-2 border-t border-gray-50">
-                    <p className="text-xs text-gray-500 italic flex items-start">
-                      <MessageSquare size={12} className="mr-1 mt-0.5 shrink-0" />
-                      <span>"{b.message}"</span>
+                    <p className="text-[10px] md:text-xs text-gray-500 italic flex items-start">
+                      <MessageSquare size={10} className="mr-1 mt-0.5 shrink-0" />
+                      <span className="line-clamp-2">"{b.message}"</span>
                     </p>
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               {/* Owner/Provider Actions */}
               {b.status === 'pending' && b.ownerId === user?.uid && (
                 <>
@@ -7820,16 +7864,16 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                       setSelectedBooking(b);
                       setIsAcceptModalOpen(true);
                     }} 
-                    className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700"
+                    className="flex-1 md:flex-none justify-center bg-green-600 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold hover:bg-green-700 flex items-center"
                   >
                     Accept
                   </button>
-                  <button onClick={() => handleStatus(b.id, 'cancelled')} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-700">Reject</button>
+                  <button onClick={() => handleStatus(b.id, 'cancelled')} className="flex-1 md:flex-none justify-center bg-red-600 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold hover:bg-red-700 flex items-center">Reject</button>
                 </>
               )}
 
               {(b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid') && b.ownerId === user?.uid && (
-                <>
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   <button 
                     disabled={b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid'}
                     onClick={() => {
@@ -7842,12 +7886,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                       setIsAmountModalOpen(true);
                     }}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-100 text-orange-600 hover:bg-orange-200"
+                      "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
+                      (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100"
                     )}
                   >
-                    <Edit2 size={16} />
-                    <span>Update Amount</span>
+                    <Edit2 size={12} className="md:size-4" />
+                    <span>Amount</span>
                   </button>
                   <button 
                     disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)}
@@ -7860,12 +7904,12 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                       setIsPaymentRecordModalOpen(true);
                     }}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all",
-                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
+                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                     )}
                   >
-                    <IndianRupee size={16} />
-                    <span>Manage Payments</span>
+                    <IndianRupee size={12} className="md:size-4" />
+                    <span>Payments</span>
                   </button>
                   <button 
                     onClick={() => {
@@ -7890,19 +7934,19 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                         toast.error('Failed to generate invoice');
                       }
                     }}
-                    className="px-4 py-2 bg-purple-50 text-purple-600 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all hover:bg-purple-100"
+                    className="flex-1 md:flex-none justify-center px-3 py-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all hover:bg-purple-100"
                   >
-                    <Download size={16} />
+                    <Download size={12} className="md:size-4" />
                     <span>Invoice</span>
                   </button>
-                </>
+                </div>
               )}
               
               {/* User Actions */}
               {b.status === 'confirmed' && b.userId === user?.uid && (
                 <button 
                   onClick={() => handlePayment(b)}
-                  className="bg-orange-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-orange-700 flex items-center space-x-2"
+                  className="w-full md:w-auto bg-orange-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-orange-700 flex items-center justify-center space-x-2"
                 >
                   <CreditCard size={16} />
                   <span>Pay Now</span>
@@ -9608,6 +9652,13 @@ const SearchResultsView = () => {
 
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
 
+  useEffect(() => {
+    setSearchTerm(searchParams.get('q') || '');
+    setSelectedState(searchParams.get('state') || '');
+    setSelectedDistrict(searchParams.get('district') || '');
+    setSelectedBlock(searchParams.get('block') || '');
+  }, [searchParams]);
+
   const states = Object.keys(LOCATION_DATA || {});
   const districts = selectedState ? Object.keys(LOCATION_DATA[selectedState] || {}) : [];
   const blocks = (selectedState && selectedDistrict && LOCATION_DATA[selectedState]) ? (LOCATION_DATA[selectedState][selectedDistrict] || []) : [];
@@ -9757,19 +9808,6 @@ const SearchResultsView = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div className="mb-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-black text-gray-900">Explore Categories</h2>
-          <button 
-            onClick={clearFilters}
-            className="text-orange-600 font-bold hover:underline flex items-center"
-          >
-            Clear All Filters
-          </button>
-        </div>
-        <CategoryDisplay />
-      </div>
-
       <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-orange-100 mb-16 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 blur-2xl" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-pink-50 rounded-full -ml-16 -mb-16 blur-2xl" />
@@ -9847,11 +9885,20 @@ const SearchResultsView = () => {
         </div>
       </div>
 
-      <div className="mb-12">
-        <h1 className="text-4xl font-black text-gray-900 mb-4">Results</h1>
-        <p className="text-gray-500">
-          Found {venues.length} venues and {services.length} services
-        </p>
+      <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-black text-gray-900 mb-2">Results</h1>
+          <p className="text-gray-500">
+            Found {venues.length} venues and {services.length} services
+          </p>
+        </div>
+        <button 
+          onClick={clearFilters}
+          className="bg-orange-50 text-orange-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-orange-100 transition-all flex items-center w-fit"
+        >
+          <RotateCcw size={16} className="mr-2" />
+          Clear All Filters
+        </button>
       </div>
 
       {loading ? (
@@ -10230,6 +10277,8 @@ export default function App() {
               <Route path="/gallery" element={<GalleryView />} />
               <Route path="/about" element={<AboutView />} />
               <Route path="/terms" element={<TermsView />} />
+              <Route path="/privacy" element={<PrivacyView />} />
+              <Route path="/pricing" element={<PricingView />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </main>
@@ -10254,10 +10303,23 @@ export default function App() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-400 font-bold uppercase tracking-wider">App Rating</p>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-2xl font-black text-white">{appRating}</span>
-                          <span className="text-gray-500">/ 5.0</span>
-                          <span className="text-xs text-gray-600 ml-2">({totalFeedback} reviews)</span>
+                        <div className="flex flex-col space-y-1">
+                          <div className="flex items-center space-x-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star 
+                                key={star} 
+                                size={14} 
+                                className={cn(
+                                  star <= Math.round(appRating) ? "text-orange-500 fill-orange-500" : "text-gray-600"
+                                )} 
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-2xl font-black text-white">{appRating}</span>
+                            <span className="text-gray-500 font-bold">/ 5.0</span>
+                            <span className="text-xs text-gray-600 ml-2 whitespace-nowrap">({totalFeedback} reviews)</span>
+                          </div>
                         </div>
                       </div>
                       <button 
@@ -11765,6 +11827,93 @@ const VenueListView = () => {
           <h3 className="text-2xl font-bold text-gray-400">No venues found matching your criteria</h3>
         </div>
       )}
+    </div>
+  );
+};
+
+const PrivacyView = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromRegistration = location.state?.fromRegistration;
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-32">
+      {fromRegistration && (
+        <button 
+          onClick={() => navigate(-1)}
+          className="mb-8 flex items-center text-orange-600 font-bold hover:text-orange-700 transition-colors"
+        >
+          <ArrowLeft size={20} className="mr-2" />
+          Go Back to Registration
+        </button>
+      )}
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
+        <div className="prose max-w-none text-gray-700 space-y-6">
+          <p>At Best Venue Option, we prioritize your privacy. This policy outlines how we handle your data.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mt-8">1. Information We Collect</h2>
+          <p>We collect information you provide directly to us during registration, such as your name, mobile number, and business details.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mt-8">2. How We Use Your Information</h2>
+          <p>Your information is used to provide our services, connect you with visitors, and improve your experience on our platform.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mt-8">3. Data Security</h2>
+          <p>We implement industry-standard security measures to protect your data from unauthorized access.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PricingView = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-32">
+      <div className="text-center mb-16">
+        <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 tracking-tighter">Subscription Plans</h1>
+        <p className="text-xl text-gray-500">Simple, transparent pricing for growing your business.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {[
+          { name: 'Basic', price: '0', duration: 'Free', benefits: ['1 Venue Listing', 'Basic Analytics', 'Standard Support'], color: 'gray' },
+          { name: 'Professional', price: '999', duration: 'per year', benefits: ['Unlimited Listings', 'Priority Search', 'Whastapp Alerts', 'Advanced Analytics'], color: 'orange', featured: true },
+          { name: 'Enterprise', price: '2499', duration: 'per year', benefits: ['All Pro Features', 'Dedicated Manager', 'Custom Branding', 'API Access'], color: 'purple' }
+        ].map((plan, i) => (
+          <div key={i} className={cn(
+            "bg-white rounded-[3rem] p-10 border-2 transition-all hover:scale-[1.02]",
+            plan.featured ? "border-orange-500 shadow-2xl shadow-orange-100 scale-105 relative z-10" : "border-gray-100 shadow-xl"
+          )}>
+            {plan.featured && <span className="absolute top-0 right-10 -translate-y-1/2 bg-orange-600 text-white px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">Most Popular</span>}
+            <h3 className="text-2xl font-black mb-2">{plan.name}</h3>
+            <div className="mb-8">
+              <span className="text-5xl font-black">₹{plan.price}</span>
+              <span className="text-gray-500 ml-2 font-bold tracking-tight">/{plan.duration}</span>
+            </div>
+            <ul className="space-y-4 mb-10">
+              {plan.benefits.map((b, idx) => (
+                <li key={idx} className="flex items-center text-gray-600 font-medium">
+                  <CheckCircle size={18} className="text-green-500 mr-3 shrink-0" />
+                  {b}
+                </li>
+              ))}
+            </ul>
+            <button 
+              onClick={() => navigate('/login')}
+              className={cn(
+                "w-full py-5 rounded-[1.5rem] font-black text-lg transition-all shadow-lg",
+                plan.featured ? "bg-orange-600 text-white hover:bg-orange-700 shadow-orange-200" : "bg-gray-900 text-white hover:bg-black shadow-gray-200"
+              )}
+            >
+              Get Started Now
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="mt-20 text-center">
+        <button onClick={() => navigate('/login')} className="text-gray-400 font-bold hover:text-gray-600 transition-colors">
+          Already have an account? Login here
+        </button>
+      </div>
     </div>
   );
 };
