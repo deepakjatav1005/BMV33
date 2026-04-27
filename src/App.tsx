@@ -1245,8 +1245,15 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
       let query = db.from('app_feedback').select('*');
       
       if (user?.uid) {
-        query = query.or(`user_id.eq.${user.uid}${vMobile ? `,visitor_mobile.eq.${vMobile}` : ''}`);
-      } else if (vMobile) {
+        // Registered User: match by user_id OR their mobile
+        const uid = user.uid;
+        if (vMobile && vMobile.length === 10) {
+          query = query.or(`user_id.eq.${uid},visitor_mobile.eq.${vMobile}`);
+        } else {
+          query = query.eq('user_id', uid);
+        }
+      } else if (vMobile && vMobile.length === 10) {
+        // Visitor: match by mobile only
         query = query.eq('visitor_mobile', vMobile);
       } else {
         return;
@@ -1262,6 +1269,9 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
           setVisitorName(data.user_name || '');
           setVisitorMobile(data.visitor_mobile || '');
         }
+      } else {
+        // Reset if no record found for the new mobile
+        setExistingFeedbackId(null);
       }
     } catch (err) {
       console.error('Error fetching existing feedback:', err);
@@ -1297,30 +1307,27 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
         created_at: new Date().toISOString()
       };
 
-      if (existingFeedbackId) {
-        const { error } = await db.from('app_feedback').update(feedbackData).eq('id', existingFeedbackId);
-        if (error) throw error;
-        toast.success('Your app feedback has been updated!');
-      } else {
-        // Double check for existing by mobile/user_id just before insert to be safe
+      // Best effort to find existing record ID just before submission
+      let finalId = existingFeedbackId;
+      if (!finalId) {
         let checkQuery = db.from('app_feedback').select('id');
         if (user?.uid) {
           checkQuery = checkQuery.or(`user_id.eq.${user.uid},visitor_mobile.eq.${currentMobile}`);
         } else {
           checkQuery = checkQuery.eq('visitor_mobile', currentMobile);
         }
-        
         const { data: doubleCheck } = await checkQuery.maybeSingle();
+        finalId = doubleCheck?.id;
+      }
 
-        if (doubleCheck) {
-          const { error } = await db.from('app_feedback').update(feedbackData).eq('id', doubleCheck.id);
-          if (error) throw error;
-          toast.success('Your app feedback has been updated!');
-        } else {
-          const { error } = await db.from('app_feedback').insert([feedbackData]);
-          if (error) throw error;
-          toast.success('Thank you for your feedback!');
-        }
+      if (finalId) {
+        const { error } = await db.from('app_feedback').update(feedbackData).eq('id', finalId);
+        if (error) throw error;
+        toast.success('Your app feedback has been updated!');
+      } else {
+        const { error } = await db.from('app_feedback').insert([feedbackData]);
+        if (error) throw error;
+        toast.success('Thank you for your feedback!');
       }
       
       setIsSuccess(true);
@@ -1366,11 +1373,29 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
         ) : (
           <div className="p-8">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900">Rate Our App</h3>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">
+                  {existingFeedbackId ? 'Update Your Feedback' : 'Rate Our App'}
+                </h3>
+                <p className="text-sm text-gray-500">We value your opinion!</p>
+              </div>
+              <button 
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-xl transition-all"
+              >
                 <X size={24} />
               </button>
             </div>
+
+            {existingFeedbackId && (
+              <div className="mb-6 bg-orange-50 border border-orange-100 p-4 rounded-2xl flex items-start space-x-3">
+                <ShieldCheck className="text-orange-600 mt-1 shrink-0" size={18} />
+                <div>
+                  <span className="block text-xs font-bold text-orange-700 uppercase tracking-wider mb-1">Existing feedback found!</span>
+                  <p className="text-[10px] text-orange-600 leading-tight">Your previous ratings and comments are loaded. Submitting will update your existing feedback instead of creating a duplicate.</p>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* ... existing form fields ... */}
@@ -1619,11 +1644,24 @@ const ReviewSection = ({
             {hasExistingReview ? 'Edit Your Review' : `Rate & Review ${targetName}`}
           </h3>
           {hasExistingReview && (
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-              Existing Review Found
+            <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-orange-100 flex items-center">
+              <RotateCcw size={12} className="mr-1" />
+              Updating Existing Review
             </span>
           )}
         </div>
+        {hasExistingReview && (
+          <div className="mb-6 bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-start space-x-3">
+            <Info className="text-blue-600 mt-1 shrink-0" size={18} />
+            <div>
+              <span className="block text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Duplicate Entry Prevented</span>
+              <p className="text-[10px] text-blue-600 leading-tight">
+                {user ? "A review from your account already exists. " : "A review matching your mobile number already exists. "}
+                Submitting this form will replace your previous review data with the new values.
+              </p>
+            </div>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-center space-x-2 mb-4">
             {[1, 2, 3, 4, 5].map((star) => (
