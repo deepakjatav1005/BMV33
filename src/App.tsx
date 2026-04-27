@@ -432,6 +432,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
 import { format } from 'date-fns';
+import { calculateDistance as calculateGeoDistance } from './lib/utils';
+import LocationPicker from './components/LocationPicker';
+import LocationDisplay from './components/LocationDisplay';
 
 // --- Components ---
 const ConfirmModal = ({ 
@@ -1021,6 +1024,17 @@ const formatTime12h = (timeStr: string | null | undefined) => {
     return `${h12.toString().padStart(2, '0')}:${m} ${ampm}`;
   } catch (err) {
     return timeStr;
+  }
+};
+
+const formatDateTime12h = (date: Date | string | null | undefined) => {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+    return format(d, 'dd/MM/yyyy hh:mm a');
+  } catch {
+    return typeof date === 'string' ? date : '';
   }
 };
 
@@ -4709,6 +4723,16 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         </div>
       </div>
 
+      {venue.latitude && venue.longitude && (
+        <div className="mb-12 bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <LocationDisplay 
+            latitude={venue.latitude} 
+            longitude={venue.longitude} 
+            businessName={venue.name} 
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-12">
           {/* Main Highlights Bar */}
@@ -5054,6 +5078,8 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         reviewCount: data.review_count,
         availableFor: data.available_for,
         catalogue: data.catalogue || [],
+        latitude: data.latitude,
+        longitude: data.longitude,
         createdAt: data.created_at
       } as ServiceProvider);
 
@@ -5280,6 +5306,18 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
           </div>
         </div>
       </div>
+
+      {service.latitude && service.longitude && (
+        <div className="max-w-7xl mx-auto px-4 mt-8">
+          <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <LocationDisplay 
+              latitude={service.latitude} 
+              longitude={service.longitude} 
+              businessName={service.name} 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 mt-10">
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-wrap gap-8 justify-around">
@@ -5765,7 +5803,7 @@ const BookingManagerView = ({
       
       const booking = bookings.find(b => b.id === id);
       if (status === 'confirmed' && booking) {
-        const msg = `Congratulations! Your booking for ${booking.targetName} on ${booking.eventDate} has been CONFIRMED. We look forward to serving you!`;
+        const msg = `Congratulations! Your booking for ${booking.targetName} on ${formatDateDDMMYYYY(booking.eventDate)} has been CONFIRMED. We look forward to serving you!`;
         sendWhatsAppAlert(booking.visitorMobile || '', msg);
       }
       
@@ -5910,8 +5948,8 @@ const BookingManagerView = ({
       const whatsappMsg = `*Booking Confirmation - BEST VANUE OPTION*%0A%0A` +
         `Hello ${manualBooking.partyName}, your booking for *${manualBooking.targetName}* has been confirmed!%0A%0A` +
         `*Booking Details:*%0A` +
-        `*Date:* ${manualBooking.eventDate}${manualBooking.endDate ? ' to ' + manualBooking.endDate : ''}%0A` +
-        `*Time:* ${manualBooking.startTime} - ${manualBooking.endTime}%0A` +
+        `*Date:* ${formatDateDDMMYYYY(manualBooking.eventDate)}${manualBooking.endDate ? ' to ' + formatDateDDMMYYYY(manualBooking.endDate) : ''}%0A` +
+        `*Time:* ${formatTime12h(manualBooking.startTime)} - ${formatTime12h(manualBooking.endTime)}%0A` +
         `*Event:* ${manualBooking.eventType}%0A%0A` +
         `Thank you for choosing our service!`;
       
@@ -6006,7 +6044,7 @@ const BookingManagerView = ({
                   </div>
                   <p className="text-[10px] md:text-sm text-gray-500 font-medium truncate">{booking.targetName} • {booking.eventType}</p>
                   <div className="flex flex-wrap items-center gap-x-2 md:gap-x-4 gap-y-1 mt-1.5 md:mt-2 text-[9px] md:text-sm text-gray-400">
-                    <span className="flex items-center whitespace-nowrap"><Calendar size={10} className="mr-0.5 md:mr-1" /> {booking.eventDate}</span>
+                    <span className="flex items-center whitespace-nowrap"><Calendar size={10} className="mr-0.5 md:mr-1" /> {formatDateDDMMYYYY(booking.eventDate)}</span>
                     <span className="flex items-center whitespace-nowrap"><Phone size={10} className="mr-0.5 md:mr-1" /> {booking.visitorMobile}</span>
                     {booking.partyAddress && <span className="flex items-center col-span-2 md:col-span-1"><MapPin size={10} className="mr-0.5 md:mr-1" /> {booking.partyAddress}</span>}
                   </div>
@@ -6685,7 +6723,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           'Status': (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed Successfully' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : (b.status || 'Pending'),
           'Party Name': b.partyName || b.visitorName || 'N/A',
           'Mobile': b.visitorMobile || 'N/A',
-          'Date': b.eventDate,
+          'Date': formatDateDDMMYYYY(b.eventDate),
           'Invoice No': `INV-${(b.id || '').substring(0, 8).toUpperCase()}`,
           'Actual Amount': subTotal,
           'Received Amount': paymentsTotal,
@@ -6703,7 +6741,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
       doc.setFontSize(10);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+      doc.text(`Generated on: ${formatDateTime12h(new Date())}`, 14, 30);
       
       const tableHeaders = [
         ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Inv.Amt', 'Paid', 'Pending', 'Type']
@@ -6722,7 +6760,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
           (b.partyName || b.visitorName || 'N/A').substring(0, 15),
           b.visitorMobile || 'N/A',
           (b.partyAddress || 'N/A').substring(0, 10),
-          b.eventDate,
+          formatDateDDMMYYYY(b.eventDate),
           (b.id || '').substring(0, 5).toUpperCase(),
           subTotal.toString(),
           paymentsTotal.toString(),
@@ -7853,9 +7891,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                 </span>
               </div>
               <div className="flex flex-wrap items-center text-[9px] md:text-sm text-gray-500 gap-1.5 md:gap-x-4 md:gap-y-2 mt-2">
-                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={10} className="mr-1 text-orange-600" /> {b.eventDate}</span>
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={10} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
                 <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={10} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
-                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={10} className="mr-1" /> {b.startTime} - {b.endTime}</span>}
+                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={10} className="mr-1" /> {formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>}
               </div>
               
               <div className="mt-3 md:mt-4 p-3 md:p-4 bg-white rounded-2xl border border-gray-100 space-y-2">
@@ -8291,7 +8329,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
         <div className="bg-green-50 border border-green-100 p-6 rounded-2xl flex justify-between items-center">
           <div>
             <h3 className="font-bold text-green-800">Active Subscription</h3>
-            <p className="text-sm text-green-600">Valid until {new Date(currentSub.endDate).toLocaleDateString()}</p>
+            <p className="text-sm text-green-600">Valid until {formatDateDDMMYYYY(currentSub.endDate)}</p>
           </div>
           <ShieldCheck className="text-green-600" size={32} />
         </div>
@@ -8629,6 +8667,8 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     video_url: '',
     facilities: [] as string[],
     availableFor: [] as string[],
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -8645,6 +8685,8 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         video_url: formData.video_url,
         facilities: formData.facilities,
         available_for: formData.availableFor,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         state: profile?.state || '',
         district: profile?.district || '',
         block: profile?.block || '',
@@ -8748,6 +8790,12 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
             />
           </div>
 
+          <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <LocationPicker 
+              onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
+            />
+          </div>
+
           <div className="md:col-span-2 space-y-4">
             <label className="block text-sm font-bold text-gray-700">Media Uploads (Photos & Videos)</label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -8847,7 +8895,9 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           priceLevel: data.price_level || 'per day',
           video_url: data.video_url || '',
           availableFor: data.available_for || [],
-          facilities: data.facilities || []
+          facilities: data.facilities || [],
+          latitude: data.latitude,
+          longitude: data.longitude
         });
       }
       setLoading(false);
@@ -8868,7 +8918,9 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         images: formData.images,
         video_url: formData.video_url,
         available_for: formData.availableFor,
-        facilities: formData.facilities
+        facilities: formData.facilities,
+        latitude: formData.latitude,
+        longitude: formData.longitude
       }).eq('id', id);
       if (error) throw error;
       toast.success('Service updated successfully!');
@@ -8955,6 +9007,13 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <LocationPicker 
+              initialLocation={formData.latitude ? { lat: formData.latitude, lng: formData.longitude } : undefined}
+              onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
             />
           </div>
           <div className="md:col-span-2 space-y-4">
@@ -9061,7 +9120,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           pricePerDay: data.price_per_day,
           video_url: data.video_url || '',
           availableFor: data.available_for || [],
-          facilities: data.facilities || []
+          facilities: data.facilities || [],
+          latitude: data.latitude,
+          longitude: data.longitude
         });
       }
       setLoading(false);
@@ -9084,7 +9145,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         images: formData.images,
         video_url: formData.video_url,
         facilities: formData.facilities,
-        available_for: formData.availableFor
+        available_for: formData.availableFor,
+        latitude: formData.latitude,
+        longitude: formData.longitude
       }).eq('id', id);
       if (error) throw error;
       toast.success('Venue updated successfully!');
@@ -9183,6 +9246,13 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none uppercase"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <LocationPicker 
+              initialLocation={formData.latitude ? { lat: formData.latitude, lng: formData.longitude } : undefined}
+              onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
             />
           </div>
 
@@ -9460,6 +9530,8 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     video_url: '',
     facilities: [] as string[],
     availableFor: [] as string[],
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -9481,6 +9553,8 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         video_url: formData.video_url,
         facilities: formData.facilities,
         available_for: formData.availableFor,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         owner_id: user?.uid,
         rating: 0,
         review_count: 0
@@ -9577,6 +9651,12 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={formData.pricePerDay || ''}
               onChange={(e) => setFormData({...formData, pricePerDay: parseInt(e.target.value) || 0})}
+            />
+          </div>
+
+          <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <LocationPicker 
+              onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
             />
           </div>
           <div className="md:col-span-2">
@@ -10740,7 +10820,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         'Email': u.email,
         'Role': u.role,
         'Status': u.status,
-        'Created At': new Date(u.createdAt).toLocaleString()
+        'Created At': formatDateTime12h(u.createdAt)
       }));
       
       if (type === 'excel') {
@@ -11222,6 +11302,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                         <tr className="border-b border-gray-100 pb-4">
                           <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">User</th>
                           <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Role</th>
+                          <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Registered At</th>
                           <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Status</th>
                           <th className="py-4 font-bold text-gray-400 text-sm uppercase tracking-wider">Actions</th>
                         </tr>
@@ -11240,6 +11321,9 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                               }`}>
                                 {u.role}
                               </span>
+                            </td>
+                            <td className="py-4 text-sm text-gray-500 font-bold">
+                              {formatDateTime12h(u.createdAt)}
                             </td>
                             <td className="py-4">
                               <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${

@@ -41,6 +41,8 @@ CREATE TABLE public.venues (
     facilities TEXT[], -- Array of facilities
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
+    latitude NUMERIC,
+    longitude NUMERIC,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -57,6 +59,8 @@ CREATE TABLE public.service_providers (
     images TEXT[],
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
+    latitude NUMERIC,
+    longitude NUMERIC,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

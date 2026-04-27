@@ -123,6 +123,8 @@ export interface Venue {
   rateChart?: { item: string; price: number }[];
   catalogue?: CatalogueItem[];
   availableFor?: string[];
+  latitude?: number;
+  longitude?: number;
   createdAt: any;
 }
 
@@ -169,6 +171,8 @@ export interface ServiceProvider {
   catalogue?: CatalogueItem[];
   availableFor?: string[];
   facilities?: string[];
+  latitude?: number;
+  longitude?: number;
   createdAt: any;
 }
 
