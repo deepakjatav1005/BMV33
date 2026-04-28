@@ -3066,7 +3066,7 @@ const RegistrationView = () => {
         display_name: formData.name,
         father_name: formData.fatherName,
         mobile_number: formData.mobileNumber,
-        email: formData.email,
+        email: formData.email || null,
         photo_url: formData.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + regId,
         role: formData.role,
         state: formData.state,
@@ -3154,8 +3154,8 @@ const RegistrationView = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Gmail ID (Email)</label>
-              <input required type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+              <label className="block text-sm font-bold text-gray-700 mb-1">Gmail ID (Optional)</label>
+              <input type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             </div>
             <div className="md:col-span-2">
@@ -8791,6 +8791,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
           </div>
 
           <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-700">Geo-Tag Location (Optional)</label>
+              <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-bold uppercase">Skip to leave empty</span>
+            </div>
             <LocationPicker 
               onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
             />
@@ -9011,6 +9015,10 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           </div>
 
           <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-700">Geo-Tag Location (Optional)</label>
+              <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-bold uppercase">Skip to leave empty</span>
+            </div>
             <LocationPicker 
               initialLocation={formData.latitude ? { lat: formData.latitude, lng: formData.longitude } : undefined}
               onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
@@ -9250,6 +9258,10 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           </div>
 
           <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-700">Geo-Tag Location (Optional)</label>
+              <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-bold uppercase">Skip to leave empty</span>
+            </div>
             <LocationPicker 
               initialLocation={formData.latitude ? { lat: formData.latitude, lng: formData.longitude } : undefined}
               onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
@@ -9655,6 +9667,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
           </div>
 
           <div className="md:col-span-2 border-t border-gray-100 pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-700">Geo-Tag Location (Optional)</label>
+              <span className="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400 font-bold uppercase">Skip to leave empty</span>
+            </div>
             <LocationPicker 
               onLocationSelect={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})}
             />

@@ -16,9 +16,10 @@ interface LocationDisplayProps {
 }
 
 const LocationDisplay: React.FC<LocationDisplayProps> = ({ latitude, longitude, businessName }) => {
-  const { isLoaded } = useJsApiLoader({
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+    googleMapsApiKey: apiKey || ''
   });
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -45,6 +46,30 @@ const LocationDisplay: React.FC<LocationDisplayProps> = ({ latitude, longitude, 
   const openInGoogleMaps = () => {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`, '_blank');
   };
+
+  if (!apiKey) {
+    return (
+      <div className="h-[300px] bg-gray-50 rounded-[1.5rem] flex flex-col items-center justify-center text-gray-500 p-6 text-center border border-gray-100">
+        <MapPin size={32} className="mb-4 opacity-30" />
+        <p className="text-xs">Google Maps key not configured. Directions available via external link.</p>
+        <button onClick={openInGoogleMaps} className="mt-4 text-blue-600 font-bold text-xs flex items-center">
+          <ExternalLink size={14} className="mr-1" /> View Location on Maps
+        </button>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-[300px] bg-red-50 rounded-[1.5rem] flex flex-col items-center justify-center text-red-500 p-6 text-center border border-red-100">
+        <MapPin size={32} className="mb-4 opacity-30" />
+        <p className="text-xs">Error loading Google Maps. Visit Google Cloud Console to enable 'Maps JavaScript API'.</p>
+        <button onClick={openInGoogleMaps} className="mt-4 text-red-600 font-bold text-xs flex items-center">
+          <ExternalLink size={14} className="mr-1" /> View on Maps Instead
+        </button>
+      </div>
+    );
+  }
 
   if (!isLoaded) return <div className="h-[300px] bg-gray-100 animate-pulse rounded-[1.5rem]" />;
 

@@ -28,7 +28,7 @@ CREATE TABLE public.venues (
     owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
-    venue_type TEXT,
+    type TEXT, -- Changed from venue_type to type to match App.tsx
     address TEXT,
     state TEXT,
     district TEXT,
@@ -38,7 +38,9 @@ CREATE TABLE public.venues (
     capacity INTEGER,
     price_per_day NUMERIC,
     images TEXT[], -- Array of image URLs
+    video_url TEXT, -- Added missing field
     facilities TEXT[], -- Array of facilities
+    available_for TEXT[], -- Added missing field
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
     latitude NUMERIC,
@@ -49,14 +51,20 @@ CREATE TABLE public.venues (
 -- 3. Service Providers Table
 CREATE TABLE public.service_providers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    provider_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+    owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE, -- Changed from provider_id to owner_id to match App.tsx
     name TEXT NOT NULL,
-    service_type TEXT,
+    type TEXT, -- Changed from service_type to type to match App.tsx
     description TEXT,
+    state TEXT, -- Added missing field
+    district TEXT, -- Added missing field
+    block TEXT, -- Added missing field
     price_range TEXT,
     price_level TEXT,
     city TEXT,
     images TEXT[],
+    video_url TEXT, -- Added missing field
+    facilities TEXT[], -- Added missing field
+    available_for TEXT[], -- Added missing field
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
     latitude NUMERIC,
