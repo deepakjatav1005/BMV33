@@ -927,7 +927,7 @@ const LanguageContext = React.createContext({
 
 const useTranslation = () => React.useContext(LanguageContext);
 
-import { CNZLogo } from './components/CNZLogo';
+import { AppLogo } from './components/AppLogo';
 import { PoweredByCNZ } from './components/PoweredByCNZ';
 import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
 
@@ -2133,18 +2133,8 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link to="/" className="flex items-center space-x-2 group">
-              <div className="relative">
-                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-orange-200 group-hover:rotate-12 transition-transform">BVO</div>
-                <div 
-                  className={cn(
-                    "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm",
-                    isSupabaseConnected ? "bg-green-500" : "bg-red-500"
-                  )} 
-                  title={isSupabaseConnected ? "Live Supabase Connected" : "Local Mock Mode - No Sync"}
-                />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent hidden sm:inline-block">BEST VANUE OPTION</span>
+            <Link to="/" className="flex items-center group">
+              <AppLogo size="md" />
             </Link>
 
             <div className="hidden md:flex items-center space-x-8">
@@ -3121,7 +3111,8 @@ const RegistrationView = () => {
         </Link>
       </div>
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
-        <div className="bg-orange-600 p-8 text-white text-center">
+        <div className="bg-orange-600 p-8 text-white text-center flex flex-col items-center">
+          <AppLogo size="lg" showText={false} className="mb-4" />
           <h1 className="text-3xl font-bold">Partner Registration</h1>
           <p className="mt-2 opacity-90">Join India's largest event planning network</p>
         </div>
@@ -3386,7 +3377,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
           <span>Back to Home</span>
         </Link>
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg shadow-orange-200">BVO</div>
+          <AppLogo size="xl" className="justify-center mb-4" showText={false} />
           <h1 className="text-2xl font-bold text-gray-900">Partner Login</h1>
           <p className="text-gray-500 mt-2">Enter your credentials to access dashboard</p>
         </div>
@@ -3526,7 +3517,7 @@ const AboutView = () => {
         <Home size={18} />
         <span>{t('home')}</span>
       </Link>
-      <div className="w-24 h-24 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-5xl font-bold mx-auto mb-8 shadow-2xl shadow-orange-200">BVO</div>
+      <AppLogo size="xl" className="justify-center mb-8" showText={false} />
       <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VANUE OPTION</h1>
       <p className="text-xl text-gray-600 leading-relaxed mb-12">
         BEST VANUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
@@ -3933,7 +3924,7 @@ const HomeView = ({ user }: { user: any }) => {
         if (vData) setFeaturedVenues(vData.map(d => ({ 
           ...d, 
           ownerId: d.owner_id, 
-          venueType: d.venue_type, 
+          venueType: d.type, 
           pricePerDay: d.price_per_day, 
           rating: d.rating || 0,
           reviewCount: d.review_count || 0,
@@ -3943,8 +3934,8 @@ const HomeView = ({ user }: { user: any }) => {
         const { data: sData } = await db.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
         if (sData) setFeaturedServices(sData.map(d => ({ 
           ...d, 
-          providerId: d.provider_id, 
-          serviceType: d.service_type, 
+          providerId: d.owner_id, 
+          serviceType: d.type, 
           priceRange: d.price_range, 
           rating: d.rating || 0,
           reviewCount: d.review_count || 0,
@@ -6905,7 +6896,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         setVenues(vData.map(d => ({
           ...d,
           ownerId: d.owner_id,
-          venueType: d.venue_type,
+          venueType: d.type,
           pricePerDay: d.price_per_day,
           availableFor: d.available_for || [],
           catalogue: d.catalogue || [],
@@ -6916,15 +6907,15 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
       const sQuery = db.from('service_providers').select('*');
       if (profile?.role !== 'admin') {
-        sQuery.eq('provider_id', user?.uid);
+        sQuery.eq('owner_id', user?.uid);
       }
       const { data: sData } = await sQuery;
       
       if (sData) {
         setServices(sData.map(d => ({
           ...d,
-          providerId: d.provider_id,
-          serviceType: d.service_type,
+          providerId: d.owner_id,
+          serviceType: d.type,
           priceRange: d.price_range,
           priceLevel: d.price_level,
           availableFor: d.available_for || [],
@@ -8677,7 +8668,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     try {
       const { error } = await db.from('service_providers').insert([{
         name: formData.name,
-        service_type: formData.serviceType,
+        type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
@@ -8691,7 +8682,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         district: profile?.district || '',
         block: profile?.block || '',
         pincode: profile?.pincode || '',
-        provider_id: user?.uid,
+        owner_id: user?.uid,
         rating: 0,
         review_count: 0
       }]);
@@ -8886,15 +8877,15 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
       if (!id) return;
       const { data, error } = await db.from('service_providers').select('*').eq('id', id).single();
       if (!error && data) {
-        if (data.provider_id !== user?.uid && profile?.role !== 'admin') {
+        if (data.owner_id !== user?.uid && profile?.role !== 'admin') {
           toast.error('Unauthorized');
           navigate('/dashboard');
           return;
         }
         setFormData({
           ...data,
-          providerId: data.provider_id,
-          serviceType: data.service_type,
+          ownerId: data.owner_id,
+          serviceType: data.type,
           priceRange: data.price_range,
           priceLevel: data.price_level || 'per day',
           video_url: data.video_url || '',
@@ -8915,7 +8906,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
     try {
       const { error } = await db.from('service_providers').update({
         name: formData.name,
-        service_type: formData.serviceType,
+        type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
@@ -9144,7 +9135,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
     try {
       const { error } = await db.from('venues').update({
         name: formData.name,
-        venue_type: formData.venueType,
+        type: formData.venueType,
         description: formData.description,
         address: formData.address,
         pincode: formData.pincode,
@@ -9552,7 +9543,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     try {
       const { error } = await db.from('venues').insert([{
         name: formData.name,
-        venue_type: formData.venueType,
+        type: formData.venueType,
         description: formData.description,
         address: formData.address,
         state: profile?.state || '',
@@ -9818,7 +9809,7 @@ const SearchResultsView = () => {
         id: d.id,
         ownerId: d.owner_id,
         name: d.name,
-        venueType: d.venue_type,
+        venueType: d.type,
         state: d.state,
         district: d.district,
         block: d.block,
@@ -9877,9 +9868,9 @@ const SearchResultsView = () => {
       // Process Services including Synth
       let sData = servicesData.map(d => ({
         id: d.id,
-        providerId: d.provider_id,
+        providerId: d.owner_id,
         name: d.name,
-        serviceType: d.service_type,
+        serviceType: d.type,
         state: d.state,
         district: d.district,
         block: d.block,
@@ -10354,11 +10345,10 @@ export default function App() {
     return (
       <div className="h-screen flex items-center justify-center bg-orange-50">
         <motion.div 
-          animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
+          animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="w-20 h-20 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-4xl font-bold shadow-2xl"
         >
-          BVO
+          <AppLogo size="xl" />
         </motion.div>
       </div>
     );
@@ -10422,10 +10412,7 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
                 <div className="col-span-1 md:col-span-2">
                   <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg text-center">BVO</div>
-                      <span className="text-2xl font-bold">BEST VANUE OPTION</span>
-                    </div>
+                    <AppLogo size="md" />
                   </div>
                   <p className="text-gray-400 max-w-sm mb-6">
                     {t('heroTagline')}
@@ -11838,7 +11825,7 @@ const VenueListView = () => {
         id: d.id,
         ownerId: d.owner_id,
         name: d.name,
-        venueType: d.venue_type,
+        venueType: d.type,
         state: d.state,
         district: d.district,
         block: d.block,
@@ -12084,9 +12071,9 @@ const ServiceListView = ({ user }: { user: any }) => {
 
       let data = servicesData.map(d => ({
         id: d.id,
-        providerId: d.provider_id,
+        providerId: d.owner_id,
         name: d.name,
-        serviceType: d.service_type,
+        serviceType: d.type,
         state: d.state,
         district: d.district,
         block: d.block,
