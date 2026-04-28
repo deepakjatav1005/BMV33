@@ -13,31 +13,38 @@ const rawUrl = supabaseUrl && supabaseUrl !== 'undefined' ? supabaseUrl : undefi
 const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnonKey : undefined;
 
 // Initialize real Supabase if keys are present
-export const supabase = (rawUrl && rawKey) 
-  ? createClient(rawUrl, rawKey, {
+let supabaseInstance: any = null;
+
+if (rawUrl && rawKey && rawUrl.startsWith('http')) {
+  try {
+    supabaseInstance = createClient(rawUrl, rawKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true
       }
-    })
-  : null;
+    });
+  } catch (err) {
+    console.error('❌ Failed to create Supabase client:', err);
+  }
+}
 
-if (supabase) {
+if (supabaseInstance) {
   console.log('✅ Supabase initialized successfully.');
   // Add a simple connection check
-  supabase.from('users').select('count', { count: 'exact', head: true })
-    .then(({ error }) => {
+  supabaseInstance.from('users').select('count', { count: 'exact', head: true })
+    .then(({ error }: any) => {
       if (error) {
         console.error('❌ Supabase Connection Error:', error.message);
-        console.error('Check if the domain is allowed in Supabase -> Authentication -> URL Configuration');
-        console.error('Also verify that RLS (Row Level Security) policies allow reading the users table.');
       } else {
         console.log('📡 Live connection to Supabase active.');
       }
+    })
+    .catch((err: any) => {
+      console.error('❌ Supabase ping failed:', err);
     });
 } else {
-  console.warn('⚠️ Supabase URL or Anon Key is missing!');
+  console.warn('⚠️ Supabase URL or Anon Key is missing or invalid!');
   console.warn('VITE_SUPABASE_URL:', supabaseUrl ? 'Defined' : 'MISSING');
   console.warn('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Defined' : 'MISSING');
   console.info('Falling back to LocalStorage Mock Data Service.');
@@ -212,5 +219,6 @@ const mockDataService = {
   }
 };
 
+export const supabase = supabaseInstance;
 export const isSupabaseConnected = !!supabase;
 export const dataService = supabase || mockDataService;

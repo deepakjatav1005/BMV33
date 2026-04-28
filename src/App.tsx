@@ -378,6 +378,12 @@ import {
   Tent, 
   CheckCircle, 
   Clock, 
+  Shield,
+  ShieldCheck,
+  Database,
+  Activity,
+  FileText,
+  BarChart2,
   AlertCircle,
   IndianRupee,
   ChevronRight,
@@ -395,11 +401,9 @@ import {
   Sparkles,
   Briefcase,
   CreditCard,
-  ShieldCheck,
   ArrowRight,
   Download,
   RotateCcw,
-  BarChart2,
   XCircle,
   Info,
   Shirt,
@@ -418,7 +422,6 @@ import {
   MessageSquare,
   Play,
   Flower2,
-  FileText,
   LayoutDashboard,
   Lightbulb,
   ChefHat,
@@ -1452,10 +1455,11 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
                     type="tel"
                     required
                     maxLength={10}
+                    pattern="[0-9]{10}"
                     value={visitorMobile}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      if (val.length <= 10) setVisitorMobile(val);
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setVisitorMobile(val);
                     }}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:outline-none"
                     placeholder="10-digit mobile number"
@@ -1707,10 +1711,12 @@ const ReviewSection = ({
             <input
               required
               type="tel"
+              maxLength={10}
+              pattern="[0-9]{10}"
               placeholder="Your Mobile Number"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
               value={visitorMobile}
-              onChange={(e) => setVisitorMobile(e.target.value)}
+              onChange={(e) => setVisitorMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
             />
           </div>
           <textarea
@@ -2297,7 +2303,7 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
     if (banners.length > 0) {
       const timer = setInterval(() => {
         setCurrentBanner(prev => (prev + 1) % banners.length);
-      }, 5000);
+      }, 15000);
       return () => clearInterval(timer);
     }
   }, [banners.length]);
@@ -2327,7 +2333,7 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
+            transition={{ duration: 2 }}
             src={banners[currentBanner]?.imageUrl || defaultBanner} 
             alt="Wedding Venue" 
             className="w-full h-full object-cover brightness-50"
@@ -2950,10 +2956,11 @@ const ForgotPasswordView = () => {
               required 
               type="tel" 
               maxLength={10}
+              pattern="[0-9]{10}"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
               placeholder="Enter 10-digit mobile number"
               value={mobileNumber} 
-              onChange={e => setMobileNumber(e.target.value.replace(/\D/g, ''))} 
+              onChange={e => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} 
             />
           </div>
           <button 
@@ -3136,11 +3143,12 @@ const RegistrationView = () => {
                 required 
                 type="tel" 
                 maxLength={10}
+                pattern="[0-9]{10}"
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
                 value={formData.mobileNumber} 
                 onChange={e => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= 10) setFormData({...formData, mobileNumber: val});
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setFormData({...formData, mobileNumber: val});
                 }} 
               />
             </div>
@@ -3371,26 +3379,26 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 
   return (
     <div className="max-w-md mx-auto px-4 py-32">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 border border-orange-100 relative">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl p-10 border border-orange-100 relative">
         <Link to="/" className="absolute -top-12 left-0 flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm">
           <Home size={18} />
           <span>Back to Home</span>
         </Link>
         <div className="text-center mb-10">
           <AppLogo size="xl" className="justify-center mb-4" showText={false} />
-          <h1 className="text-2xl font-bold text-gray-900">Partner Login</h1>
-          <p className="text-gray-500 mt-2">Enter your credentials to access dashboard</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Login Portal</h1>
+          <p className="text-gray-500 mt-2 font-medium">Enter your credentials to continue</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Registration ID</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Registration ID / Email</label>
             <input required type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-              placeholder="UTSAV123456"
+              placeholder="Deepak / UTSAV123456"
               value={regId} onChange={e => setRegId(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Password (Mobile Number)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Password</label>
             <input required type="password" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
               placeholder="••••••••••"
               value={password} onChange={e => setPassword(e.target.value)} />
@@ -3400,7 +3408,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
             type="submit" 
             className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all disabled:opacity-50"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? 'Processing...' : 'Login Now'}
           </button>
           <div className="text-center mt-4">
             <Link to="/forgot-password" title="Forgot Password?" className="text-sm text-orange-600 font-medium hover:underline">Forgot Password?</Link>
@@ -3588,7 +3596,7 @@ const useAutoScroll = (speed = 0.5) => {
 };
 
 const ServiceInfoStickers = () => {
-  const scrollRef = useAutoScroll(0.8);
+  const scrollRef = useAutoScroll(0.4);
   const services = [
     {
       title: "Grand Weddings",
@@ -3896,9 +3904,9 @@ const TermsView = () => {
 
 const HomeView = ({ user }: { user: any }) => {
   const { t } = useTranslation();
-  const venuesScrollRef = useAutoScroll(0.6);
-  const topProvidersScrollRef = useAutoScroll(0.5);
-  const categoriesScrollRef = useAutoScroll(0.4);
+  const venuesScrollRef = useAutoScroll(0.1);
+  const topProvidersScrollRef = useAutoScroll(0.08);
+  const categoriesScrollRef = useAutoScroll(0.06);
   const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
   const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
@@ -3911,7 +3919,7 @@ const HomeView = ({ user }: { user: any }) => {
     if (banners.length > 1 && isAutoScrollEnabled) {
       const interval = setInterval(() => {
         setCurrentBannerIndex(prev => (prev + 1) % banners.length);
-      }, 5000);
+      }, 15000);
       return () => clearInterval(interval);
     }
   }, [banners, isAutoScrollEnabled]);
@@ -4030,7 +4038,7 @@ const HomeView = ({ user }: { user: any }) => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 1.2, ease: "easeInOut" }}
+                transition={{ duration: 2, ease: "easeInOut" }}
                 className="absolute inset-0"
                 onMouseEnter={() => setIsAutoScrollEnabled(false)}
                 onMouseLeave={() => setIsAutoScrollEnabled(true)}
@@ -4909,12 +4917,13 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                         required
                         type="tel" 
                         maxLength={10}
+                        pattern="[0-9]{10}"
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                         placeholder="10-digit mobile number"
                         value={visitorMobile}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          if (val.length <= 10) setVisitorMobile(val);
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setVisitorMobile(val);
                         }}
                       />
                     </div>
@@ -5489,12 +5498,13 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                           required
                           type="tel" 
                           maxLength={10}
+                          pattern="[0-9]{10}"
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                           placeholder="Enter mobile number"
                           value={visitorMobile}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '');
-                            if (val.length <= 10) setVisitorMobile(val);
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setVisitorMobile(val);
                           }}
                         />
                       </div>
@@ -6109,9 +6119,9 @@ const BookingManagerView = ({
                           <IndianRupee size={16} className="md:size-[18px]" />
                         </button>
                         <button 
-                          onClick={() => {
+                          onClick={async () => {
                             try {
-                              const pdfBlob = generateInvoice(booking, 0, profile);
+                              const pdfBlob = await generateInvoice(booking, 0, profile);
                               const url = URL.createObjectURL(pdfBlob);
                               const link = document.createElement('a');
                               link.href = url;
@@ -6239,11 +6249,12 @@ const BookingManagerView = ({
                         required
                         type="tel" 
                         maxLength={10}
+                        pattern="[0-9]{10}"
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
                         value={manualBooking.mobileNumber}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          if (val.length <= 10) setManualBooking({...manualBooking, mobileNumber: val});
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setManualBooking({...manualBooking, mobileNumber: val});
                         }}
                       />
                     </div>
@@ -6471,7 +6482,24 @@ const numberToWords = (num: number): string => {
   return convert(num) + ' Rupees Only';
 };
 
-const generateInvoice = (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
+const imageUrlToBase64 = async (url: string): Promise<string | null> => {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error('Error fetching image for invoice:', e);
+    return null;
+  }
+};
+
+const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
   const doc = new jsPDF();
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
   const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
@@ -6648,13 +6676,40 @@ const generateInvoice = (booking: Booking, expenditure: number, providerProfile?
   doc.setDrawColor(234, 88, 12);
   doc.line(20, 265, 190, 265);
   
-  // App Logo (BVO) in footer
-  doc.setFillColor(234, 88, 12);
-  doc.circle(25, 275, 6, 'F');
-  doc.setFontSize(8);
-  doc.setTextColor(255);
-  doc.setFont("helvetica", "bold");
-  doc.text("BVO", 25, 276, { align: 'center' });
+  // App Logo in footer
+  let logoBase64 = null;
+  try {
+    const { data: logoSetting } = await db.from('admin_settings').select('value').eq('key', 'app_logo').maybeSingle();
+    if (logoSetting?.value) {
+      logoBase64 = await imageUrlToBase64(logoSetting.value);
+    }
+  } catch (err) {
+    console.warn('Could not fetch app logo for invoice');
+  }
+
+  if (logoBase64) {
+    try {
+      // Add a small circle/frame for the logo
+      doc.setDrawColor(234, 88, 12);
+      doc.circle(26, 276, 7, 'S');
+      doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
+    } catch (err) {
+      // Fallback if addImage fails
+      doc.setFillColor(234, 88, 12);
+      doc.circle(25, 275, 6, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(255);
+      doc.setFont("helvetica", "bold");
+      doc.text("BVO", 25, 276, { align: 'center' });
+    }
+  } else {
+    doc.setFillColor(234, 88, 12);
+    doc.circle(25, 275, 6, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(255);
+    doc.setFont("helvetica", "bold");
+    doc.text("BVO", 25, 276, { align: 'center' });
+  }
 
   doc.setFontSize(14);
   doc.setTextColor(234, 88, 12);
@@ -7497,9 +7552,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                   <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
                                   <td className="py-4">
                                     <button 
-                                      onClick={() => {
+                                      onClick={async () => {
                                         try {
-                                          const pdfBlob = generateInvoice(b, 0, profile);
+                                          const pdfBlob = await generateInvoice(b, 0, profile);
                                           const url = URL.createObjectURL(pdfBlob);
                                           const link = document.createElement('a');
                                           link.href = url;
@@ -7979,9 +8034,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     <span>Payments</span>
                   </button>
                   <button 
-                    onClick={() => {
+                    onClick={async () => {
                       try {
-                        const pdfBlob = generateInvoice(b, 0, profile);
+                        const pdfBlob = await generateInvoice(b, 0, profile);
                         const url = URL.createObjectURL(pdfBlob);
                         const link = document.createElement('a');
                         link.href = url;
@@ -9433,9 +9488,11 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
             <input 
               required
               type="tel" 
+              maxLength={10}
+              pattern="[0-9]{10}"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={formData.mobileNumber}
-              onChange={(e) => setFormData({...formData, mobileNumber: e.target.value})}
+              onChange={(e) => setFormData({...formData, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10)})}
             />
           </div>
           <div>
@@ -10491,7 +10548,7 @@ export default function App() {
 
 const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -10502,6 +10559,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [servicePhotos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
   const [moments, setMoments] = useState<{id: string, media_url: string, type: string, created_at: string}[]>([]);
+  const [appLogoUrl, setAppLogoUrl] = useState<string>('/logo.png');
   const [loading, setLoading] = useState(true);
   const [reportFilters, setReportFilters] = useState({
     name: '',
@@ -10649,6 +10707,11 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       if (activeTab === 'moments') {
         const { data } = await db.from('moments').select('*').order('created_at', { ascending: false });
         if (data) setMoments(data);
+      }
+
+      if (activeTab === 'settings') {
+        const { data } = await db.from('admin_settings').select('value').eq('key', 'app_logo_url').maybeSingle();
+        if (data?.value) setAppLogoUrl(data.value);
       }
     } catch (err) {
       console.error(err);
@@ -11014,6 +11077,23 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
+  const handleLogoUpload = async (url: string) => {
+    if (!url) return;
+    setLoading(true);
+    try {
+      const { error } = await db.from('admin_settings').upsert({ key: 'app_logo_url', value: url });
+      if (error) throw error;
+      setAppLogoUrl(url);
+      toast.success('App Logo updated successfully');
+      // Force reload to reflect change across app
+      window.location.reload();
+    } catch (err) {
+      toast.error('Failed to update app logo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateAdminProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (profile) {
@@ -11077,6 +11157,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
 
         <div className="flex space-x-4 mb-8 overflow-x-auto pb-2">
           {[
+            { id: 'settings', label: 'App Settings', icon: Settings },
             { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
             { id: 'users', label: 'User Management', icon: Users },
             { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
@@ -11085,6 +11166,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
             { id: 'moments', label: 'Moments Photos', icon: Sparkles },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
+            { id: 'database', label: 'Database & Security', icon: Database },
           ].map(tab => (
             <button
               key={tab.id}
@@ -11205,8 +11287,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
-                      <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height={300} debounce={50}>
                           <PieChart>
                             <Pie
                               data={[
@@ -11228,8 +11310,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </div>
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">Booking Status</h4>
-                      <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height={300} debounce={50}>
                           <BarChart data={[
                             { name: 'Total', count: bookings.length },
                             { name: 'Completed', count: bookings.filter(b => (b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed' || ((b.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0))).length },
@@ -11739,6 +11821,68 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                 </div>
               )}
 
+              {activeTab === 'settings' && (
+                <div className="max-w-4xl mx-auto space-y-12">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                      <h3 className="text-2xl font-bold text-gray-900">App Branding</h3>
+                      <p className="text-gray-500">Update the application logo and other visual assets that appear throughout the platform.</p>
+                      
+                      <div className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 flex flex-col items-center space-y-6">
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-orange-200">
+                          <img 
+                            src={appLogoUrl} 
+                            alt="Current App Logo" 
+                            className="h-32 w-auto object-contain" 
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo.png';
+                            }}
+                          />
+                        </div>
+                        <div className="w-full text-center py-4 bg-orange-100 rounded-2xl border-2 border-orange-200">
+                          <p className="text-sm text-orange-800 font-bold uppercase tracking-wider">
+                            Logo Specifications:
+                          </p>
+                          <p className="text-lg font-black text-orange-900 mt-1">
+                            Taller (1:2 Aspect Ratio)
+                          </p>
+                          <p className="text-xs text-orange-700 font-medium">
+                            Example: 512x1024px Recommended
+                          </p>
+                        </div>
+                        <div className="w-full">
+                          <ImageUpload 
+                            label="Upload New App Logo" 
+                            onUpload={handleLogoUpload} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <h3 className="text-2xl font-bold text-gray-900">Maintenance & Security</h3>
+                      <p className="text-gray-500">Global system controls and security configurations.</p>
+                      
+                      <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 space-y-6">
+                        <div className="flex items-center space-x-4 text-red-700">
+                          <AlertCircle size={24} />
+                          <h4 className="font-bold">Danger Zone</h4>
+                        </div>
+                        <button 
+                          onClick={resetAllRatings}
+                          className="w-full bg-white text-red-600 py-4 rounded-2xl font-bold border-2 border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center space-x-2"
+                        >
+                          <Trash2 size={20} />
+                          <span>Wipe All Reviews & Ratings</span>
+                        </button>
+                        <p className="text-xs text-red-500 text-center">This action cannot be undone. All user-submitted reviews will be permanently deleted.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'profile' && (
                 <div className="max-w-md mx-auto">
                   <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 mb-8">
@@ -11763,8 +11907,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">Mobile Number (For Recovery)</label>
-                      <input required type="tel" maxLength={10} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
-                        value={adminProfile.mobileNumber} onChange={e => setAdminProfile({...adminProfile, mobileNumber: e.target.value.replace(/\D/g, '')})} />
+                      <input required type="tel" maxLength={10} pattern="[0-9]{10}" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                        value={adminProfile.mobileNumber} onChange={e => setAdminProfile({...adminProfile, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10)})} />
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-1">New Password (Optional)</label>
@@ -11776,6 +11920,160 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       Update Profile
                     </button>
                   </form>
+                </div>
+              )}
+
+              {activeTab === 'database' && (
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className={`p-8 rounded-[2.5rem] border-2 shadow-sm ${isSupabaseConnected ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                      <div className="flex items-center justify-between mb-6">
+                        <div className={`p-4 rounded-2xl ${isSupabaseConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                          <Database size={24} />
+                        </div>
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${isSupabaseConnected ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700'}`}>
+                          {isSupabaseConnected ? 'CONNECTED' : 'OFFLINE'}
+                        </span>
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">Supabase Connectivity</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                        {isSupabaseConnected 
+                          ? 'App is currently communicating with live Supabase environment.' 
+                          : 'App is running in Offline/Mock mode. Check environment variables.'}
+                      </p>
+                      <button 
+                        onClick={async () => {
+                          const { error } = await db.from('users').select('count', { count: 'exact', head: true });
+                          if (error) toast.error(`Health check failed: ${error.message}`);
+                          else toast.success('Database responding correctly!');
+                        }}
+                        className="w-full bg-white border-2 border-gray-100 py-3 rounded-2xl font-bold text-gray-900 hover:bg-gray-50 transition-all"
+                      >
+                        Run Connection Test
+                      </button>
+                    </div>
+
+                    <div className="p-8 rounded-[2.5rem] border-2 border-blue-100 bg-blue-50 shadow-sm">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="bg-blue-500 p-4 rounded-2xl text-white">
+                          <Shield size={24} />
+                        </div>
+                        <span className="text-xs font-bold text-blue-700 bg-blue-200 px-3 py-1 rounded-full uppercase tracking-tighter">Secure</span>
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">SQL Master Script</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                        Ensure your Supabase project has all required tables by running this script in the SQL editor.
+                      </p>
+                      <button 
+                        onClick={() => {
+                          const script = document.getElementById('sql-master-script-hidden')?.innerText || '';
+                          navigator.clipboard.writeText(script);
+                          toast.success('SQL Script copied!');
+                        }}
+                        className="w-full bg-blue-600 text-white py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                      >
+                        Copy SQL Script
+                      </button>
+                    </div>
+
+                    <div className="p-8 rounded-[2.5rem] border-2 border-orange-100 bg-orange-50 shadow-sm">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="bg-orange-500 p-4 rounded-2xl text-white">
+                          <Settings size={24} />
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">Supabase Settings</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                        Verify your settings if connection is intermittent.
+                      </p>
+                      <ul className="text-xs text-orange-800 space-y-2 font-medium">
+                        <li>• Enable RLS Policies on all public tables</li>
+                        <li>• Add Domain to Allowed Redirect URLs</li>
+                        <li>• Check if "gen_random_uuid()" is enabled</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900 rounded-[2rem] p-8 shadow-2xl">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-white font-bold">SQL Setup Preview</h4>
+                      <span className="text-gray-500 text-xs font-mono">schema_v1.0.sql</span>
+                    </div>
+                    <pre id="sql-master-script-hidden" className="text-green-400 font-mono text-[10px] h-64 overflow-y-auto custom-scrollbar">
+{`-- SUPABASE MASTER SQL SETUP
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS public.users (
+    uid TEXT PRIMARY KEY,
+    registration_id TEXT UNIQUE,
+    display_name TEXT,
+    mobile_number TEXT UNIQUE,
+    email TEXT,
+    role TEXT,
+    status TEXT DEFAULT 'active',
+    password TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.venues (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    type TEXT,
+    capacity INTEGER,
+    price_per_day NUMERIC,
+    rating NUMERIC DEFAULT 0,
+    review_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.service_providers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    type TEXT,
+    description TEXT,
+    price_range TEXT,
+    rating NUMERIC DEFAULT 0,
+    review_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.bookings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id TEXT,
+    owner_id TEXT,
+    visitor_name TEXT,
+    visitor_mobile TEXT,
+    target_id UUID,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.banners (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT,
+    image_url TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT,
+    message TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);`}
+                    </pre>
+                  </div>
                 </div>
               )}
             </>
@@ -11990,52 +12288,91 @@ const PrivacyView = () => {
 
 const PricingView = () => {
   const navigate = useNavigate();
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const { data, error } = await db.from('subscription_plans').select('*').eq('is_active', true);
+        if (error) throw error;
+        if (data) {
+          setPlans(data.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            price: d.price,
+            duration: d.duration,
+            benefits: d.benefits || [],
+            role: d.role,
+            isActive: d.is_active,
+            createdAt: d.created_at
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching pricing plans:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-32">
       <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 tracking-tighter">Subscription Plans</h1>
+        <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 tracking-tighter uppercase">Subscription Plans</h1>
         <p className="text-xl text-gray-500">Simple, transparent pricing for growing your business.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {[
-          { name: 'Basic', price: '0', duration: 'Free', benefits: ['1 Venue Listing', 'Basic Analytics', 'Standard Support'], color: 'gray' },
-          { name: 'Professional', price: '999', duration: 'per year', benefits: ['Unlimited Listings', 'Priority Search', 'Whastapp Alerts', 'Advanced Analytics'], color: 'orange', featured: true },
-          { name: 'Enterprise', price: '2499', duration: 'per year', benefits: ['All Pro Features', 'Dedicated Manager', 'Custom Branding', 'API Access'], color: 'purple' }
-        ].map((plan, i) => (
-          <div key={i} className={cn(
-            "bg-white rounded-[3rem] p-10 border-2 transition-all hover:scale-[1.02]",
-            plan.featured ? "border-orange-500 shadow-2xl shadow-orange-100 scale-105 relative z-10" : "border-gray-100 shadow-xl"
-          )}>
-            {plan.featured && <span className="absolute top-0 right-10 -translate-y-1/2 bg-orange-600 text-white px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">Most Popular</span>}
-            <h3 className="text-2xl font-black mb-2">{plan.name}</h3>
-            <div className="mb-8">
-              <span className="text-5xl font-black">₹{plan.price}</span>
-              <span className="text-gray-500 ml-2 font-bold tracking-tight">/{plan.duration}</span>
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, i) => (
+            <div key={plan.id} className={cn(
+              "bg-white rounded-[3rem] p-10 border-2 transition-all hover:scale-[1.02] flex flex-col",
+              i === 1 ? "border-orange-500 shadow-2xl shadow-orange-100 scale-105 relative z-10" : "border-gray-100 shadow-xl"
+            )}>
+              {i === 1 && <span className="absolute top-0 right-10 -translate-y-1/2 bg-orange-600 text-white px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">Most Popular</span>}
+              <div className="mb-2 flex justify-between items-start">
+                <h3 className="text-2xl font-black uppercase">{plan.name}</h3>
+                <span className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded-md uppercase text-gray-500">{plan.role}</span>
+              </div>
+              <div className="mb-8">
+                <span className="text-5xl font-black">₹{plan.price}</span>
+                <span className="text-gray-500 ml-2 font-bold tracking-tight">/{plan.duration}</span>
+              </div>
+              <ul className="space-y-4 mb-10 flex-grow">
+                {plan.benefits.map((b, idx) => (
+                  <li key={idx} className="flex items-center text-gray-600 font-medium text-sm">
+                    <CheckCircle size={18} className="text-green-500 mr-3 shrink-0" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+              <button 
+                onClick={() => navigate('/login')}
+                className={cn(
+                  "w-full py-5 rounded-[1.5rem] font-black text-lg transition-all shadow-lg",
+                  i === 1 ? "bg-orange-600 text-white hover:bg-orange-700 shadow-orange-200" : "bg-gray-900 text-white hover:bg-black shadow-gray-200"
+                )}
+              >
+                Get Started Now
+              </button>
             </div>
-            <ul className="space-y-4 mb-10">
-              {plan.benefits.map((b, idx) => (
-                <li key={idx} className="flex items-center text-gray-600 font-medium">
-                  <CheckCircle size={18} className="text-green-500 mr-3 shrink-0" />
-                  {b}
-                </li>
-              ))}
-            </ul>
-            <button 
-              onClick={() => navigate('/login')}
-              className={cn(
-                "w-full py-5 rounded-[1.5rem] font-black text-lg transition-all shadow-lg",
-                plan.featured ? "bg-orange-600 text-white hover:bg-orange-700 shadow-orange-200" : "bg-gray-900 text-white hover:bg-black shadow-gray-200"
-              )}
-            >
-              Get Started Now
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+          {plans.length === 0 && (
+            <div className="col-span-full text-center py-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+              <p className="text-gray-500 font-bold">No active plans available at the moment. Please check back later.</p>
+            </div>
+          )}
+        </div>
+      )}
       
       <div className="mt-20 text-center">
-        <button onClick={() => navigate('/login')} className="text-gray-400 font-bold hover:text-gray-600 transition-colors">
+        <button onClick={() => navigate('/login')} className="text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase tracking-wider text-sm">
           Already have an account? Login here
         </button>
       </div>
