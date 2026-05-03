@@ -11188,15 +11188,33 @@ export default function App() {
   );
 }
 
-// --- Admin View ---
+// --- Admin View Components ---
 
 // --- Flex & Banner Download View (Admin) ---
 const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], services: ServiceProvider[] }) => {
   const [selectedType, setSelectedType] = useState<number>(1);
   const [selectedItemId, setSelectedItemId] = useState('');
+  const [selectedSize, setSelectedSize] = useState('4x6');
+  const [selectedInchSize, setSelectedInchSize] = useState('3x6');
   const [appName, setAppName] = useState('BEST VANUE OPTION');
   const [appTagline, setAppTagline] = useState('VANUE & EVENT & SERVICE PROVIDERS');
   const [appLogoUrl, setAppLogoUrl] = useState('/logo.png');
+
+  const flexSizes = [
+    { label: '2 x 4 Ft', value: '2x4', w: 1219.2, h: 609.6 },
+    { label: '2 x 6 Ft', value: '2x6', w: 1828.8, h: 609.6 },
+    { label: '3 x 6 Ft', value: '3x6', w: 1828.8, h: 914.4 },
+    { label: '4 x 6 Ft', value: '4x6', w: 1828.8, h: 1219.2 },
+    { label: '4 x 8 Ft', value: '4x8', w: 2438.4, h: 1219.2 },
+    { label: '4 x 10 Ft', value: '4x10', w: 3048, h: 1219.2 },
+    { label: '6 x 10 Ft', value: '6x10', w: 3048, h: 1828.8 },
+    { label: '8 x 10 Ft', value: '8x10', w: 3048, h: 2438.4 },
+    { label: '8 x 20 Ft', value: '8x20', w: 6096, h: 2438.4 },
+  ];
+
+  const cardSizes = [
+    { label: '3 x 6 Inch', value: '3x6', w: 152.4, h: 76.2 },
+  ];
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -11227,12 +11245,23 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
   const generateFlex = async () => {
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: [457, 304] // Large format (1.5ft x 1ft)
-    });
+    const sizeObj = selectedType === 4 
+      ? cardSizes.find(s => s.value === selectedInchSize) 
+      : flexSizes.find(s => s.value === selectedSize);
     
+    if (!sizeObj) return;
+
+    // Use landscape if width > height
+    const orientation = sizeObj.w >= sizeObj.h ? 'l' : 'p';
+    const doc = new jsPDF({
+      orientation: orientation,
+      unit: 'mm',
+      format: [sizeObj.w, sizeObj.h]
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
     const splitName = (name: string) => {
       if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
       const words = name.split(' ');
@@ -11244,42 +11273,49 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
     };
     const nameParts = splitName(appName);
 
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    // 3D Text Helper (Shadow offset)
+    const draw3DText = (text: string, x: number, y: number, options: any, color1: [number, number, number], color2: [number, number, number]) => {
+      doc.setTextColor(color2[0], color2[1], color2[2]);
+      doc.text(text, x + 1, y + 1, options);
+      doc.setTextColor(color1[0], color1[1], color1[2]);
+      doc.text(text, x, y, options);
+    };
 
-    // Helper for App Branding Footer
+    // App Branding Footer with Logo
     const addAppBranding = (yOffset = 0) => {
-      const footerY = pageHeight - 40 + yOffset;
+      const footerY = pageHeight - (pageHeight * 0.1) + yOffset;
+      const footerH = pageHeight * 0.1;
+      
       doc.setFillColor(255, 255, 255);
-      doc.rect(0, footerY - 10, pageWidth, 50, 'F');
+      doc.rect(0, footerY - 5, pageWidth, footerH + 5, 'F');
       
       doc.setDrawColor(77, 121, 255);
-      doc.setLineWidth(1);
-      doc.line(0, footerY - 10, pageWidth, footerY - 10);
+      doc.setLineWidth(2);
+      doc.line(0, footerY - 5, pageWidth, footerY - 5);
       
-      const brandX = 40;
+      const logoSize = footerH * 0.6;
+      const brandX = pageWidth * 0.1;
       if (appLogoUrl) {
-        try { doc.addImage(appLogoUrl, 'PNG', brandX, footerY - 6, 12, 12); } catch(e) {}
+        try { doc.addImage(appLogoUrl, 'PNG', brandX, footerY, logoSize, logoSize); } catch(e) {}
       }
       
-      doc.setFontSize(24);
+      doc.setFontSize(footerH * 0.4);
       doc.setFont("helvetica", "bold");
-      const textStartX = brandX + 15;
-      doc.setTextColor(77, 121, 255);
-      doc.text(nameParts.part1, textStartX, footerY + 2);
-      if (nameParts.part2) {
-        const part1Width = doc.getTextWidth(nameParts.part1 + ' ');
-        doc.setTextColor(255, 77, 77);
-        doc.text(nameParts.part2, textStartX + part1Width, footerY + 2);
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(appTagline, textStartX, footerY + 10);
+      const textStartX = brandX + logoSize + 5;
       
       doc.setTextColor(77, 121, 255);
-      doc.setFontSize(14);
-      doc.text("www.bestvanueoption.com", pageWidth - 30, footerY + 2, { align: 'right' });
+      doc.text(nameParts.part1, textStartX, footerY + (logoSize/2));
+      const p1W = doc.getTextWidth(nameParts.part1 + ' ');
+      doc.setTextColor(255, 77, 77);
+      doc.text(nameParts.part2, textStartX + p1W, footerY + (logoSize/2));
+
+      doc.setFontSize(footerH * 0.15);
+      doc.setTextColor(154, 52, 18);
+      doc.text(appTagline, textStartX, footerY + (logoSize/2) + (footerH * 0.2));
+      
+      doc.setTextColor(77, 121, 255);
+      doc.setFontSize(footerH * 0.2);
+      doc.text("www.bestvanueoption.com", pageWidth - (pageWidth * 0.1), footerY + (logoSize/2), { align: 'right' });
     };
 
     // Background
@@ -11288,81 +11324,81 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
     
     // Border
     doc.setDrawColor(234, 88, 12);
-    doc.setLineWidth(5);
-    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+    doc.setLineWidth(pageWidth * 0.01);
+    doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
 
     if (selectedType === 1 || selectedType === 2) {
       const item: any = selectedItem;
-      if (!item) {
-        toast.error("No item selected");
-        return;
-      }
+      if (!item) return;
 
       // Title/Type Banner
       doc.setFillColor(234, 88, 12);
-      doc.rect(10, 10, pageWidth - 20, 40, 'F');
+      doc.rect(5, 5, pageWidth - 10, pageHeight * 0.12, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(30);
-      doc.setFont("helvetica", "italic");
-      const promoText = selectedType === 1 ? "PREMIUM VENUE DESTINATION" : "TOP RATED SERVICE PARTNER";
-      doc.text(promoText, pageWidth/2, 35, { align: 'center' });
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setFont("helvetica", "bold");
+      const promoText = selectedType === 1 ? "EXCELLENT VENUE DESTINATION" : "PROFESSIONAL SERVICE PROVIDER";
+      doc.text(promoText.toUpperCase(), pageWidth/2, pageHeight * 0.08, { align: 'center' });
 
       // Information Section
       doc.setTextColor(0, 0, 0);
-      doc.setFontSize(60);
+      doc.setFontSize(pageHeight * 0.1);
       doc.setFont("helvetica", "bold");
-      doc.text(item.name.toUpperCase(), 30, 80, { maxWidth: pageWidth/2 });
+      doc.text(item.name.toUpperCase(), 20, pageHeight * 0.25, { maxWidth: pageWidth * 0.6 });
 
-      doc.setFontSize(24);
+      doc.setFontSize(pageHeight * 0.04);
       doc.setTextColor(234, 88, 12);
       const typeLabel = selectedType === 1 ? item.venueType : item.serviceType;
-      doc.text(typeLabel.toUpperCase(), 30, 95);
+      doc.text(`CAT: ${typeLabel.toUpperCase()}`, 20, pageHeight * 0.32);
 
       doc.setTextColor(100, 100, 100);
-      doc.setFontSize(18);
+      doc.setFontSize(pageHeight * 0.03);
       doc.setFont("helvetica", "normal");
-      doc.text(`Owned by: ${item.ownerName}`, 30, 110);
+      doc.text(`Manager/Owner: ${item.ownerName}`, 20, pageHeight * 0.38);
       
-      const address = item.address || [item.block, item.district].filter(Boolean).join(", ");
-      doc.text(`Location: ${address}`, 30, 120, { maxWidth: pageWidth/2 - 40 });
+      const address = item.address || [item.block, item.district, item.state].filter(Boolean).join(", ");
+      doc.text(`Location: ${address}`, 20, pageHeight * 0.43, { maxWidth: pageWidth * 0.5 });
 
-      // Available For & Amenities
+      // Details
+      let detailsY = pageHeight * 0.52;
       if (item.availableFor?.length) {
         doc.setTextColor(234, 88, 12);
         doc.setFont("helvetica", "bold");
-        doc.text("AVAILABLE FOR:", 30, 145);
+        doc.setFontSize(pageHeight * 0.035);
+        doc.text("IDEAL FOR:", 20, detailsY);
         doc.setTextColor(50, 50, 50);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text(item.availableFor.slice(0, 5).join(" | "), 30, 155, { maxWidth: pageWidth/2 - 40 });
+        doc.setFontSize(pageHeight * 0.025);
+        doc.text(item.availableFor.join(" | "), 20, detailsY + (pageHeight * 0.04), { maxWidth: pageWidth * 0.5 });
+        detailsY += pageHeight * 0.12;
       }
 
       if (item.facilities?.length) {
         doc.setTextColor(234, 88, 12);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text("AMENITIES:", 30, 180);
+        doc.setFontSize(pageHeight * 0.035);
+        doc.text("SERVICES & AMENITIES:", 20, detailsY);
         doc.setTextColor(50, 50, 50);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text(item.facilities.slice(0, 8).join(" \u2022 "), 30, 190, { maxWidth: pageWidth/2 - 40 });
+        doc.setFontSize(pageHeight * 0.025);
+        doc.text(item.facilities.join(" \u2022 "), 20, detailsY + (pageHeight * 0.04), { maxWidth: pageWidth * 0.5 });
       }
 
       // Photos
       if (item.images?.[0]) {
         try {
-          doc.addImage(item.images[0], 'JPEG', pageWidth/2 + 20, 60, pageWidth/2 - 50, 120);
+          doc.addImage(item.images[0], 'JPEG', pageWidth * 0.6, pageHeight * 0.15, pageWidth * 0.35, pageHeight * 0.5);
         } catch(e) {}
       }
 
       // QR Code
       try {
         const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
-        const qr = await QRCode.toDataURL(url, { width: 400, color: { dark: '#ea580c' } });
-        doc.addImage(qr, 'PNG', pageWidth - 100, 190, 60, 60);
-        doc.setFontSize(12);
+        const qr = await QRCode.toDataURL(url, { width: 1000, color: { dark: '#ea580c' } });
+        doc.addImage(qr, 'PNG', pageWidth - (pageWidth * 0.2), pageHeight * 0.68, pageWidth * 0.15, pageWidth * 0.15);
+        doc.setFontSize(pageHeight * 0.02);
         doc.setTextColor(234, 88, 12);
-        doc.text("SCAN TO BOOK ONLINE", pageWidth - 70, 255, { align: 'center' });
+        doc.text("SCAN TO BOOK & REVIEW", pageWidth - (pageWidth * 0.125), pageHeight * 0.85, { align: 'center' });
       } catch(e) {}
 
       addAppBranding();
@@ -11370,82 +11406,91 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
     } else if (selectedType === 3) {
       // App Branding (Dedicated Flex)
       doc.setFillColor(255, 247, 237);
-      doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
+      doc.rect(5, 5, pageWidth - 10, pageHeight - 10, 'F');
       
-      // Central Branding
-      doc.setFontSize(90);
+      // Central Branding 3D
+      const brandFontSize = pageHeight * 0.15;
+      doc.setFontSize(brandFontSize);
       doc.setFont("helvetica", "bold");
-      const startX = (pageWidth - doc.getTextWidth(nameParts.part1 + ' ' + nameParts.part2)) / 2;
-      doc.setTextColor(77, 121, 255);
-      doc.text(nameParts.part1, startX, 100);
-      doc.setTextColor(255, 77, 77);
-      doc.text(nameParts.part2, startX + doc.getTextWidth(nameParts.part1 + ' '), 100);
       
-      doc.setFontSize(40);
+      const totalW = doc.getTextWidth(nameParts.part1 + ' ' + nameParts.part2);
+      const startX = (pageWidth - totalW) / 2;
+      
+      draw3DText(nameParts.part1, startX, pageHeight * 0.3, {}, [77, 121, 255], [0, 0, 100]);
+      const p1Width = doc.getTextWidth(nameParts.part1 + ' ');
+      draw3DText(nameParts.part2, startX + p1Width, pageHeight * 0.3, {}, [255, 77, 77], [100, 0, 0]);
+      
+      doc.setFontSize(pageHeight * 0.06);
       doc.setTextColor(154, 52, 18);
-      doc.text(appTagline, pageWidth/2, 130, { align: 'center' });
+      doc.text(appTagline, pageWidth/2, pageHeight * 0.4, { align: 'center' });
 
       if (appLogoUrl) {
-        try { doc.addImage(appLogoUrl, 'PNG', pageWidth/2 - 50, 150, 100, 100); } catch(e) {}
+        try { doc.addImage(appLogoUrl, 'PNG', pageWidth/2 - (pageHeight * 0.15), pageHeight * 0.45, pageHeight * 0.3, pageHeight * 0.3); } catch(e) {}
       }
       
-      // Categories Grid
-      doc.setFontSize(20);
+      // Categories
+      doc.setFontSize(pageHeight * 0.04);
       doc.setTextColor(234, 88, 12);
-      doc.text("ALL VENUE TYPES:", 40, 200);
-      doc.setFontSize(12);
+      doc.text("OUR PARTNERS:", pageWidth/2, pageHeight * 0.8, { align: 'center' });
+      doc.setFontSize(pageHeight * 0.025);
       doc.setTextColor(100, 100, 100);
-      const vTypes = ['Marriage Garden', 'Hotel', 'Marriage Hall', 'Restaurant', 'Community Hall'];
-      doc.text(vTypes.join(" | "), 40, 210);
+      const allCats = ['Hotel', 'Garden', 'Hall', 'DJ', 'Tent', 'Photo', 'Catering', 'Makeup', 'Band', 'Auto', 'Event Planner'];
+      doc.text(allCats.join(" | "), pageWidth/2, pageHeight * 0.85, { align: 'center' });
 
-      doc.setFontSize(20);
-      doc.setTextColor(234, 88, 12);
-      doc.text("SERVICES WE PROVIDE:", 40, 235);
-      doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
-      const sTypes = ['DJ', 'Tent', 'Photo', 'Catering', 'Makeup', 'Band', 'Vehicle', 'Event Manager'];
-      doc.text(sTypes.join(" | "), 40, 245);
-
-      // Registration QR (Barcode replacement)
+      // Registration QR
       try {
-        const qr = await QRCode.toDataURL(window.location.origin + "/registration", { width: 300 });
-        doc.addImage(qr, 'PNG', pageWidth - 80, 180, 50, 50);
-        doc.setFontSize(12);
-        doc.text("SCAN TO REGISTER BUSINESS", pageWidth - 55, 235, { align: 'center' });
+        const qr = await QRCode.toDataURL(window.location.origin + "/registration", { width: 1000 });
+        doc.addImage(qr, 'PNG', pageWidth - (pageHeight*0.25), pageHeight * 0.7, pageHeight * 0.2, pageHeight * 0.2);
+        doc.setFontSize(pageHeight * 0.02);
+        doc.text("SCAN TO REGISTER BUSINESS", pageWidth - (pageHeight * 0.15), pageHeight * 0.92, { align: 'center' });
       } catch(e) {}
 
-      doc.setFontSize(24);
+      doc.setFontSize(pageHeight * 0.04);
       doc.setTextColor(77, 121, 255);
-      doc.text("www.bestvanueoption.com", pageWidth/2, 280, { align: 'center' });
+      doc.text("www.bestvanueoption.com", pageWidth/2, pageHeight * 0.95, { align: 'center' });
 
     } else if (selectedType === 4) {
       // Rating Accept Card for App (Global)
       doc.setFillColor(255, 248, 241);
-      doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
+      doc.rect(5, 5, pageWidth - 10, pageHeight - 10, 'F');
 
-      doc.setFontSize(80);
-      doc.setTextColor(234, 88, 12);
+      // Top Branding
+      const logoSize = pageHeight * 0.2;
+      if (appLogoUrl) {
+         try { doc.addImage(appLogoUrl, 'PNG', 15, 10, logoSize, logoSize); } catch(e) {}
+      }
+      doc.setFontSize(pageHeight * 0.1);
       doc.setFont("helvetica", "bold");
-      doc.text("RATE OUR PLATFORM", pageWidth/2, 80, { align: 'center' });
+      doc.setTextColor(77, 121, 255);
+      doc.text(nameParts.part1, 15 + logoSize + 5, 20);
+      doc.setTextColor(255, 77, 77);
+      doc.text(nameParts.part2, 15 + logoSize + 5 + doc.getTextWidth(nameParts.part1 + ' '), 20);
+      doc.setFontSize(pageHeight * 0.05);
+      doc.setTextColor(154, 52, 18);
+      doc.text(appTagline, 15 + logoSize + 5, 28);
+
+      doc.setFontSize(pageHeight * 0.12);
+      doc.setTextColor(234, 88, 12);
+      doc.text("RATE OUR PLATFORM", pageWidth/2, pageHeight * 0.45, { align: 'center' });
 
       try {
         const qr = await QRCode.toDataURL(window.location.origin, { width: 500, color: { dark: '#ea580c' } });
-        doc.addImage(qr, 'PNG', pageWidth/2 - 70, 100, 140, 140);
-        doc.setFontSize(28);
-        doc.text("SCAN & TELL US WHAT YOU THINK", pageWidth/2, 260, { align: 'center' });
+        doc.addImage(qr, 'PNG', pageWidth/2 - (pageHeight * 0.2), pageHeight * 0.5, pageHeight * 0.4, pageHeight * 0.4);
       } catch(e) {}
 
-      addAppBranding();
+      doc.setFontSize(pageHeight * 0.08);
+      doc.setTextColor(77, 121, 255);
+      doc.text("www.bestvanueoption.com", pageWidth/2, pageHeight * 0.95, { align: 'center' });
     }
 
-    doc.save(`Flex_${selectedType}_${Date.now()}.pdf`);
+    doc.save(`Flex_${selectedType}_${sizeObj.value}_${Date.now()}.pdf`);
   };
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Flex & Banner Download</h2>
-        <p className="text-gray-500 text-sm mt-1">Generate high-quality flex designs for branding and promotions</p>
+        <p className="text-gray-500 text-sm mt-1">Generate high-quality printable designs for branding and promotions</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -11483,89 +11528,127 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                 value={selectedItemId}
                 onChange={(e) => setSelectedItemId(e.target.value)}
               >
-                {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                {items.length === 0 && <option value="">No items found</option>}
+                {items.length === 0 ? (
+                  <option value="">No registered {selectedType === 1 ? 'venues' : 'services'} found</option>
+                ) : (
+                  items.map(i => <option key={i.id} value={i.id}>{i.name} ({selectedType === 1 ? i.venueType : i.serviceType})</option>)
+                )}
               </select>
             </div>
           )}
+
+          <div className="space-y-4">
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest leading-none">Select Print Size</label>
+            {selectedType === 4 ? (
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold"
+                value={selectedInchSize}
+                onChange={(e) => setSelectedInchSize(e.target.value)}
+              >
+                {cardSizes.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            ) : (
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold"
+                value={selectedSize}
+                onChange={(e) => setSelectedSize(e.target.value)}
+              >
+                {flexSizes.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            )}
+          </div>
 
           <div className="p-6 bg-orange-50 rounded-2xl border border-orange-100 text-sm text-orange-800 flex items-start gap-4">
             <div className="bg-orange-200 p-2 rounded-lg">
                <FileText size={20} />
             </div>
             <div>
-              <p className="font-bold">Ready for Download</p>
-              <p className="opacity-80">The generated PDF will be in a large format suitable for flex printing.</p>
+              <p className="font-bold">Pro Graphics Generation</p>
+              <p className="opacity-80">This will generate a high-DPI PDF document with {selectedType === 4 ? 'inch' : 'feet'} dimensions suitable for professional printing.</p>
             </div>
           </div>
 
           <button 
             onClick={generateFlex}
-            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-700 transition-all shadow-lg active:scale-95"
+            disabled={(selectedType === 1 || selectedType === 2) && !selectedItemId}
+            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={24} />
-            <span>Download Flex PDF</span>
+            <span>Download High-Quality PDF</span>
           </button>
         </div>
 
         <div className="bg-white p-2 rounded-3xl border-4 border-gray-100 shadow-inner overflow-hidden flex items-center justify-center min-h-[400px]">
           <div className="w-full aspect-[1.5/1] bg-white border border-gray-200 shadow-lg p-6 relative flex flex-col items-center justify-center text-center">
-             {/* Mock Preview */}
+             <div className="absolute inset-0 bg-gray-50 flex items-center justify-center -z-10 text-[120px] font-black text-gray-100 select-none">FLEX</div>
              {selectedType === 1 || selectedType === 2 ? (
                <>
-                 <div className="absolute top-0 left-0 w-full h-8 bg-orange-600"></div>
+                 <div className="absolute top-0 left-0 w-full h-8 bg-orange-600 flex items-center px-4">
+                   <span className="text-[8px] font-bold text-white uppercase tracking-widest">Promotion Banner</span>
+                 </div>
                  <div className="mt-4 mb-2">
-                   <h3 className="text-3xl font-black text-gray-900 uppercase">{selectedItem?.name || "Selection Name"}</h3>
-                   <span className="text-orange-600 font-bold uppercase tracking-widest text-sm">
-                     {selectedType === 1 ? selectedItem?.venueType : selectedItem?.serviceType}
+                   <h3 className="text-2xl font-black text-gray-900 uppercase leading-none">{selectedItem?.name || "Selection Name"}</h3>
+                   <span className="text-orange-600 font-bold uppercase tracking-widest text-[10px]">
+                     {selectedType === 1 ? (selectedItem as Venue)?.venueType : (selectedItem as ServiceProvider)?.serviceType}
                    </span>
                  </div>
-                 {selectedItem?.images?.[0] && (
-                   <div className="w-40 h-24 bg-gray-100 rounded-lg mb-4 overflow-hidden">
-                     <img src={selectedItem.images[0]} className="w-full h-full object-cover" />
-                   </div>
-                 )}
-                 <div className="w-16 h-16 bg-gray-50 border-2 border-orange-100 flex items-center justify-center rounded-lg">
-                   <QrCode className="text-orange-600" />
+                 <div className="grid grid-cols-2 gap-4 w-full px-6">
+                    <div className="text-left text-[8px] space-y-1">
+                       <p className="font-bold text-gray-400">AMENITIES:</p>
+                       <p className="text-gray-900">Full list displayed in PDF...</p>
+                    </div>
+                    <div className="w-full h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-100">
+                      {selectedItem?.images?.[0] ? <img src={selectedItem.images[0]} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-4 text-gray-300" />}
+                    </div>
+                 </div>
+                 <div className="mt-4 flex flex-col items-center">
+                    <QrCode size={32} className="text-orange-500 mb-1" />
+                    <span className="text-[6px] font-bold text-orange-400 uppercase">Scan to Book</span>
                  </div>
                  <div className="mt-auto pt-4 border-t w-full flex justify-between px-4 items-end">
-                    <div className="text-left">
-                       <span className="block text-xs font-black text-blue-600 leading-none">BEST VANUE</span>
-                       <span className="block text-xs font-black text-red-600 leading-none">OPTION</span>
+                    <div className="text-left leading-none">
+                       <span className="block text-[10px] font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-[10px] font-black text-red-600">OPTION</span>
                     </div>
-                    <span className="text-[8px] font-bold text-gray-400">www.bestvanueoption.com</span>
+                    <span className="text-[6px] font-bold text-gray-400">www.bestvanueoption.com</span>
                  </div>
                </>
              ) : selectedType === 3 ? (
-               <div className="flex flex-col items-center justify-center h-full w-full bg-orange-50/50">
-                  <div className="mb-4">
-                    <span className="text-4xl font-black text-blue-600">BEST VANUE</span>
-                    <span className="text-4xl font-black text-red-600 ml-2">OPTION</span>
+               <div className="flex flex-col items-center justify-center h-full w-full bg-orange-50/30 p-8">
+                  <div className="flex items-center gap-2 mb-4">
+                     <AppLogo showText={false} size="xs" />
+                     <div className="text-left leading-none">
+                       <span className="block text-2xl font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-2xl font-black text-red-600">OPTION</span>
+                     </div>
                   </div>
-                  <p className="text-orange-800 font-bold uppercase tracking-widest text-xs mb-8">{appTagline}</p>
-                  <div className="grid grid-cols-2 gap-4 w-full px-8 text-[8px] text-gray-500 font-bold">
-                    <div className="border border-orange-100 p-2 rounded-lg bg-white">ALL VENUE TYPES</div>
-                    <div className="border border-orange-100 p-2 rounded-lg bg-white">ALL SERVICE TYPES</div>
+                  <p className="text-orange-800 font-bold uppercase tracking-tighter text-xs mb-8">{appTagline}</p>
+                  <div className="w-full h-12 bg-white rounded-lg border border-orange-100 mb-4 flex items-center justify-center text-[8px] font-black px-4 text-gray-400">
+                    GARDEN | HOTEL | DJ | TENT | PHOTO | CATERING | BAND
                   </div>
-                  <div className="mt-8 flex flex-col items-center gap-2">
-                    <QrCode size={40} className="text-gray-400" />
-                    <span className="text-[10px] font-bold text-gray-400">SCAN TO REGISTER</span>
+                  <div className="mt-auto flex items-center justify-between w-full">
+                     <span className="text-[10px] font-bold text-blue-600">bestvanueoption.com</span>
+                     <div className="flex flex-col items-center gap-1">
+                        <QrCode size={24} className="text-orange-500" />
+                        <span className="text-[6px] font-bold text-gray-400 uppercase">Register Business</span>
+                     </div>
                   </div>
-                  <div className="mt-auto text-blue-600 font-bold text-xs">www.bestvanueoption.com</div>
                </div>
              ) : (
-                <div className="flex flex-col items-center justify-center h-full w-full bg-orange-50/50">
-                  <h3 className="text-2xl font-black text-orange-600 mb-8">RATE OUR PLATFORM</h3>
-                  <div className="w-32 h-32 bg-white border-2 border-orange-100 flex items-center justify-center rounded-2xl shadow-sm mb-4">
+                <div className="flex flex-col items-center justify-center h-full w-full bg-white p-8">
+                  <div className="w-full flex justify-between items-center mb-12">
+                     <div className="text-left leading-none">
+                       <span className="block text-[12px] font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-[12px] font-black text-red-600">OPTION</span>
+                     </div>
+                     <AppLogo showText={false} size="xs" />
+                  </div>
+                  <h3 className="text-3xl font-black text-orange-600 mb-8 uppercase tracking-widest">Rate Our App</h3>
+                  <div className="w-32 h-32 bg-orange-50 border-2 border-orange-100 flex items-center justify-center rounded-2xl shadow-sm mb-4">
                     <QrCode size={64} className="text-orange-600" />
                   </div>
-                  <p className="text-xs font-black text-gray-500">SCAN & REVIEW</p>
-                  <div className="mt-auto pt-4 border-t w-full flex justify-between px-4 items-end">
-                    <div className="text-left">
-                       <span className="block text-xs font-black text-blue-600 leading-none">BEST VANUE</span>
-                       <span className="block text-xs font-black text-red-600 leading-none">OPTION</span>
-                    </div>
-                  </div>
+                  <p className="text-xs font-black text-gray-400">SCAN & REVIEW NOW</p>
+                  <div className="mt-auto text-blue-600 font-black text-[10px] tracking-widest">WWW.BESTVANUEOPTION.COM</div>
                 </div>
              )}
           </div>
@@ -11741,10 +11824,18 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       }
 
       if (activeTab === 'flex-download') {
-        const { data: vData } = await db.from('venues').select('*, owner_profile:user_profiles(displayName)');
-        const { data: sData } = await db.from('service_providers').select('*, provider_profile:user_profiles(displayName)');
-        if (vData) setAdminVenues(vData.map((v: any) => ({ ...v, ownerName: v.owner_profile?.displayName || 'Owner' })));
-        if (sData) setAdminServices(sData.map((s: any) => ({ ...s, ownerName: s.provider_profile?.displayName || 'Provider' })));
+        const { data: vData } = await db.from('venues').select('*');
+        const { data: sData } = await db.from('service_providers').select('*');
+        
+        // Fetch profile names separately to avoid relationship issues if they aren't configured
+        const { data: pData } = await db.from('user_profiles').select('id, displayName');
+        const profileMap = (pData || []).reduce((acc: any, p: any) => {
+          acc[p.id] = p.displayName;
+          return acc;
+        }, {});
+
+        if (vData) setAdminVenues(vData.map((v: any) => ({ ...v, ownerName: profileMap[v.owner_id] || 'Owner' })));
+        if (sData) setAdminServices(sData.map((s: any) => ({ ...s, ownerName: profileMap[s.provider_id] || 'Provider' })));
       }
 
       if (activeTab === 'settings') {
