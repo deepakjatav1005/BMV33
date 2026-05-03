@@ -3,7 +3,7 @@ import { dataService as db } from '../services/dataService';
 
 interface AppLogoProps {
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
 }
 
@@ -25,6 +25,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
   }, []);
 
   const sizeClasses = {
+    xs: 'h-6',
     sm: 'h-8',
     md: 'h-12',
     lg: 'h-24',

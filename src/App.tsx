@@ -430,8 +430,10 @@ import {
   Layout,
   Users2,
   Globe,
-  ArrowLeft
+  ArrowLeft,
+  QrCode
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -1655,7 +1657,7 @@ const ReviewSection = ({
   };
 
   return (
-    <div className="mt-12 space-y-8">
+    <div id="reviews" className="mt-12 space-y-8">
       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-gray-900">
@@ -5728,8 +5730,23 @@ const BookingManagerView = ({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
+  const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
   const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
-  const [manualBooking, setManualBooking] = useState({
+  const [manualBooking, setManualBooking] = useState<{
+    partyName: string;
+    partyAddress: string;
+    mobileNumber: string;
+    eventDate: string;
+    endDate: string;
+    startTime: string;
+    endTime: string;
+    eventType: string;
+    targetId: string;
+    targetName: string;
+    totalAmount: number;
+    bookingMode: 'complete' | 'partial';
+    selectedItems: string[];
+  }>({
     partyName: '',
     partyAddress: '',
     mobileNumber: '',
@@ -5740,10 +5757,37 @@ const BookingManagerView = ({
     eventType: 'Wedding',
     targetId: '',
     targetName: '',
-    totalAmount: 0
+    totalAmount: 0,
+    bookingMode: 'complete',
+    selectedItems: []
   });
   const [venues, setVenues] = useState<Venue[]>(parentVenues || []);
   const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
+
+  useEffect(() => {
+    if (manualBooking.bookingMode === 'partial' && manualBooking.targetId) {
+      const targetVenue = venues.find(v => v.id === manualBooking.targetId);
+      if (targetVenue?.catalogue) {
+        const start = new Date(manualBooking.eventDate);
+        const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
+        const amenitiesTotal = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
+        setManualBooking(prev => ({ ...prev, totalAmount: amenitiesTotal }));
+      }
+    } else if (manualBooking.bookingMode === 'complete' && manualBooking.targetId) {
+       const targetVenue = venues.find(v => v.id === manualBooking.targetId);
+       if (targetVenue) {
+         const start = new Date(manualBooking.eventDate);
+         const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+         const diffTime = Math.abs(end.getTime() - start.getTime());
+         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+         setManualBooking(prev => ({ ...prev, totalAmount: (targetVenue.pricePerDay || 0) * diffDays }));
+       }
+    }
+  }, [manualBooking.bookingMode, manualBooking.selectedItems, manualBooking.eventDate, manualBooking.endDate, manualBooking.targetId, venues]);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
@@ -5919,6 +5963,7 @@ const BookingManagerView = ({
     
     const updateData: any = { 
       updated_amount: newAmount,
+      extra_services: editableExtraServices,
       is_invoice_generated: false 
     };
     
@@ -6013,12 +6058,39 @@ const BookingManagerView = ({
       const isService = !targetVenue;
       const tid = generateTransactionId(profile?.registrationId || 'BVO', count || 0);
 
+      let extraServices: any[] = [];
+      let finalTargetName = manualBooking.targetName;
+      let finalTotalAmount = manualBooking.totalAmount;
+
+      const start = new Date(manualBooking.eventDate);
+      const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (manualBooking.bookingMode === 'partial' && targetVenue?.catalogue) {
+        const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
+        extraServices = selectedAmenities.map(item => ({
+          name: item.level,
+          amount: (item.priceRate || 0) * diffDays
+        }));
+        finalTargetName = manualBooking.targetName + ' (Amenities)';
+        
+        // If the user didn't override the amount (i.e. it's still default or 0), 
+        // set it to the sum of amenities.
+        const amenitiesTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
+        if (finalTotalAmount === 0 || finalTotalAmount === (targetVenue.pricePerDay || 0)) {
+           finalTotalAmount = amenitiesTotal;
+        }
+      } else if (!isService) {
+        finalTargetName = manualBooking.targetName + ' (Venue)';
+      }
+
       const { error } = await db.from('bookings').insert([{
         user_id: user?.uid,
         owner_id: user?.uid,
         target_id: manualBooking.targetId,
         target_type: isService ? 'service' : 'venue',
-        target_name: manualBooking.targetName,
+        target_name: finalTargetName,
         event_date: manualBooking.eventDate,
         end_date: manualBooking.endDate || null,
         start_time: manualBooking.startTime,
@@ -6027,22 +6099,24 @@ const BookingManagerView = ({
         party_name: manualBooking.partyName,
         party_address: manualBooking.partyAddress,
         visitor_mobile: manualBooking.mobileNumber,
-        status: (manualBooking.totalAmount > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
+        status: (finalTotalAmount > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
         is_manual: true,
         payment_mode: 'Cash',
         payment_status: paymentStatus || 'Pending',
-        total_amount: manualBooking.totalAmount || 0,
-        updated_amount: manualBooking.totalAmount || 0,
-        transaction_id: tid
+        total_amount: finalTotalAmount || 0,
+        updated_amount: finalTotalAmount || 0,
+        transaction_id: tid,
+        extra_services: extraServices
       }]);
       if (error) throw error;
       setIsManualModalOpen(false);
       const whatsappMsg = `*Booking Confirmation - BEST VANUE OPTION*%0A%0A` +
-        `Hello ${manualBooking.partyName}, your booking for *${manualBooking.targetName}* has been confirmed!%0A%0A` +
+        `Hello ${manualBooking.partyName}, your booking for *${finalTargetName}* has been confirmed!%0A%0A` +
         `*Booking Details:*%0A` +
         `*Date:* ${formatDateDDMMYYYY(manualBooking.eventDate)}${manualBooking.endDate ? ' to ' + formatDateDDMMYYYY(manualBooking.endDate) : ''}%0A` +
         `*Time:* ${formatTime12h(manualBooking.startTime)} - ${formatTime12h(manualBooking.endTime)}%0A` +
         `*Event:* ${manualBooking.eventType}%0A%0A` +
+        `*Total Amount:* ₹${finalTotalAmount.toLocaleString()}%0A%0A` +
         `Thank you for choosing our service!`;
       
       sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
@@ -6058,7 +6132,9 @@ const BookingManagerView = ({
         eventType: 'Wedding',
         targetId: '',
         targetName: '',
-        totalAmount: 0
+        totalAmount: 0,
+        bookingMode: 'complete',
+        selectedItems: []
       });
       setManualCallSatisfied(false);
       if (onUpdate) onUpdate();
@@ -6181,6 +6257,7 @@ const BookingManagerView = ({
                             }
                             setSelectedBooking(booking);
                             setNewAmount(booking.updatedAmount || booking.totalAmount);
+                            setEditableExtraServices(booking.extra_services || []);
                             setIsAmountModalOpen(true);
                           }}
                           className={cn(
@@ -6411,8 +6488,76 @@ const BookingManagerView = ({
                         ))}
                       </select>
                     </div>
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Removed Payment Status and Total Amount as per request */}
+
+                    {venues.find(v => v.id === manualBooking.targetId) && (
+                      <div className="md:col-span-2 bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-4">
+                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => setManualBooking({...manualBooking, bookingMode: 'complete'})}
+                            className={cn(
+                              "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                              manualBooking.bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                            )}
+                          >
+                            Complete Venue
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setManualBooking({...manualBooking, bookingMode: 'partial'})}
+                            className={cn(
+                              "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                              manualBooking.bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                            )}
+                          >
+                            Select Amenities
+                          </button>
+                        </div>
+
+                        {manualBooking.bookingMode === 'partial' && (
+                          <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
+                              {venues.find(v => v.id === manualBooking.targetId)?.catalogue?.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                                <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
+                                  <div className="flex items-center space-x-2">
+                                    <input 
+                                      type="checkbox"
+                                      className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                                      checked={manualBooking.selectedItems.includes(item.id || '')}
+                                      onChange={(e) => {
+                                        if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, item.id || '']});
+                                        else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== item.id)});
+                                      }}
+                                    />
+                                    <span className="text-[10px] font-bold text-gray-700 uppercase">{item.level}</span>
+                                  </div>
+                                  <span className="text-[10px] font-black text-orange-600">₹{item.priceRate?.toLocaleString()}</span>
+                                </label>
+                              ))}
+                              {(!venues.find(v => v.id === manualBooking.targetId)?.catalogue || venues.find(v => v.id === manualBooking.targetId)?.catalogue?.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                                <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount (₹)</label>
+                      <input 
+                        type="number" 
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold text-orange-600"
+                        value={manualBooking.totalAmount}
+                        onChange={(e) => setManualBooking({...manualBooking, totalAmount: parseFloat(e.target.value) || 0})}
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-wider">
+                        {manualBooking.bookingMode === 'complete' 
+                          ? "Enter full venue price for selected dates" 
+                          : "Calculated based on selected amenities. You can override manually."}
+                      </p>
                     </div>
                   </div>
 
@@ -6449,24 +6594,49 @@ const BookingManagerView = ({
         )}
       </AnimatePresence>
 
-      {/* Amount Update Modal */}
       {isAmountModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold mb-6">Update Booking Amount</h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Current Details</div>
-                <div className="font-bold text-gray-900">{selectedBooking?.partyName || selectedBooking?.visitorName}</div>
-                <div className="text-sm text-gray-500">Original Amount: ₹{(selectedBooking?.totalAmount || 0).toLocaleString()}</div>
-              </div>
+            <div className="space-y-6">
+              {editableExtraServices.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Update Amenities Rates</label>
+                  <div className="space-y-2">
+                    {editableExtraServices.map((service: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="flex-1 text-xs font-bold text-gray-700 uppercase truncate">{service.name}</span>
+                        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                          <span className="text-[10px] font-black text-gray-400">₹</span>
+                          <input 
+                            type="number" 
+                            className="w-20 text-xs font-black text-orange-600 focus:outline-none"
+                            value={service.amount}
+                            onChange={(e) => {
+                              const newVal = parseFloat(e.target.value) || 0;
+                              const updated = [...editableExtraServices];
+                              updated[idx] = { ...updated[idx], amount: newVal };
+                              setEditableExtraServices(updated);
+                              
+                              const newExtrasTotal = updated.reduce((sum, s) => sum + s.amount, 0);
+                              const oldExtrasTotal = editableExtraServices.reduce((sum, s) => sum + s.amount, 0);
+                              setNewAmount(prev => Math.max(0, prev - oldExtrasTotal + newExtrasTotal));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">New Amount (INR)</label>
+                <label className="block text-sm font-bold mb-1 text-gray-700">Final Total Amount (INR)</label>
                 <input 
                   type="number" 
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold text-orange-600" 
                   value={newAmount} 
                   onChange={e => setNewAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="Enter new amount"
                 />
               </div>
               <div className="flex space-x-4 pt-4">
@@ -6593,9 +6763,10 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
   const doc = new jsPDF();
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const baseAmount = booking.updatedAmount || booking.totalAmount || 0;
+  const fullTotalRecord = booking.updatedAmount || booking.totalAmount || 0;
   const extraServicesTotal = booking.extra_services?.reduce((sum, s) => sum + s.amount, 0) || 0;
-  const subTotal = baseAmount + expenditure + extraServicesTotal;
+  const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
+  const subTotal = fullTotalRecord + expenditure; // Since fullTotalRecord already includes extraServicesTotal (base + extra)
   const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
   const totalAdvanceLegacy = (booking.advance_amount || 0);
   // Fix double counting: If we have individual payments, advance_amount is likely synced to the sum.
@@ -6685,11 +6856,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.text("Amount (INR)", 160, 127, { align: 'right' });
 
   // Table Rows
-  doc.setFont("helvetica", "normal");
-  doc.text(`Base Booking Amount for ${booking.targetName}`, 25, 140);
-  doc.text(baseAmount.toLocaleString(), 160, 140, { align: 'right' });
+  let currentY = 140;
+  if (baseAmount > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY);
+    doc.text(baseAmount.toLocaleString(), 160, currentY, { align: 'right' });
+    currentY += 10;
+  }
 
-  let currentY = 150;
   if (expenditure > 0) {
     doc.text("Additional Expenditure", 25, currentY);
     doc.text(expenditure.toLocaleString(), 160, currentY, { align: 'right' });
@@ -6778,33 +6952,52 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     console.warn('Could not fetch app logo for invoice');
   }
 
+  // Split name for colors
+  const splitName = (name: string) => {
+    if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+    const words = name.split(' ');
+    if (words.length > 1) {
+      const mid = Math.ceil(words.length / 2);
+      return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
+    }
+    return { part1: name, part2: '' };
+  };
+  const appDisplayName = "BEST VANUE OPTION"; // Or fetch from settings if available in this scope
+  const nameParts = splitName(appDisplayName);
+
   if (logoBase64) {
     try {
       // Add a small circle/frame for the logo
-      doc.setDrawColor(234, 88, 12);
+      doc.setDrawColor(77, 121, 255);
       doc.circle(26, 276, 7, 'S');
       doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
     } catch (err) {
       // Fallback if addImage fails
-      doc.setFillColor(234, 88, 12);
+      doc.setFillColor(77, 121, 255);
       doc.circle(25, 275, 6, 'F');
       doc.setFontSize(8);
       doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
-      doc.text("BVO", 25, 276, { align: 'center' });
+      doc.text("B", 25, 276, { align: 'center' });
     }
   } else {
-    doc.setFillColor(234, 88, 12);
+    doc.setFillColor(77, 121, 255);
     doc.circle(25, 275, 6, 'F');
     doc.setFontSize(8);
     doc.setTextColor(255);
     doc.setFont("helvetica", "bold");
-    doc.text("BVO", 25, 276, { align: 'center' });
+    doc.text("B", 25, 276, { align: 'center' });
   }
 
   doc.setFontSize(14);
-  doc.setTextColor(234, 88, 12);
-  doc.text("BEST VANUE OPTION", 35, 276);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(77, 121, 255); // Blue
+  doc.text(nameParts.part1, 35, 276);
+  if (nameParts.part2) {
+    const part1Width = doc.getTextWidth(nameParts.part1 + ' ');
+    doc.setTextColor(255, 77, 77); // Red
+    doc.text(nameParts.part2, 35 + part1Width, 276);
+  }
   
   doc.setFontSize(8);
   doc.setTextColor(100);
@@ -6819,10 +7012,292 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   return doc.output('blob');
 };
 
+// --- Rating Card View ---
+const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | null, venues: Venue[], services: ServiceProvider[] }) => {
+  const [selectedId, setSelectedId] = useState('');
+  const [activeType, setActiveType] = useState<'venue' | 'service'>(profile?.role === 'owner' ? 'venue' : 'service');
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [appLogoUrl, setAppLogoUrl] = useState<string>('/logo.png');
+  const [appName, setAppName] = useState<string>('BEST VANUE OPTION');
+  const [appTagline, setAppTagline] = useState<string>('VANUE & EVENT & SERVICE PROVIDERS');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data: logoData } = await db.from('admin_settings').select('value').eq('key', 'app_logo_url').maybeSingle();
+        if (logoData?.value) setAppLogoUrl(logoData.value);
+
+        const { data: nameData } = await db.from('admin_settings').select('value').eq('key', 'app_name').maybeSingle();
+        if (nameData?.value) setAppName(nameData.value);
+
+        const { data: taglineData } = await db.from('admin_settings').select('value').eq('key', 'app_tagline').maybeSingle();
+        if (taglineData?.value) setAppTagline(taglineData.value);
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const items = useMemo(() => {
+    if (activeType === 'venue') return venues;
+    return services;
+  }, [activeType, venues, services]);
+
+  useEffect(() => {
+    if (items.length > 0 && !selectedId) {
+      setSelectedId(items[0].id || '');
+    }
+  }, [items, selectedId]);
+
+  const selectedItem = useMemo(() => items.find(i => i.id === selectedId), [items, selectedId]);
+
+  useEffect(() => {
+    if (selectedId) {
+      const url = `${window.location.origin}${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}#reviews`;
+      QRCode.toDataURL(url, { 
+        width: 600, 
+        margin: 2,
+        color: {
+          dark: '#ea580c', // orange-600
+          light: '#ffffff'
+        }
+      }, (err, url) => {
+        if (!err) setQrDataUrl(url);
+      });
+    }
+  }, [selectedId, activeType]);
+
+  const downloadCard = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [105, 148] // A6 size
+    });
+
+    // Design
+    doc.setFillColor(255, 247, 237); // orange-50
+    doc.rect(0, 0, 105, 148, 'F');
+    
+    doc.setDrawColor(234, 88, 12); // orange-600
+    doc.setLineWidth(1.5);
+    doc.rect(5, 5, 95, 138);
+
+    // Header: Business Info
+    const name = selectedItem?.name || profile?.displayName || "BUSINESS NAME";
+    const address = (selectedItem as any)?.address || (selectedItem ? [selectedItem.block, selectedItem.district, selectedItem.state].filter(Boolean).join(", ") : "") || profile?.block + ", " + profile?.district || "Address not specified";
+    const typeLabel = activeType === 'venue' ? (selectedItem as any)?.venueType : (selectedItem as any)?.serviceType;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(name.toUpperCase(), 52.5, 20, { align: 'center', maxWidth: 85 });
+    
+    if (typeLabel) {
+      doc.setFontSize(10);
+      doc.setTextColor(234, 88, 12);
+      doc.text(typeLabel.toUpperCase(), 52.5, 26, { align: 'center' });
+    }
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(address, 52.5, typeLabel ? 32 : 28, { align: 'center', maxWidth: 85 });
+
+    // Middle: QR Section
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(234, 88, 12);
+    doc.text("SCAN TO RATE & REVIEW", 52.5, 48, { align: 'center' });
+
+    if (qrDataUrl) {
+      doc.addImage(qrDataUrl, 'PNG', 22.5, 55, 60, 60);
+    }
+
+    // Footer: App Branding
+    const startY = 125;
+    
+    // Split name for colors
+    const splitName = (name: string) => {
+      if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+      const words = name.split(' ');
+      if (words.length > 1) {
+        const mid = Math.ceil(words.length / 2);
+        return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
+      }
+      return { part1: name, part2: '' };
+    };
+    const nameParts = splitName(appName);
+
+    // Logo and Name on same line
+    if (appLogoUrl) {
+      try {
+        doc.addImage(appLogoUrl, 'PNG', 15, startY - 6, 8, 8);
+      } catch (e) {
+        doc.setFillColor(77, 121, 255);
+        doc.circle(19, startY - 2, 2, 'F');
+      }
+    }
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    
+    const startTextX = 25;
+    doc.setTextColor(77, 121, 255); // Blue
+    doc.text(nameParts.part1, startTextX, startY);
+    
+    if (nameParts.part2) {
+      const part1Width = doc.getTextWidth(nameParts.part1 + ' ');
+      doc.setTextColor(255, 77, 77); // Red
+      doc.text(nameParts.part2, startTextX + part1Width, startY);
+    }
+
+    // Tagline below
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(154, 52, 18);
+    doc.text(appTagline, 52.5, startY + 8, { align: 'center' });
+    
+    doc.setFontSize(6);
+    doc.setTextColor(77, 121, 255);
+    doc.text("www.bestvanueoption.com", 52.5, startY + 12, { align: 'center' });
+    
+    doc.save(`Review_Card_${name}.pdf`);
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Rating Accept Card</h2>
+          <p className="text-gray-500 text-sm mt-1">Download your custom QR card for customers to rate your business</p>
+        </div>
+        <button 
+          onClick={downloadCard}
+          className="flex items-center space-x-2 bg-orange-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg active:scale-95"
+        >
+          <Download size={20} />
+          <span>Download PDF Card</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <div>
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Select Business to Generate For</label>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {profile?.role === 'owner' && (
+                <button 
+                  onClick={() => setActiveType('venue')}
+                  className={cn(
+                    "py-2 rounded-xl text-xs font-bold transition-all border",
+                    activeType === 'venue' ? "bg-orange-600 text-white border-orange-600" : "bg-gray-50 text-gray-500 border-gray-200"
+                  )}
+                >
+                  Venues
+                </button>
+              )}
+              {profile?.role === 'provider' && (
+                <button 
+                  onClick={() => setActiveType('service')}
+                  className={cn(
+                    "py-2 rounded-xl text-xs font-bold transition-all border",
+                    activeType === 'service' ? "bg-orange-600 text-white border-orange-600" : "bg-gray-50 text-gray-500 border-gray-200"
+                  )}
+                >
+                  Services
+                </button>
+              )}
+            </div>
+            
+            <select 
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold"
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+            >
+              {items.map(item => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+              {items.length === 0 && <option value="">No items found</option>}
+            </select>
+          </div>
+
+          <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 italic text-sm text-orange-700">
+            Scanning this QR code will directly take your customers to your {activeType === 'venue' ? 'Venue' : 'Service'} page where they can leave ratings and reviews.
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Card Preview</label>
+          <div className="relative w-[300px] aspect-[1/1.414] bg-orange-50 rounded-2xl border-4 border-orange-600 p-6 flex flex-col items-center justify-between text-center shadow-2xl overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-orange-200/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+             <div className="absolute bottom-0 left-0 w-32 h-32 bg-orange-200/20 rounded-full -ml-16 -mb-16 blur-3xl"></div>
+
+             <div className="space-y-1 w-full">
+               <p className="font-black text-gray-900 uppercase tracking-tight truncate w-full text-xl">
+                 {selectedItem?.name || "Business Name"}
+               </p>
+               <p className="text-[10px] font-bold text-gray-500 uppercase px-4 truncate">
+                 {(selectedItem as any)?.address || (selectedItem ? [selectedItem.block, selectedItem.district, selectedItem.state].filter(Boolean).join(", ") : "") || "Address Placeholder"}
+               </p>
+             </div>
+
+             <div className="my-4">
+               <h2 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Scan to Rate Us</h2>
+               {qrDataUrl ? (
+                 <div className="p-4 bg-white rounded-2xl border-2 border-orange-100 shadow-inner">
+                   <img src={qrDataUrl} className="w-32 h-32" alt="QR Code Preview" />
+                 </div>
+               ) : (
+                 <div className="w-32 h-32 bg-gray-100 rounded-2xl flex items-center justify-center animate-pulse">
+                   <QrCode size={48} className="text-gray-300" />
+                 </div>
+               )}
+             </div>
+
+             <div className="border-t-2 border-orange-200 pt-3 w-full flex flex-col items-center">
+               <div className="flex items-center gap-2 mb-1">
+                 <div className="shadow-sm rounded-lg overflow-hidden border border-orange-100">
+                   <AppLogo size="xs" showText={false} />
+                 </div>
+                 <h1 className="text-xl font-black tracking-tighter leading-none flex gap-1">
+                   {(() => {
+                     const name = appName || 'BEST VANUE OPTION';
+                     if (name === 'BEST VANUE OPTION') {
+                       return (
+                         <>
+                           <span className="text-[#4d79ff]">BEST VANUE</span>
+                           <span className="text-[#ff4d4d]">OPTION</span>
+                         </>
+                       );
+                     }
+                     const words = name.split(' ');
+                     if (words.length > 1) {
+                       const mid = Math.ceil(words.length / 2);
+                       return (
+                         <>
+                           <span className="text-[#4d79ff]">{words.slice(0, mid).join(' ')}</span>
+                           <span className="text-[#ff4d4d]">{words.slice(mid).join(' ')}</span>
+                         </>
+                       );
+                     }
+                     return <span className="text-[#4d79ff]">{name}</span>;
+                   })()}
+                 </h1>
+               </div>
+               <p className="text-[7px] uppercase tracking-widest font-black text-orange-800">{appTagline}</p>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'subscription' | 'booking-manager' | 'reports'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card'>(initialTab);
   const [reportFilters, setReportFilters] = useState({
     name: '',
     mobile: '',
@@ -7121,6 +7596,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
+    { id: 'rating-card', label: 'Rating Accept Card', icon: <QrCode size={20} />, roles: ['owner', 'provider'] },
     { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
   ].sort((a, b) => {
     if (a.id === 'overview') return -1;
@@ -7684,6 +8160,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               {activeTab === 'subscription' && (
                 <SubscriptionManageView user={user} profile={profile} />
               )}
+              {activeTab === 'rating-card' && (
+                <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm min-h-[500px]">
+                  <RatingCardView profile={profile} venues={venues} services={services} />
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -7831,6 +8312,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
+  const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
 
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
@@ -7874,6 +8356,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     
     const updateData: any = { 
       updated_amount: newAmount,
+      extra_services: editableExtraServices,
       is_invoice_generated: false 
     };
     
@@ -8110,6 +8593,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                       }
                       setSelectedBooking(b);
                       setNewAmount(b.updatedAmount || b.totalAmount);
+                      setEditableExtraServices(b.extra_services || []);
                       setIsAmountModalOpen(true);
                     }}
                     className={cn(
@@ -8236,18 +8720,46 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
 
       {isAmountModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold mb-6">Update Booking Amount</h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="text-xs font-bold text-gray-400 uppercase mb-1">Current Amount</div>
-                <div className="text-2xl font-black text-gray-900">₹{(selectedBooking?.updatedAmount || selectedBooking?.totalAmount || 0).toLocaleString()}</div>
-              </div>
+            <div className="space-y-6">
+              {editableExtraServices.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Update Amenities Rates</label>
+                  <div className="space-y-2">
+                    {editableExtraServices.map((service, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="flex-1 text-xs font-bold text-gray-700 uppercase truncate">{service.name}</span>
+                        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                          <span className="text-[10px] font-black text-gray-400">₹</span>
+                          <input 
+                            type="number" 
+                            className="w-20 text-xs font-black text-orange-600 focus:outline-none"
+                            value={service.amount}
+                            onChange={(e) => {
+                              const newVal = parseFloat(e.target.value) || 0;
+                              const updated = [...editableExtraServices];
+                              updated[idx] = { ...updated[idx], amount: newVal };
+                              setEditableExtraServices(updated);
+                              
+                              // Auto-recalculate subtotal if desired
+                              const newExtrasTotal = updated.reduce((sum, s) => sum + s.amount, 0);
+                              const oldExtrasTotal = editableExtraServices.reduce((sum, s) => sum + s.amount, 0);
+                              setNewAmount(prev => prev - oldExtrasTotal + newExtrasTotal);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-bold mb-1 text-gray-700">New Total Amount (INR)</label>
+                <label className="block text-sm font-bold mb-1 text-gray-700">Final Total Amount (INR)</label>
                 <input 
                   type="number" 
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500" 
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold text-orange-600" 
                   value={newAmount} 
                   onChange={e => setNewAmount(parseFloat(e.target.value) || 0)}
                   placeholder="Enter new amount"
@@ -10678,9 +11190,394 @@ export default function App() {
 
 // --- Admin View ---
 
+// --- Flex & Banner Download View (Admin) ---
+const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], services: ServiceProvider[] }) => {
+  const [selectedType, setSelectedType] = useState<number>(1);
+  const [selectedItemId, setSelectedItemId] = useState('');
+  const [appName, setAppName] = useState('BEST VANUE OPTION');
+  const [appTagline, setAppTagline] = useState('VANUE & EVENT & SERVICE PROVIDERS');
+  const [appLogoUrl, setAppLogoUrl] = useState('/logo.png');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data: logoData } = await db.from('admin_settings').select('value').eq('key', 'app_logo_url').maybeSingle();
+        if (logoData?.value) setAppLogoUrl(logoData.value);
+        const { data: nameData } = await db.from('admin_settings').select('value').eq('key', 'app_name').maybeSingle();
+        if (nameData?.value) setAppName(nameData.value);
+        const { data: taglineData } = await db.from('admin_settings').select('value').eq('key', 'app_tagline').maybeSingle();
+        if (taglineData?.value) setAppTagline(taglineData.value);
+      } catch (err) {}
+    };
+    fetchSettings();
+  }, []);
+
+  const items = useMemo(() => {
+    if (selectedType === 1) return venues;
+    if (selectedType === 2) return services;
+    return [];
+  }, [selectedType, venues, services]);
+
+  useEffect(() => {
+    if (items.length > 0 && (!selectedItemId || !items.find(i => i.id === selectedItemId))) {
+      setSelectedItemId(items[0].id || '');
+    }
+  }, [items, selectedItemId]);
+
+  const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
+
+  const generateFlex = async () => {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [457, 304] // Large format (1.5ft x 1ft)
+    });
+    
+    const splitName = (name: string) => {
+      if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+      const words = name.split(' ');
+      if (words.length > 1) {
+        const mid = Math.ceil(words.length / 2);
+        return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
+      }
+      return { part1: name, part2: '' };
+    };
+    const nameParts = splitName(appName);
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Helper for App Branding Footer
+    const addAppBranding = (yOffset = 0) => {
+      const footerY = pageHeight - 40 + yOffset;
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, footerY - 10, pageWidth, 50, 'F');
+      
+      doc.setDrawColor(77, 121, 255);
+      doc.setLineWidth(1);
+      doc.line(0, footerY - 10, pageWidth, footerY - 10);
+      
+      const brandX = 40;
+      if (appLogoUrl) {
+        try { doc.addImage(appLogoUrl, 'PNG', brandX, footerY - 6, 12, 12); } catch(e) {}
+      }
+      
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      const textStartX = brandX + 15;
+      doc.setTextColor(77, 121, 255);
+      doc.text(nameParts.part1, textStartX, footerY + 2);
+      if (nameParts.part2) {
+        const part1Width = doc.getTextWidth(nameParts.part1 + ' ');
+        doc.setTextColor(255, 77, 77);
+        doc.text(nameParts.part2, textStartX + part1Width, footerY + 2);
+      }
+
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(appTagline, textStartX, footerY + 10);
+      
+      doc.setTextColor(77, 121, 255);
+      doc.setFontSize(14);
+      doc.text("www.bestvanueoption.com", pageWidth - 30, footerY + 2, { align: 'right' });
+    };
+
+    // Background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    // Border
+    doc.setDrawColor(234, 88, 12);
+    doc.setLineWidth(5);
+    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+    if (selectedType === 1 || selectedType === 2) {
+      const item: any = selectedItem;
+      if (!item) {
+        toast.error("No item selected");
+        return;
+      }
+
+      // Title/Type Banner
+      doc.setFillColor(234, 88, 12);
+      doc.rect(10, 10, pageWidth - 20, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(30);
+      doc.setFont("helvetica", "italic");
+      const promoText = selectedType === 1 ? "PREMIUM VENUE DESTINATION" : "TOP RATED SERVICE PARTNER";
+      doc.text(promoText, pageWidth/2, 35, { align: 'center' });
+
+      // Information Section
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(60);
+      doc.setFont("helvetica", "bold");
+      doc.text(item.name.toUpperCase(), 30, 80, { maxWidth: pageWidth/2 });
+
+      doc.setFontSize(24);
+      doc.setTextColor(234, 88, 12);
+      const typeLabel = selectedType === 1 ? item.venueType : item.serviceType;
+      doc.text(typeLabel.toUpperCase(), 30, 95);
+
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Owned by: ${item.ownerName}`, 30, 110);
+      
+      const address = item.address || [item.block, item.district].filter(Boolean).join(", ");
+      doc.text(`Location: ${address}`, 30, 120, { maxWidth: pageWidth/2 - 40 });
+
+      // Available For & Amenities
+      if (item.availableFor?.length) {
+        doc.setTextColor(234, 88, 12);
+        doc.setFont("helvetica", "bold");
+        doc.text("AVAILABLE FOR:", 30, 145);
+        doc.setTextColor(50, 50, 50);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(14);
+        doc.text(item.availableFor.slice(0, 5).join(" | "), 30, 155, { maxWidth: pageWidth/2 - 40 });
+      }
+
+      if (item.facilities?.length) {
+        doc.setTextColor(234, 88, 12);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text("AMENITIES:", 30, 180);
+        doc.setTextColor(50, 50, 50);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(14);
+        doc.text(item.facilities.slice(0, 8).join(" \u2022 "), 30, 190, { maxWidth: pageWidth/2 - 40 });
+      }
+
+      // Photos
+      if (item.images?.[0]) {
+        try {
+          doc.addImage(item.images[0], 'JPEG', pageWidth/2 + 20, 60, pageWidth/2 - 50, 120);
+        } catch(e) {}
+      }
+
+      // QR Code
+      try {
+        const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
+        const qr = await QRCode.toDataURL(url, { width: 400, color: { dark: '#ea580c' } });
+        doc.addImage(qr, 'PNG', pageWidth - 100, 190, 60, 60);
+        doc.setFontSize(12);
+        doc.setTextColor(234, 88, 12);
+        doc.text("SCAN TO BOOK ONLINE", pageWidth - 70, 255, { align: 'center' });
+      } catch(e) {}
+
+      addAppBranding();
+
+    } else if (selectedType === 3) {
+      // App Branding (Dedicated Flex)
+      doc.setFillColor(255, 247, 237);
+      doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
+      
+      // Central Branding
+      doc.setFontSize(90);
+      doc.setFont("helvetica", "bold");
+      const startX = (pageWidth - doc.getTextWidth(nameParts.part1 + ' ' + nameParts.part2)) / 2;
+      doc.setTextColor(77, 121, 255);
+      doc.text(nameParts.part1, startX, 100);
+      doc.setTextColor(255, 77, 77);
+      doc.text(nameParts.part2, startX + doc.getTextWidth(nameParts.part1 + ' '), 100);
+      
+      doc.setFontSize(40);
+      doc.setTextColor(154, 52, 18);
+      doc.text(appTagline, pageWidth/2, 130, { align: 'center' });
+
+      if (appLogoUrl) {
+        try { doc.addImage(appLogoUrl, 'PNG', pageWidth/2 - 50, 150, 100, 100); } catch(e) {}
+      }
+      
+      // Categories Grid
+      doc.setFontSize(20);
+      doc.setTextColor(234, 88, 12);
+      doc.text("ALL VENUE TYPES:", 40, 200);
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      const vTypes = ['Marriage Garden', 'Hotel', 'Marriage Hall', 'Restaurant', 'Community Hall'];
+      doc.text(vTypes.join(" | "), 40, 210);
+
+      doc.setFontSize(20);
+      doc.setTextColor(234, 88, 12);
+      doc.text("SERVICES WE PROVIDE:", 40, 235);
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      const sTypes = ['DJ', 'Tent', 'Photo', 'Catering', 'Makeup', 'Band', 'Vehicle', 'Event Manager'];
+      doc.text(sTypes.join(" | "), 40, 245);
+
+      // Registration QR (Barcode replacement)
+      try {
+        const qr = await QRCode.toDataURL(window.location.origin + "/registration", { width: 300 });
+        doc.addImage(qr, 'PNG', pageWidth - 80, 180, 50, 50);
+        doc.setFontSize(12);
+        doc.text("SCAN TO REGISTER BUSINESS", pageWidth - 55, 235, { align: 'center' });
+      } catch(e) {}
+
+      doc.setFontSize(24);
+      doc.setTextColor(77, 121, 255);
+      doc.text("www.bestvanueoption.com", pageWidth/2, 280, { align: 'center' });
+
+    } else if (selectedType === 4) {
+      // Rating Accept Card for App (Global)
+      doc.setFillColor(255, 248, 241);
+      doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'F');
+
+      doc.setFontSize(80);
+      doc.setTextColor(234, 88, 12);
+      doc.setFont("helvetica", "bold");
+      doc.text("RATE OUR PLATFORM", pageWidth/2, 80, { align: 'center' });
+
+      try {
+        const qr = await QRCode.toDataURL(window.location.origin, { width: 500, color: { dark: '#ea580c' } });
+        doc.addImage(qr, 'PNG', pageWidth/2 - 70, 100, 140, 140);
+        doc.setFontSize(28);
+        doc.text("SCAN & TELL US WHAT YOU THINK", pageWidth/2, 260, { align: 'center' });
+      } catch(e) {}
+
+      addAppBranding();
+    }
+
+    doc.save(`Flex_${selectedType}_${Date.now()}.pdf`);
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Flex & Banner Download</h2>
+        <p className="text-gray-500 text-sm mt-1">Generate high-quality flex designs for branding and promotions</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { id: 1, label: 'Venue Promotion', icon: <Home size={20} /> },
+          { id: 2, label: 'Service Promotion', icon: <Music size={20} /> },
+          { id: 3, label: 'App Branding', icon: <Globe size={20} /> },
+          { id: 4, label: 'Rating Accept Card', icon: <QrCode size={20} /> },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setSelectedType(item.id)}
+            className={cn(
+              "flex flex-col items-center p-6 rounded-3xl border-2 transition-all gap-3",
+              selectedType === item.id 
+                ? "bg-orange-50 border-orange-500 text-orange-600 shadow-md transform scale-[1.02]" 
+                : "bg-white border-gray-100 text-gray-500 hover:border-gray-200"
+            )}
+          >
+            <div className={cn("p-3 rounded-2xl", selectedType === item.id ? "bg-orange-500 text-white" : "bg-gray-50")}>
+              {item.icon}
+            </div>
+            <span className="font-bold text-sm text-center line-clamp-2">{item.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          {(selectedType === 1 || selectedType === 2) && (
+            <div className="space-y-4">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest leading-none">Select {selectedType === 1 ? 'Venue' : 'Provider'}</label>
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold"
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(e.target.value)}
+              >
+                {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                {items.length === 0 && <option value="">No items found</option>}
+              </select>
+            </div>
+          )}
+
+          <div className="p-6 bg-orange-50 rounded-2xl border border-orange-100 text-sm text-orange-800 flex items-start gap-4">
+            <div className="bg-orange-200 p-2 rounded-lg">
+               <FileText size={20} />
+            </div>
+            <div>
+              <p className="font-bold">Ready for Download</p>
+              <p className="opacity-80">The generated PDF will be in a large format suitable for flex printing.</p>
+            </div>
+          </div>
+
+          <button 
+            onClick={generateFlex}
+            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-700 transition-all shadow-lg active:scale-95"
+          >
+            <Download size={24} />
+            <span>Download Flex PDF</span>
+          </button>
+        </div>
+
+        <div className="bg-white p-2 rounded-3xl border-4 border-gray-100 shadow-inner overflow-hidden flex items-center justify-center min-h-[400px]">
+          <div className="w-full aspect-[1.5/1] bg-white border border-gray-200 shadow-lg p-6 relative flex flex-col items-center justify-center text-center">
+             {/* Mock Preview */}
+             {selectedType === 1 || selectedType === 2 ? (
+               <>
+                 <div className="absolute top-0 left-0 w-full h-8 bg-orange-600"></div>
+                 <div className="mt-4 mb-2">
+                   <h3 className="text-3xl font-black text-gray-900 uppercase">{selectedItem?.name || "Selection Name"}</h3>
+                   <span className="text-orange-600 font-bold uppercase tracking-widest text-sm">
+                     {selectedType === 1 ? selectedItem?.venueType : selectedItem?.serviceType}
+                   </span>
+                 </div>
+                 {selectedItem?.images?.[0] && (
+                   <div className="w-40 h-24 bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                     <img src={selectedItem.images[0]} className="w-full h-full object-cover" />
+                   </div>
+                 )}
+                 <div className="w-16 h-16 bg-gray-50 border-2 border-orange-100 flex items-center justify-center rounded-lg">
+                   <QrCode className="text-orange-600" />
+                 </div>
+                 <div className="mt-auto pt-4 border-t w-full flex justify-between px-4 items-end">
+                    <div className="text-left">
+                       <span className="block text-xs font-black text-blue-600 leading-none">BEST VANUE</span>
+                       <span className="block text-xs font-black text-red-600 leading-none">OPTION</span>
+                    </div>
+                    <span className="text-[8px] font-bold text-gray-400">www.bestvanueoption.com</span>
+                 </div>
+               </>
+             ) : selectedType === 3 ? (
+               <div className="flex flex-col items-center justify-center h-full w-full bg-orange-50/50">
+                  <div className="mb-4">
+                    <span className="text-4xl font-black text-blue-600">BEST VANUE</span>
+                    <span className="text-4xl font-black text-red-600 ml-2">OPTION</span>
+                  </div>
+                  <p className="text-orange-800 font-bold uppercase tracking-widest text-xs mb-8">{appTagline}</p>
+                  <div className="grid grid-cols-2 gap-4 w-full px-8 text-[8px] text-gray-500 font-bold">
+                    <div className="border border-orange-100 p-2 rounded-lg bg-white">ALL VENUE TYPES</div>
+                    <div className="border border-orange-100 p-2 rounded-lg bg-white">ALL SERVICE TYPES</div>
+                  </div>
+                  <div className="mt-8 flex flex-col items-center gap-2">
+                    <QrCode size={40} className="text-gray-400" />
+                    <span className="text-[10px] font-bold text-gray-400">SCAN TO REGISTER</span>
+                  </div>
+                  <div className="mt-auto text-blue-600 font-bold text-xs">www.bestvanueoption.com</div>
+               </div>
+             ) : (
+                <div className="flex flex-col items-center justify-center h-full w-full bg-orange-50/50">
+                  <h3 className="text-2xl font-black text-orange-600 mb-8">RATE OUR PLATFORM</h3>
+                  <div className="w-32 h-32 bg-white border-2 border-orange-100 flex items-center justify-center rounded-2xl shadow-sm mb-4">
+                    <QrCode size={64} className="text-orange-600" />
+                  </div>
+                  <p className="text-xs font-black text-gray-500">SCAN & REVIEW</p>
+                  <div className="mt-auto pt-4 border-t w-full flex justify-between px-4 items-end">
+                    <div className="text-left">
+                       <span className="block text-xs font-black text-blue-600 leading-none">BEST VANUE</span>
+                       <span className="block text-xs font-black text-red-600 leading-none">OPTION</span>
+                    </div>
+                  </div>
+                </div>
+             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -10691,6 +11588,8 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [servicePhotos, setServicePhotos] = useState<ServiceTypePhoto[]>([]);
   const [moments, setMoments] = useState<{id: string, media_url: string, type: string, created_at: string}[]>([]);
+  const [adminVenues, setAdminVenues] = useState<Venue[]>([]);
+  const [adminServices, setAdminServices] = useState<ServiceProvider[]>([]);
   const [appLogoUrl, setAppLogoUrl] = useState<string>('/logo.png');
   const [loading, setLoading] = useState(true);
   const [reportFilters, setReportFilters] = useState({
@@ -10839,6 +11738,13 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       if (activeTab === 'moments') {
         const { data } = await db.from('moments').select('*').order('created_at', { ascending: false });
         if (data) setMoments(data);
+      }
+
+      if (activeTab === 'flex-download') {
+        const { data: vData } = await db.from('venues').select('*, owner_profile:user_profiles(displayName)');
+        const { data: sData } = await db.from('service_providers').select('*, provider_profile:user_profiles(displayName)');
+        if (vData) setAdminVenues(vData.map((v: any) => ({ ...v, ownerName: v.owner_profile?.displayName || 'Owner' })));
+        if (sData) setAdminServices(sData.map((s: any) => ({ ...s, ownerName: s.provider_profile?.displayName || 'Provider' })));
       }
 
       if (activeTab === 'settings') {
@@ -11297,6 +12203,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
             { id: 'banners', label: 'Banners', icon: LucideImage },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
             { id: 'moments', label: 'Moments Photos', icon: Sparkles },
+            { id: 'flex-download', label: 'Flex & Banner', icon: QrCode },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
             { id: 'database', label: 'Database & Security', icon: Database },
           ].map(tab => (
@@ -12053,6 +12960,10 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     </button>
                   </form>
                 </div>
+              )}
+
+              {activeTab === 'flex-download' && (
+                <FlexBannerDownloadView venues={adminVenues} services={adminServices} />
               )}
 
               {activeTab === 'database' && (
