@@ -4472,6 +4472,8 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     const [eventType, setEventType] = useState('');
     const [visitorAddress, setVisitorAddress] = useState(profile?.pincode ? `${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}` : '');
     const [message, setMessage] = useState('');
+    const [selectedItems, setSelectedItems] = useState<string[]>([]);
+    const [bookingMode, setBookingMode] = useState<'complete' | 'partial'>('complete');
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
     const [isCallSatisfied, setIsCallSatisfied] = useState(false);
     const [ownerProfile, setOwnerProfile] = useState<any>(null);
@@ -4556,7 +4558,14 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       const end = endDate ? new Date(endDate) : start;
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      const totalAmount = (venue?.pricePerDay || 0) * diffDays;
+      
+      let totalAmount = 0;
+      if (bookingMode === 'complete') {
+        totalAmount = (venue?.pricePerDay || 0) * diffDays;
+      } else {
+        const selectedAmenities = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+        totalAmount = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
+      }
 
       // Check for existing pending booking from this visitor for this venue
       const { data: existingPending, error: pendingError } = await db
@@ -4613,6 +4622,12 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       const ownerRegId = ownerProfile?.registration_id || ownerProfile?.registrationId || 'BVO';
       const tid = generateTransactionId(ownerRegId, count || 0);
 
+      const selectedAmenities = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+      const extraServices = selectedAmenities.map(item => ({ 
+        name: item.level, 
+        amount: (item.priceRate || 0) * diffDays 
+      }));
+
       const bookingData = {
         user_id: user?.uid || 'visitor',
         visitor_name: visitorName,
@@ -4620,7 +4635,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         event_type: eventType,
         target_id: venue?.id,
         target_type: 'venue',
-        target_name: venue?.name,
+        target_name: venue?.name + (bookingMode === 'partial' ? ' (Selected Amenities)' : ' (Complete Venue)'),
         owner_id: venue?.ownerId,
         event_date: bookingDate,
         end_date: endDate || bookingDate,
@@ -4630,7 +4645,8 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         total_amount: totalAmount,
         message: message || '',
         party_address: visitorAddress,
-        transaction_id: tid
+        transaction_id: tid,
+        extra_services: extraServices
       };
 
       const { error } = await db.from('bookings').insert([bookingData]);
@@ -4806,9 +4822,17 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                       <div className="flex justify-between items-end">
                         <div>
                           <h4 className="text-xl font-bold text-orange-600 uppercase tracking-wide">{item.level}</h4>
-                          <div className="flex items-center text-gray-500 text-sm mt-1">
-                            <Users size={14} className="mr-1" />
-                            <span>Capacity: {item.capacity} persons</span>
+                          <div className="flex items-center gap-4 text-gray-500 text-sm mt-1">
+                            <div className="flex items-center">
+                              <Users size={14} className="mr-1" />
+                              <span>Capacity: {item.capacity} persons</span>
+                            </div>
+                            {item.priceRate !== undefined && (
+                              <div className="flex items-center text-orange-600 font-bold">
+                                <IndianRupee size={12} className="mr-0.5" />
+                                <span>₹{item.priceRate.toLocaleString()}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -4882,7 +4906,12 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
           <div className="sticky top-24 space-y-8">
             <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8">
               <div className="flex items-baseline space-x-2 mb-6">
-                <span className="text-3xl font-bold text-gray-900">₹{(venue.pricePerDay || 0).toLocaleString()}</span>
+                <span className="text-3xl font-bold text-gray-900">
+                  {bookingMode === 'complete' 
+                    ? `₹${(venue.pricePerDay || 0).toLocaleString()}`
+                    : `₹${(venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')).reduce((sum, item) => sum + (item.priceRate || 0), 0) || 0).toLocaleString()}`
+                  }
+                </span>
                 <span className="text-gray-500">/ day</span>
               </div>
 
@@ -4949,6 +4978,61 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                         onChange={(e) => setVisitorAddress(e.target.value)}
                       />
                     </div>
+
+                    <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-3">
+                      <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                      <div className="flex gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => setBookingMode('complete')}
+                          className={cn(
+                            "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                            bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                          )}
+                        >
+                          Complete Venue
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setBookingMode('partial')}
+                          className={cn(
+                            "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                            bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                          )}
+                        >
+                          Select Amenities
+                        </button>
+                      </div>
+
+                      {bookingMode === 'partial' && venue.catalogue && (
+                        <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities</label>
+                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
+                            {venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                              <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
+                                <div className="flex items-center space-x-2">
+                                  <input 
+                                    type="checkbox"
+                                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                                    checked={selectedItems.includes(item.id || '')}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setSelectedItems([...selectedItems, item.id || '']);
+                                      else setSelectedItems(selectedItems.filter(id => id !== item.id));
+                                    }}
+                                  />
+                                  <span className="text-xs font-bold text-gray-700 uppercase">{item.level}</span>
+                                </div>
+                                <span className="text-xs font-black text-orange-600">₹{item.priceRate?.toLocaleString()}</span>
+                              </label>
+                            ))}
+                            {(!venue.catalogue || venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                              <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date Start From</label>
@@ -5397,11 +5481,18 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                     <div key={idx} className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="font-bold text-lg text-purple-600 uppercase tracking-wide">{item.level}</h4>
-                        {item.capacity > 0 && (
-                          <span className="text-xs font-bold bg-purple-50 text-purple-600 px-3 py-1 rounded-full">
-                            Capacity: {item.capacity}
-                          </span>
-                        )}
+                        <div className="flex gap-2 items-center">
+                          {item.capacity > 0 && (
+                            <span className="text-xs font-bold bg-purple-50 text-purple-600 px-3 py-1 rounded-full">
+                              Capacity: {item.capacity}
+                            </span>
+                          )}
+                          {item.priceRate && (
+                            <span className="text-xs font-black bg-orange-50 text-orange-600 px-3 py-1 rounded-full border border-orange-100 flex items-center">
+                              <IndianRupee size={10} className="mr-0.5" /> {item.priceRate.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-gray-600 text-sm">{item.description}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -7967,6 +8058,20 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     </div>
                   )}
                 </div>
+
+                {b.extra_services && b.extra_services.length > 0 && (
+                  <div className="pt-2 border-t border-gray-50">
+                    <div className="flex flex-wrap gap-2">
+                      {b.extra_services.map((s, idx) => (
+                        <div key={idx} className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold border border-orange-100">
+                          <CheckCircle size={10} className="mr-1" />
+                          {s.name} (₹{s.amount.toLocaleString()})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {b.message && (
                   <div className="pt-2 border-t border-gray-50">
                     <p className="text-[10px] md:text-xs text-gray-500 italic flex items-start">
@@ -8424,8 +8529,10 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
   );
   const [loading, setLoading] = useState(false);
   const [newItem, setNewItem] = useState<Partial<CatalogueItem>>({
+    id: Math.random().toString(36).substr(2, 9),
     level: activeType === 'venue' ? 'rooms(ac)' : 'work sample',
     capacity: 0,
+    priceRate: 0,
     images: [],
     videos: [],
     description: ''
@@ -8450,10 +8557,10 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
   useEffect(() => {
     if (activeType === 'venue') {
       setSelectedId(venues[0]?.id || '');
-      setNewItem(prev => ({ ...prev, level: 'rooms(ac)' }));
+      setNewItem(prev => ({ ...prev, id: Math.random().toString(36).substr(2, 9), level: 'rooms(ac)' }));
     } else {
       setSelectedId(services[0]?.id || '');
-      setNewItem(prev => ({ ...prev, level: 'work sample' }));
+      setNewItem(prev => ({ ...prev, id: Math.random().toString(36).substr(2, 9), level: 'work sample' }));
     }
   }, [activeType, venues.length, services.length]);
 
@@ -8464,13 +8571,21 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
     }
     setLoading(true);
     try {
-      const updatedCatalogue = [...(selectedItem.catalogue || []), newItem as CatalogueItem];
+      const updatedCatalogue = [...(selectedItem.catalogue || []), { ...newItem, id: newItem.id || Math.random().toString(36).substr(2, 9) } as CatalogueItem];
       const table = activeType === 'venue' ? 'venues' : 'service_providers';
       
       const { error } = await db.from(table).update({ catalogue: updatedCatalogue }).eq('id', selectedItem.id);
       if (error) throw error;
       
-      setNewItem({ level: activeType === 'venue' ? 'rooms(ac)' : 'work sample', capacity: 0, images: [], videos: [], description: '' });
+      setNewItem({ 
+        id: Math.random().toString(36).substr(2, 9),
+        level: activeType === 'venue' ? 'rooms(ac)' : 'work sample', 
+        capacity: 0, 
+        priceRate: 0,
+        images: [], 
+        videos: [], 
+        description: '' 
+      });
       toast.success('Catalogue item added');
     } catch (err) {
       toast.error('Failed to add catalogue item');
@@ -8550,9 +8665,9 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Level/Category</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Level/Category</label>
                   <select 
                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500"
                     value={newItem.level}
@@ -8561,72 +8676,84 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                     {levels.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
-                {activeType === 'venue' && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Capacity</label>
-                    <input 
-                      type="number"
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500"
-                      value={newItem.capacity}
-                      onChange={(e) => setNewItem({...newItem, capacity: parseInt(e.target.value) || 0})}
-                    />
-                  </div>
-                )}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                  <textarea 
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Capacity</label>
+                  <input 
+                    type="number"
                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500"
-                    rows={2}
-                    placeholder={activeType === 'service' ? "Describe this work sample..." : "Describe this level..."}
-                    value={newItem.description}
-                    onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                    value={newItem.capacity}
+                    onChange={(e) => setNewItem({...newItem, capacity: parseInt(e.target.value) || 0})}
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <ImageUpload 
-                    label="Upload Photos (Multiple)" 
-                    multiple={true}
-                    onUpload={(url) => {
-                      if (url) {
-                        setNewItem(prev => ({...prev, images: [...(prev.images || []), url]}));
-                      }
-                    }}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Price Rate (₹)</label>
+                  <input 
+                    type="number"
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 font-bold"
+                    placeholder="e.g. 5000"
+                    value={newItem.priceRate}
+                    onChange={(e) => setNewItem({...newItem, priceRate: parseFloat(e.target.value) || 0})}
                   />
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    {newItem.images?.filter(img => img !== '').map((img, i) => (
-                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
-                        <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        <button 
-                          onClick={() => setNewItem(prev => ({...prev, images: prev.images?.filter((_, idx) => idx !== i)}))}
-                          className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <VideoUpload 
-                    label="Upload Videos (Max 60 seconds)" 
-                    multiple={true}
-                    onUpload={(url) => setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}))}
-                  />
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    {newItem.videos?.map((vid, i) => (
-                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
-                        <video src={vid} className="w-full h-full object-cover" />
-                        <button 
-                          onClick={() => setNewItem(prev => ({...prev, videos: prev.videos?.filter((_, idx) => idx !== i)}))}
-                          className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                <textarea 
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  rows={2}
+                  placeholder={activeType === 'service' ? "Describe this work sample..." : "Describe this level..."}
+                  value={newItem.description}
+                  onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <ImageUpload 
+                  label="Upload Photos (Multiple)" 
+                  multiple={true}
+                  onUpload={(url) => {
+                    if (url) {
+                      setNewItem(prev => ({...prev, images: [...(prev.images || []), url]}));
+                    }
+                  }}
+                />
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {newItem.images?.filter(img => img !== '').map((img, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
+                      <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <button 
+                        onClick={() => setNewItem(prev => ({...prev, images: prev.images?.filter((_, idx) => idx !== i)}))}
+                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <VideoUpload 
+                  label="Upload Videos (Max 60 seconds)" 
+                  multiple={true}
+                  onUpload={(url) => setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}))}
+                />
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {newItem.videos?.map((vid, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
+                      <video src={vid} className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => setNewItem(prev => ({...prev, videos: prev.videos?.filter((_, idx) => idx !== i)}))}
+                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <button 
                 onClick={handleAddItem}
                 disabled={loading}
@@ -8661,7 +8788,10 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-black text-orange-600 uppercase text-sm tracking-wider">{item.level}</h4>
-                        {activeType === 'venue' && <p className="text-xs text-gray-500 font-bold mt-1">Capacity: {item.capacity} persons</p>}
+                        <div className="flex flex-wrap gap-4 mt-1">
+                          {activeType === 'venue' && <span className="text-xs text-gray-500 font-bold">Capacity: {item.capacity} persons</span>}
+                          {item.priceRate && <span className="text-xs text-orange-600 font-black">Price: ₹{item.priceRate.toLocaleString()}</span>}
+                        </div>
                       </div>
                       <button 
                         onClick={() => handleRemoveItem(i)}
@@ -8683,12 +8813,14 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
             </div>
           </div>
         )}
+
         {activeType === 'venue' && venues.length === 0 && (
           <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
             <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">Add a venue first to manage its catalogue.</p>
           </div>
         )}
+        
         {activeType === 'service' && services.length === 0 && (
           <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
             <Music2 size={48} className="mx-auto text-gray-300 mb-4" />

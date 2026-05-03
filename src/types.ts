@@ -96,8 +96,10 @@ export type CatalogueLevel =
   | 'Outdoor';
 
 export interface CatalogueItem {
+  id?: string;
   level: CatalogueLevel;
   capacity: number;
+  priceRate?: number;
   images: string[];
   videos?: string[];
   description: string;
