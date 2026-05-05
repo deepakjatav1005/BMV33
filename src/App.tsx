@@ -11529,428 +11529,299 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.text(text, x, y, options);
     };
 
-    if (selectedType === 1) {
+    if (selectedType === 1 || selectedType === 2) {
       const item: any = selectedItem;
       if (!item) return;
 
-      // Background
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      
-      const margin = pageWidth * 0.05;
-      const topY = pageHeight * 0.12;
-      
-      // 1. Top Section (Centered Venue Info)
-      doc.setFontSize(pageHeight * 0.1);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text((item.name || "UNNAMED VENUE").toUpperCase(), pageWidth / 2, topY, { align: 'center' });
-      
-      doc.setFontSize(pageHeight * 0.07);
-      doc.text((`(${item.ownerName || "OWNER NAME"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.09), { align: 'center' });
-
-      // 2. Main Content Area
-      const middleY = topY + (pageHeight * 0.22);
-      
-      // Left Details: Available For & Amenities
-      doc.setFontSize(pageHeight * 0.05);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text("(VANUE AVAILABLE FOR-)", margin, middleY);
-      
-      doc.setFontSize(pageHeight * 0.035);
-      doc.setFont("helvetica", "normal");
-      const availableText = (item.availableFor || []).slice(0, 8).join(", ");
-      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.05), { maxWidth: pageWidth * 0.55 });
-      
-      const amenitiesY = middleY + (pageHeight * 0.15);
-      doc.setFontSize(pageHeight * 0.05);
-      doc.setFont("helvetica", "bold");
-      doc.text("(VANUE AMENITIES-)", margin, amenitiesY);
-      
-      doc.setFontSize(pageHeight * 0.035);
-      doc.setFont("helvetica", "normal");
-      const amenitiesText = (item.facilities || []).slice(0, 10).join(", ");
-      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.05), { maxWidth: pageWidth * 0.55 });
-
-      // Right: Venue Main Photo
-      const photoSize = pageHeight * 0.42;
-      const photoX = pageWidth - margin - photoSize;
-      const photoY = middleY - (pageHeight * 0.02);
-      
-      if (item.images && item.images.length > 0) {
-        try {
-          // Decorative Border
-          doc.setDrawColor(0, 0, 0);
-          doc.setLineWidth(1.5);
-          doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
-          
-          doc.addImage(item.images[0], 'JPEG', photoX, photoY, photoSize, photoSize, undefined, 'FAST');
-        } catch(e) {
-          doc.rect(photoX, photoY, photoSize, photoSize, 'S');
-          doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoSize, photoSize, 'S');
-      }
-
-      // Bottom Right: QR Section
-      const qrSize = pageHeight * 0.28;
-      const qrCenterY = photoY + photoSize + (pageHeight * 0.18);
-      const qrX = pageWidth - margin - (qrSize / 2);
-      
-      doc.setFontSize(pageHeight * 0.03);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.04), { align: 'center' });
-      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.005), { align: 'center' });
-      
-      const actualQrY = qrCenterY - (qrSize/2) + (pageHeight * 0.02);
-      try {
-        const url = `${window.location.origin}/venues/${item.id}`;
-        const qr = await QRCode.toDataURL(url, { width: 1000, margin: 2 });
-        doc.addImage(qr, 'PNG', qrX - (qrSize / 2), actualQrY, qrSize, qrSize);
-      } catch(e) {}
-
-      // 3. Bottom: Address
-      const addressY = pageHeight * 0.72;
-      doc.setFontSize(pageHeight * 0.06);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      const venueAddr = item.address || [item.block, item.district].filter(Boolean).join(", ");
-      doc.text(`(ADDRESS- ${venueAddr.toUpperCase()} )`, pageWidth * 0.45, addressY, { align: 'center', maxWidth: pageWidth * 0.6 });
-
-      // 4. Platform Branding (Bottom Left)
-      const brandingY = pageHeight * 0.88;
-      const brandingLogoSize = pageHeight * 0.14;
-      
-      if (appLogoUrl) {
-        try {
-          const bLogo64 = await imageUrlToBase64(appLogoUrl);
-          if (bLogo64) doc.addImage(bLogo64, 'PNG', margin, brandingY - (brandingLogoSize/2), brandingLogoSize, brandingLogoSize);
-        } catch(e) {}
-      }
-      
-      const brandingTextX = margin + brandingLogoSize + 5;
-      doc.setFontSize(pageHeight * 0.08);
-      doc.setTextColor(234, 88, 12); // orange-600
-      doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), brandingTextX, brandingY);
-      
-      doc.setFontSize(pageHeight * 0.035);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(31, 41, 55);
-      doc.text(appTagline.toUpperCase(), brandingTextX, brandingY + (pageHeight * 0.05));
-
-      // 5. Final Footer
-      doc.setFontSize(pageHeight * 0.028);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text("VISIT FOR ONLINE BOOKING- WWW.BESTVANUEOPTION.COM", pageWidth / 2, pageHeight * 0.97, { align: 'center' });
-
-    } else if (selectedType === 2) {
-      const item: any = selectedItem;
-      if (!item) return;
-
-      // SERVICE BRANDING BANNER (Matching the uploaded design)
+      // BACKGROUND
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
       const margin = pageWidth * 0.05;
       const topY = pageHeight * 0.1;
       
-      // 1. Top Section (Centered Service Info)
+      // 1. HEADER SECTION (Centered)
       doc.setFontSize(pageHeight * 0.09);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text((item.name || "UNNAMED SERVICE").toUpperCase(), pageWidth / 2, topY, { align: 'center' });
+      const mainTitle = selectedType === 1 ? (item.name || "VENUE NAME") : (item.name || "SERVICE NAME");
+      doc.text(mainTitle.toUpperCase(), pageWidth / 2, topY, { align: 'center' });
       
-      doc.setFontSize(pageHeight * 0.06);
-      doc.text((`(${item.ownerName || "PROVIDER NAME"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.08), { align: 'center' });
+      doc.setFontSize(pageHeight * 0.07);
+      const subTitle1 = selectedType === 1 ? (item.ownerName || "OWNER NAME") : (item.ownerName || "PROVIDER NAME");
+      doc.text(`(${subTitle1.toUpperCase()})`, pageWidth / 2, topY + (pageHeight * 0.085), { align: 'center' });
 
-      doc.setFontSize(pageHeight * 0.06);
-      doc.text((`(${item.serviceType || "SERVICE TYPE"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.16), { align: 'center' });
+      if (selectedType === 2) {
+        doc.setFontSize(pageHeight * 0.06);
+        doc.text(`(${item.serviceType || "SERVICE TYPE"})`.toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.16), { align: 'center' });
+      }
 
-      // 2. Main Content Area
-      const middleY = topY + (pageHeight * 0.28);
+      // 2. MAIN CONTENT AREA
+      const middleY = topY + (selectedType === 2 ? pageHeight * 0.28 : pageHeight * 0.22);
       
-      // Left Details: Available For & Amenities
-      doc.setFontSize(pageHeight * 0.05);
+      // LEFT PART: Available For & Amenities
+      const labelFontSize = pageHeight * 0.045;
+      const contentFontSize = pageHeight * 0.032;
+      const lineSpacing = pageHeight * 0.045;
+      const leftColWidth = pageWidth * 0.55;
+
+      doc.setFontSize(labelFontSize);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text("(SERVICE AVAILABLE FOR-)", margin, middleY);
+      const label1 = selectedType === 1 ? "(VANUE AVAILABLE FOR-)" : "(SERVICE AVAILABLE FOR-)";
+      doc.text(label1, margin, middleY);
       
-      doc.setFontSize(pageHeight * 0.032);
+      doc.setFontSize(contentFontSize);
       doc.setFont("helvetica", "normal");
-      const availableText = (item.availableFor || []).slice(0, 8).join(", ");
-      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.045), { maxWidth: pageWidth * 0.55 });
+      const availableText = (item.availableFor || []).slice(0, 10).join(", ");
+      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.035), { maxWidth: leftColWidth });
       
       const amenitiesY = middleY + (pageHeight * 0.15);
-      doc.setFontSize(pageHeight * 0.05);
+      doc.setFontSize(labelFontSize);
       doc.setFont("helvetica", "bold");
-      doc.text("(SERVICE AMENITIES-)", margin, amenitiesY);
+      const label2 = selectedType === 1 ? "(VANUE AMENITIES-)" : "(SERVICE AMENITIES-)";
+      doc.text(label2, margin, amenitiesY);
       
-      doc.setFontSize(pageHeight * 0.032);
+      doc.setFontSize(contentFontSize);
       doc.setFont("helvetica", "normal");
-      const amenitiesText = (item.facilities || item.catalogue?.map((c: any) => c.level) || []).slice(0, 10).join(", ");
-      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.045), { maxWidth: pageWidth * 0.55 });
+      const amenitiesText = (item.facilities || item.catalogue?.map((c: any) => c.level) || []).slice(0, 12).join(", ");
+      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.035), { maxWidth: leftColWidth });
 
-      // Right: Service Main Photo
+      // RIGHT PART: Large Photo with Border
       const photoSize = pageHeight * 0.42;
       const photoX = pageWidth - margin - photoSize;
       const photoY = middleY - (pageHeight * 0.02);
       
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(2);
+      doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
+
       if (item.images && item.images.length > 0) {
         try {
-          doc.setDrawColor(0, 0, 0);
-          doc.setLineWidth(1.5);
-          doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
           doc.addImage(item.images[0], 'JPEG', photoX, photoY, photoSize, photoSize, undefined, 'FAST');
         } catch(e) {
-          doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+          doc.setFontSize(pageHeight * 0.03);
+          doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
         }
       } else {
-        doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+        doc.setFontSize(pageHeight * 0.03);
+        doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
       }
 
-      // Bottom Right: QR Section
+      // QR SECTION with Brackets
       const qrSize = pageHeight * 0.28;
       const qrCenterY = photoY + photoSize + (pageHeight * 0.18);
       const qrX = pageWidth - margin - (qrSize / 2);
+      const actualQrY = qrCenterY - (qrSize / 2) + (pageHeight * 0.02);
       
-      doc.setFontSize(pageHeight * 0.03);
-      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(pageHeight * 0.032);
+      doc.setTextColor(234, 88, 12); // Orange Theme
       doc.setFont("helvetica", "bold");
-      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.04), { align: 'center' });
-      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.005), { align: 'center' });
+      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.045), { align: 'center' });
+      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.01), { align: 'center' });
       
-      const actualQrY = qrCenterY - (qrSize/2) + (pageHeight * 0.02);
+      // QR CODE Brackets
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(1.5);
+      const brS = qrSize * 0.15;
+      const bQrX = qrX - (qrSize / 2);
+      const bQrY = actualQrY;
+      doc.line(bQrX - 3, bQrY - 3, bQrX - 3 + brS, bQrY - 3);
+      doc.line(bQrX - 3, bQrY - 3, bQrX - 3, bQrY - 3 + brS);
+      doc.line(bQrX + qrSize + 3, bQrY - 3, bQrX + qrSize + 3 - brS, bQrY - 3);
+      doc.line(bQrX + qrSize + 3, bQrY - 3, bQrX + qrSize + 3, bQrY - 3 + brS);
+      doc.line(bQrX - 3, bQrY + qrSize + 3, bQrX - 3 + brS, bQrY + qrSize + 3);
+      doc.line(bQrX - 3, bQrY + qrSize + 3, bQrX - 3, bQrY + qrSize + 3 - brS);
+      doc.line(bQrX + qrSize + 3, bQrY + qrSize + 3, bQrX + qrSize + 3 - brS, bQrY + qrSize + 3);
+      doc.line(bQrX + qrSize + 3, bQrY + qrSize + 3, bQrX + qrSize + 3, bQrY + qrSize + 3 - brS);
+
       try {
-        const url = `${window.location.origin}/services/${item.id}`;
+        const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
         const qr = await QRCode.toDataURL(url, { width: 1000, margin: 2 });
-        doc.addImage(qr, 'PNG', qrX - (qrSize / 2), actualQrY, qrSize, qrSize);
+        doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
 
-      // 3. Bottom: Address
-      const addressY = pageHeight * 0.72;
-      doc.setFontSize(pageHeight * 0.06);
+      // 3. BOTTOM: Address
+      const addressY = pageHeight * 0.75;
+      doc.setFontSize(pageHeight * 0.055);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      const serviceAddr = item.address || [item.block, item.district].filter(Boolean).join(", ");
-      doc.text(`(ADDRESS- ${serviceAddr.toUpperCase()} )`, pageWidth * 0.45, addressY, { align: 'center', maxWidth: pageWidth * 0.6 });
+      const addr = item.address || [item.block, item.district].filter(Boolean).join(", ");
+      doc.text(`(ADDRESS- ${addr.toUpperCase()} )`, pageWidth * 0.4, addressY, { align: 'center', maxWidth: pageWidth * 0.65 });
 
-      // 4. Platform Branding (Bottom Left)
-      const brandingY = pageHeight * 0.88;
-      const brandingLogoSize = pageHeight * 0.14;
-      
+      // 4. PLATFORM BRANDING
+      const brandY = pageHeight * 0.9;
+      const brandLogoSize = pageHeight * 0.15;
       if (appLogoUrl) {
         try {
-          const bLogo64 = await imageUrlToBase64(appLogoUrl);
-          if (bLogo64) doc.addImage(bLogo64, 'PNG', margin, brandingY - (brandingLogoSize/2), brandingLogoSize, brandingLogoSize);
+          const bLogo = await imageUrlToBase64(appLogoUrl);
+          if (bLogo) doc.addImage(bLogo, 'PNG', margin, brandY - (brandLogoSize / 2), brandLogoSize, brandLogoSize);
         } catch(e) {}
       }
-      
-      const brandingTextX = margin + brandingLogoSize + 5;
+
+      const bTextX = margin + brandLogoSize + 5;
       doc.setFontSize(pageHeight * 0.08);
-      doc.setTextColor(234, 88, 12); // orange-600
+      doc.setTextColor(234, 88, 12); // Orange Name
       doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), brandingTextX, brandingY);
+      doc.text(appName.toUpperCase(), bTextX, brandY);
       
       doc.setFontSize(pageHeight * 0.035);
+      doc.setTextColor(37, 99, 235); // Blue Tagline
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(31, 41, 55);
-      doc.text(appTagline.toUpperCase(), brandingTextX, brandingY + (pageHeight * 0.05));
+      doc.text(appTagline.toUpperCase(), bTextX, brandY + (pageHeight * 0.05));
 
-      // 5. Final Footer
+      // 5. FOOTER LINK
       doc.setFontSize(pageHeight * 0.028);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text("VISIT FOR ONLINE BOOKING- WWW.BESTVANUEOPTION.COM", pageWidth / 2, pageHeight * 0.97, { align: 'center' });
+      doc.text(`VISIT FOR ONLINE BOOKING- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.97, { align: 'center' });
 
     } else if (selectedType === 3) {
-      // APP BRANDING FLEX (Matching the uploaded design with App Color Theme)
+      // APP BRANDING BANNER (Same as Image 1)
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
       const margin = pageWidth * 0.05;
+      const logoSize = pageHeight * 0.2;
       
-      // 1. Top Section: Logo and Title
-      const logoSize = pageHeight * 0.22;
+      // 1. Header
       if (appLogoUrl) {
         try {
-          const logo64 = await imageUrlToBase64(appLogoUrl);
-          if (logo64) doc.addImage(logo64, 'PNG', margin, margin, logoSize, logoSize);
-        } catch(e) {
-          doc.setDrawColor(37, 99, 235); // Blue
-          doc.setLineWidth(2);
-          doc.circle(margin + logoSize/2, margin + logoSize/2, logoSize/2, 'S');
-          doc.setFontSize(logoSize * 0.3);
-          doc.setTextColor(234, 88, 12); // Orange
-          doc.text("BV", margin + logoSize/2, margin + logoSize/2 + 3, { align: 'center' });
-        }
+          const l64 = await imageUrlToBase64(appLogoUrl);
+          if (l64) doc.addImage(l64, 'PNG', margin, margin, logoSize, logoSize);
+        } catch(e) {}
       }
-
-      // Main Title (App Theme: Orange)
-      doc.setFontSize(pageHeight * 0.09);
-      doc.setTextColor(234, 88, 12); // orange-600
+      
+      doc.setFontSize(pageHeight * 0.12);
+      doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.35), { align: 'center' });
-
-      // Subtitle (App Theme: Blue/Black)
+      doc.text(appName.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.35), { align: 'center' });
+      
       doc.setFontSize(pageHeight * 0.04);
-      doc.setTextColor(31, 41, 55);
       doc.setFont("helvetica", "normal");
-      doc.text(appTagline.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.65), { align: 'center' });
+      doc.text(appTagline.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.6), { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.022);
+      doc.setFont("helvetica", "bold");
+      const dText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
+      doc.text(dText.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.85), { align: 'center', maxWidth: pageWidth * 0.8 });
 
-      // Description
+      // 2. Lists Area
+      const middleY = margin + logoSize + (pageHeight * 0.08);
+      const col1X = pageWidth * 0.22;
+      const col2X = pageWidth * 0.46;
+      const listHSpacing = pageHeight * 0.032;
+      
+      // PROVIDER IMAGE PLACEHOLDER
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, middleY - 10, pageWidth * 0.15, pageHeight * 0.45, 'F');
+
+      const services1 = ["CATERORS", "DHOL AND BAND", "DJ AND SOUND SERVICE", "DRONE PHOTO/VIDEO", "EVENT CLOTH/JWELLARY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR", "GHODA GADI", "GIFT ADN HAMPERS", "HALWAI", "HELPERS"];
+      const services2 = ["LOUNDRY SERVICES", "LIGHT DECORATOR", "MAKE UP ARTISTS", "MAHENDI ARTISTS", "MUSICAL GROUP", "PHOTO AND VIDEO", "PUJARI JI", "STAGE DECORATOR", "TENT HOUSED", "VEHICLE ON RENT", "OTHER SERVICES"];
+
       doc.setFontSize(pageHeight * 0.024);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      const descText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
-      doc.text(descText.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.85), { align: 'center', maxWidth: pageWidth * 0.7 });
+      services1.forEach((s, i) => doc.text(`${i + 1}. ${s}`, col1X, middleY + (i * listHSpacing)));
+      services2.forEach((s, i) => doc.text(`${i + 13}. ${s}`, col2X, middleY + (i * listHSpacing)));
 
-      // 2. Middle Section
-      const middleY = margin + logoSize + (pageHeight * 0.08);
-      const listCol1X = pageWidth * 0.22;
-      const listCol2X = pageWidth * 0.46;
-      const listLineSpacing = pageHeight * 0.035;
-      
-      // Member Placeholder
-      doc.setFillColor(243, 244, 246);
-      doc.rect(margin, middleY - 10, pageWidth * 0.16, pageHeight * 0.45, 'F');
-      doc.setTextColor(156, 163, 175);
-      doc.setFontSize(pageHeight * 0.02);
-      doc.text("PROVIDER", margin + (pageWidth * 0.08), middleY + (pageHeight * 0.2), { align: 'center' });
-
-      // Service Lists
-      const pServices = [
-        "CATERORS", "DHOL AND BAND", "DJ AND SOUND SERVICE", "DRONE PHOTO AND VIDEOGRAPER",
-        "EVENT CLOTH AND JWELLARY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR",
-        "GHODA GADI", "GIFT ADN HAMPERS", "HALWAI", "HELPERS"
-      ];
-      const sServices = [
-        "LOUNDRY SERVICES", "LIGHT DECORATOR", "MAKE UP ARTISTS", "MAHENDI ARTISTS",
-        "MUSICAL GROUP", "PHOTO AND VIDEO GRAPHER", "PUJARI JI", "STAGE DECORATOR",
-        "TENT HOUSED", "VEHICLE ON RENT", "OTHER RELATED SERVICES"
-      ];
-
-      doc.setFontSize(pageHeight * 0.026);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      
-      pServices.forEach((s, i) => {
-        doc.text(`${i + 1}. ${s}`, listCol1X, middleY + (i * listLineSpacing));
-      });
-      
-      sServices.forEach((s, i) => {
-        doc.text(`${i + 13}. ${s}`, listCol2X, middleY + (i * listLineSpacing));
-      });
-
-      // 3. Right Side: Vertical Divider and Venue types
+      // 3. Right Divider Column
       const dividerX = pageWidth * 0.74;
-      // Gradient approximation: Blue-Orange bar
-      doc.setFillColor(37, 99, 235); // Blue
-      doc.rect(dividerX, middleY - 10, pageWidth * 0.012, pageHeight * 0.5, 'F');
-      doc.setFillColor(234, 88, 12); // Orange overlay for gradient feel
-      doc.rect(dividerX, middleY + (pageHeight * 0.25), pageWidth * 0.012, pageHeight * 0.25, 'F');
+      const barH = pageHeight * 0.5;
       
-      const vCats = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HOTEL", "RESHORT", "COMMUNITY HALL"];
+      // Multi-Tone Bar
+      doc.setFillColor(236, 72, 153); // Pink
+      doc.rect(dividerX, middleY - 10, pageWidth * 0.012, barH * 0.5, 'F');
+      doc.setFillColor(234, 88, 12); // Orange
+      doc.rect(dividerX, middleY - 10 + (barH * 0.5), pageWidth * 0.012, barH * 0.5, 'F');
+      
       const vRightX = dividerX + (pageWidth * 0.04);
       
-      // Venue Icon Placeholder
+      // VENUE ICON PLACEHOLDER
       doc.setFillColor(243, 244, 246);
-      doc.roundedRect(vRightX, middleY - 10, pageWidth * 0.16, pageHeight * 0.16, 5, 5, 'F');
-      doc.setFontSize(pageHeight * 0.02);
-      doc.setTextColor(156, 163, 175);
-      doc.text("VENUE", vRightX + (pageWidth * 0.08), middleY + (pageHeight * 0.06), { align: 'center' });
+      doc.roundedRect(vRightX, middleY - 10, pageWidth * 0.18, pageHeight * 0.18, 5, 5, 'F');
 
-      doc.setFontSize(pageHeight * 0.032);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      vCats.forEach((c, i) => {
-        doc.text(`${i + 1}. ${c}`, vRightX, middleY + (pageHeight * 0.2) + (i * pageHeight * 0.055));
-      });
+      const vTypes = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HOTEL", "RESHORT", "COMMUNITY HALL"];
+      doc.setFontSize(pageHeight * 0.035);
+      vTypes.forEach((v, i) => doc.text(`${i + 1}. ${v}`, vRightX, middleY + (pageHeight * 0.22) + (i * pageHeight * 0.055)));
 
-      // 4. Footer Section
-      doc.setFontSize(pageHeight * 0.024);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      const cta1 = "ARE YOU OPERAT ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING";
-      const cta2 = "MANAGEMENT AND BOOST YOUR BUSINESS NOW";
-      doc.text(cta1.toUpperCase(), pageWidth / 2, pageHeight * 0.88, { align: 'center' });
-      doc.text(cta2.toUpperCase(), pageWidth / 2, pageHeight * 0.91, { align: 'center' });
+      // 4. Footer
+      doc.setFontSize(pageHeight * 0.022);
+      const fCta1 = "ARE YOU OPERATE ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING";
+      const fCta2 = "MANAGEMENT AND BOOST YOUR BUSINESS NOW";
+      doc.text(fCta1.toUpperCase(), pageWidth / 2, pageHeight * 0.88, { align: 'center' });
+      doc.text(fCta2.toUpperCase(), pageWidth / 2, pageHeight * 0.91, { align: 'center' });
       
-      doc.setFontSize(pageHeight * 0.028);
-      doc.setTextColor(37, 99, 235); // Blue
-      doc.text(`FOR REGISTRATION VISIT NOW- WWW.BESTVANUEOPTION.COM`, pageWidth / 2, pageHeight * 0.96, { align: 'center', charSpace: 0.5 });
+      doc.setFontSize(pageHeight * 0.026);
+      doc.setTextColor(234, 88, 12);
+      doc.text(`FOR REGISTRATION VISIT NOW- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.96, { align: 'center' });
 
     } else if (selectedType === 4) {
-      // APP RATING BANNER (Matching the uploaded design)
+      // APP RATING BANNER (Same as Image 3)
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
       const margin = pageWidth * 0.05;
-      const topY = margin + (pageHeight * 0.03);
+      const topY = pageHeight * 0.08;
       
-      // 1. Branding Header
-      const headerLogoSize = pageHeight * 0.22;
+      // Header
+      const headerLogoSize = pageHeight * 0.24;
       if (appLogoUrl) {
         try {
-          const logo64 = await imageUrlToBase64(appLogoUrl);
-          if (logo64) doc.addImage(logo64, 'PNG', margin + (pageWidth * 0.05), topY, headerLogoSize, headerLogoSize);
+          const l64 = await imageUrlToBase64(appLogoUrl);
+          if (l64) doc.addImage(l64, 'PNG', margin + (pageWidth * 0.05), topY, headerLogoSize, headerLogoSize);
         } catch(e) {}
       }
 
-      const brandingTextX = margin + headerLogoSize + (pageWidth * 0.08);
-      doc.setFontSize(pageHeight * 0.09);
-      doc.setTextColor(0, 0, 0); // Bold Black for Name
+      const midTextX = margin + headerLogoSize + (pageWidth * 0.08);
+      doc.setFontSize(pageHeight * 0.1);
+      doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), brandingTextX, topY + (headerLogoSize * 0.4));
+      doc.text(appName.toUpperCase(), midTextX, topY + (headerLogoSize * 0.4));
       
       doc.setFontSize(pageHeight * 0.045);
-      doc.setTextColor(31, 41, 55); // Dark Gray for Tagline
+      doc.setTextColor(31, 41, 55);
       doc.setFont("helvetica", "normal");
-      doc.text(appTagline.toUpperCase(), brandingTextX, topY + (headerLogoSize * 0.7));
+      doc.text(appTagline.toUpperCase(), midTextX, topY + (headerLogoSize * 0.7));
 
-      // 2. Center Text
+      // Main Text
       doc.setFontSize(pageHeight * 0.05);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.38, { align: 'center' });
-      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.44, { align: 'center' });
+      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.4, { align: 'center' });
+      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.46, { align: 'center' });
 
-      // 3. QR Code with stylized Corners
-      const qrSize = pageHeight * 0.34;
-      const qrX = (pageWidth - qrSize) / 2;
-      const qrY = pageHeight * 0.5;
+      // QR Code with Brackets
+      const qrSize = pageHeight * 0.35;
+      const bQrX = (pageWidth - qrSize) / 2;
+      const bQrY = pageHeight * 0.52;
       
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(2);
-      const bS = 15;
-      // Corners
-      doc.line(qrX - 5, qrY - 5, qrX - 5 + bS, qrY - 5);
-      doc.line(qrX - 5, qrY - 5, qrX - 5, qrY - 5 + bS);
-      doc.line(qrX + qrSize + 5, qrY - 5, qrX + qrSize + 5 - bS, qrY - 5);
-      doc.line(qrX + qrSize + 5, qrY - 5, qrX + qrSize + 5, qrY - 5 + bS);
-      doc.line(qrX - 5, qrY + qrSize + 5, qrX - 5 + bS, qrY + qrSize + 5);
-      doc.line(qrX - 5, qrY + qrSize + 5, qrX - 5, qrY + qrSize + 5 - bS);
-      doc.line(qrX + qrSize + 5, qrY + qrSize + 5, qrX + qrSize + 5 - bS, qrY + qrSize + 5);
-      doc.line(qrX + qrSize + 5, qrY + qrSize + 5, qrX + qrSize + 5, qrY + qrSize + 5 - bS);
+      const brS = qrSize * 0.15;
+      doc.line(bQrX - 4, bQrY - 4, bQrX - 4 + brS, bQrY - 4);
+      doc.line(bQrX - 4, bQrY - 4, bQrX - 4, bQrY - 4 + brS);
+      doc.line(bQrX + qrSize + 4, bQrY - 4, bQrX + qrSize + 4 - brS, bQrY - 4);
+      doc.line(bQrX + qrSize + 4, bQrY - 4, bQrX + qrSize + 4, bQrY - 4 + brS);
+      doc.line(bQrX - 4, bQrY + qrSize + 4, bQrX - 4 + brS, bQrY + qrSize + 4);
+      doc.line(bQrX - 4, bQrY + qrSize + 4, bQrX - 4, bQrY + qrSize + 4 - brS);
+      doc.line(bQrX + qrSize + 4, bQrY + qrSize + 4, bQrX + qrSize + 4 - brS, bQrY + qrSize + 4);
+      doc.line(bQrX + qrSize + 4, bQrY + qrSize + 4, bQrX + qrSize + 4, bQrY + qrSize + 4 - brS);
 
       try {
         const qr = await QRCode.toDataURL(window.location.origin + "/app-rating", { width: 1000, margin: 4 });
-        doc.addImage(qr, 'PNG', qrX, qrY, qrSize, qrSize);
+        doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
 
       doc.setFontSize(pageHeight * 0.045);
       doc.setTextColor(31, 41, 55);
       doc.setFont("helvetica", "bold");
-      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, qrY + qrSize + (pageHeight * 0.1), { align: 'center' });
+      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, bQrY + qrSize + (pageHeight * 0.1), { align: 'center' });
 
-      // 4. Footer Link
+      // Footer
       doc.setFontSize(pageHeight * 0.04);
       doc.setTextColor(0, 0, 0);
-      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.95, { align: 'center', charSpace: 0.5 });
+      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.95, { align: 'center' });
     }
 
     doc.save(`Flex_${selectedType}_${sizeObj.value}_${Date.now()}.pdf`);
