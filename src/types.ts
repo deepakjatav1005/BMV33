@@ -105,6 +105,14 @@ export interface CatalogueItem {
   description: string;
 }
 
+export interface FacilityItem {
+  id: string;
+  name: string;
+  rate: number;
+  unit: string;
+  photoUrl: string;
+}
+
 export interface Venue {
   id: string;
   ownerId: string;
@@ -120,11 +128,13 @@ export interface Venue {
   pricePerDay: number;
   images: string[];
   facilities: string[];
+  facilityDetails?: FacilityItem[];
   rating: number;
   reviewCount?: number;
   rateChart?: { item: string; price: number }[];
   catalogue?: CatalogueItem[];
   availableFor?: string[];
+  site_levels?: string[];
   latitude?: number;
   longitude?: number;
   createdAt: any;
@@ -173,6 +183,7 @@ export interface ServiceProvider {
   catalogue?: CatalogueItem[];
   availableFor?: string[];
   facilities?: string[];
+  facilityDetails?: FacilityItem[];
   latitude?: number;
   longitude?: number;
   createdAt: any;

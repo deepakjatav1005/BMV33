@@ -51,6 +51,7 @@
       rating NUMERIC(3,1) DEFAULT 0,
       review_count INTEGER DEFAULT 0,
       catalogue JSONB DEFAULT '[]',
+      facility_details JSONB DEFAULT '[]',
       created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
@@ -73,6 +74,8 @@
       pincode TEXT,
       rating NUMERIC(3,1) DEFAULT 0,
       review_count INTEGER DEFAULT 0,
+      catalogue JSONB DEFAULT '[]',
+      facility_details JSONB DEFAULT '[]',
       created_at TIMESTAMPTZ DEFAULT NOW()
   );
 
@@ -407,7 +410,6 @@ import {
   XCircle,
   Info,
   Shirt,
-  WashingMachine,
   Gem,
   Building2,
   UserPlus,
@@ -426,12 +428,16 @@ import {
   Lightbulb,
   ChefHat,
   PersonStanding,
-  HandHelping,
+  HelpingHand,
   Layout,
   Users2,
   Globe,
   ArrowLeft,
-  QrCode
+  QrCode,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { motion, AnimatePresence } from 'motion/react';
@@ -850,7 +856,7 @@ import { locations } from './data/locations';
 const LOCATION_DATA = locations;
 
 // Mock database to remove backend connection as requested
-import { dataService as db, isSupabaseConnected } from './services/dataService';
+import { dataService as db, isSupabaseConnected, setOfflineMode } from './services/dataService';
 
 import { cn } from './lib/utils';
 
@@ -935,7 +941,7 @@ const useTranslation = () => React.useContext(LanguageContext);
 import { AppLogo } from './components/AppLogo';
 import { LogoDisplay } from './components/LogoDisplay';
 import { PoweredByCNZ } from './components/PoweredByCNZ';
-import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
+import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto, FacilityItem } from './types';
 
 declare var Razorpay: any;
 
@@ -944,6 +950,12 @@ const VENUE_FACILITIES = [
   'ROOMS(AC)', 'ROOMS(NON AC)', 'DINNER HALL', 'WEDDING HALL', 'STAGE SITE', 
   'CATTERING HALL', 'PARKING SIDE', 'PARTY HALL', 'MEETING HALL', 'RESHORT SITE', 
   'RECEPTION SITE', 'GARDEN SITE', 'GROUND', 'INDOOR SITE', 'OUTDOOR SITE'
+];
+
+const VENUE_SITE_LEVELS = [
+  'rooms(non ac)', 'rooms(ac)', 'wedding hall', 'dinner hall', 'reception', 
+  'stage site', 'ground', 'garden', 'dinning hall', 'kitchin hall', 
+  'parking site', 'party hall', 'seminar hall', 'meeting hall'
 ];
 
 const EVENT_TYPES = [
@@ -4523,7 +4535,9 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         pricePerDay: data.price_per_day,
         reviewCount: data.review_count,
         availableFor: data.available_for,
+        site_levels: data.site_levels || [],
         catalogue: data.catalogue || [],
+        facilityDetails: data.facility_details || [],
         createdAt: data.created_at
       } as Venue);
 
@@ -4808,13 +4822,17 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
             <div className="mt-10">
               <h3 className="text-xl font-bold text-gray-900 mb-4">Available For & Levels</h3>
               <div className="flex flex-wrap gap-2">
-                {[...(venue.availableFor || []), ...(venue.catalogue?.map(c => c.level) || [])].filter((v, i, a) => a.indexOf(v) === i).map((item, idx) => (
+                {[
+                  ...(venue.availableFor || []), 
+                  ...(venue.site_levels || []),
+                  ...(venue.catalogue?.map(c => c.level) || [])
+                ].filter((v, i, a) => v && a.indexOf(v) === i).map((item, idx) => (
                   <span key={idx} className="bg-orange-50 text-orange-700 px-4 py-2 rounded-xl text-sm font-bold border border-orange-100">
                     {item}
                   </span>
                 ))}
-                {(!venue.availableFor || venue.availableFor.length === 0) && (!venue.catalogue || venue.catalogue.length === 0) && (
-                  <span className="text-gray-400 italic text-sm">No specific event types listed</span>
+                {(!venue.availableFor || venue.availableFor.length === 0) && (!venue.site_levels || venue.site_levels.length === 0) && (!venue.catalogue || venue.catalogue.length === 0) && (
+                  <span className="text-gray-400 italic text-sm">No specific event types or levels listed</span>
                 )}
               </div>
             </div>
@@ -4878,6 +4896,47 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {venue.facilityDetails && venue.facilityDetails.length > 0 && (
+              <div className="mt-16">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900 underline decoration-orange-500 decoration-4 underline-offset-8 italic uppercase tracking-tighter">Facilities & Price Chart</h3>
+                <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-xl overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-orange-600 text-white">
+                      <tr>
+                        <th className="px-6 py-4 font-black text-xs uppercase tracking-widest">Sr No.</th>
+                        <th className="px-6 py-4 font-black text-xs uppercase tracking-widest">Facility Name</th>
+                        <th className="px-6 py-4 font-black text-xs uppercase tracking-widest">Rate (₹)</th>
+                        <th className="px-6 py-4 font-black text-xs uppercase tracking-widest text-center">Unit</th>
+                        <th className="px-6 py-4 font-black text-xs uppercase tracking-widest text-center">Photo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-bold">
+                      {venue.facilityDetails.map((f, i) => (
+                        <tr key={f.id || i} className="hover:bg-orange-50/30 transition-all group">
+                          <td className="px-6 py-4 text-gray-400 text-sm">{i + 1}</td>
+                          <td className="px-6 py-4 text-gray-900 text-lg decoration-orange-300 group-hover:underline underline-offset-4">{f.name}</td>
+                          <td className="px-6 py-4 text-orange-600 font-black text-xl">₹{f.rate.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-center">
+                             <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] uppercase tracking-tighter whitespace-nowrap">{f.unit}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {f.photoUrl ? (
+                              <div className="relative inline-block">
+                                <img src={f.photoUrl} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md mx-auto group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" alt={f.name} />
+                                <div className="absolute inset-0 rounded-2xl ring-1 ring-black/5" />
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 italic text-[10px] font-black uppercase">Not Available</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -5221,6 +5280,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         reviewCount: data.review_count,
         availableFor: data.available_for,
         catalogue: data.catalogue || [],
+        facilityDetails: data.facility_details || [],
         latitude: data.latitude,
         longitude: data.longitude,
         createdAt: data.created_at
@@ -5548,6 +5608,51 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                       <span className="font-bold text-sm uppercase">{facility}</span>
                     </div>
                   ))}
+                </div>
+              </section>
+            )}
+
+            {service.facilityDetails && service.facilityDetails.length > 0 && (
+              <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden min-w-0">
+                <h3 className="text-2xl font-bold mb-8 text-gray-900 underline decoration-purple-500 decoration-4 underline-offset-8 italic uppercase tracking-tighter">Facility Details & Rate List</h3>
+                <div className="overflow-x-auto -mx-8 md:mx-0">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-purple-600 text-white">
+                      <tr>
+                        <th className="px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em]">Sr.</th>
+                        <th className="px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em]">Facility</th>
+                        <th className="px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em]">Rate</th>
+                        <th className="px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em] text-center">Unit</th>
+                        <th className="px-6 py-4 font-black text-[10px] uppercase tracking-[0.2em] text-center">Photo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 bg-white">
+                      {service.facilityDetails.map((f, i) => (
+                        <tr key={f.id || i} className="hover:bg-purple-50/50 transition-all group group/row">
+                          <td className="px-6 py-4 text-xs font-bold text-gray-400">{i + 1}</td>
+                          <td className="px-6 py-4">
+                            <span className="text-gray-900 font-black text-sm uppercase tracking-tight">{f.name}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-purple-700 font-black text-lg">₹{f.rate.toLocaleString()}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter whitespace-nowrap">{f.unit}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {f.photoUrl ? (
+                              <div className="relative inline-block group-hover/row:scale-110 transition-transform duration-300">
+                                <img src={f.photoUrl} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-lg mx-auto" referrerPolicy="no-referrer" alt={f.name} />
+                                <div className="absolute inset-0 rounded-2xl ring-1 ring-black/5" />
+                              </div>
+                            ) : (
+                              <span className="text-gray-200 font-black uppercase text-[8px] tracking-[0.2em]">No Photo</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}
@@ -7529,7 +7634,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card'>(initialTab);
   const [reportFilters, setReportFilters] = useState({
     name: '',
     mobile: '',
@@ -9266,6 +9371,137 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
   );
 };
 
+const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityItem[], onChange: (f: FacilityItem[]) => void }) => {
+  const [newFacility, setNewFacility] = useState<Partial<FacilityItem>>({
+    name: '',
+    rate: 0,
+    unit: '',
+    photoUrl: ''
+  });
+
+  const handleAdd = () => {
+    if (!newFacility.name || !newFacility.unit) {
+      toast.error('Facility Name and Unit are required');
+      return;
+    }
+    const item: FacilityItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: newFacility.name!,
+      rate: newFacility.rate || 0,
+      unit: newFacility.unit!,
+      photoUrl: newFacility.photoUrl || ''
+    };
+    onChange([...facilities, item]);
+    setNewFacility({ name: '', rate: 0, unit: '', photoUrl: '' });
+  };
+
+  const handleRemove = (id: string) => {
+    onChange(facilities.filter(f => f.id !== id));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Facility Name</label>
+            <input 
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 uppercase"
+              placeholder="e.g. Catering"
+              value={newFacility.name}
+              onChange={(e) => setNewFacility({...newFacility, name: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Rate (₹)</label>
+            <input 
+              type="number"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 font-bold"
+              placeholder="500"
+              value={newFacility.rate}
+              onChange={(e) => setNewFacility({...newFacility, rate: parseFloat(e.target.value) || 0})}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Unit</label>
+            <input 
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 uppercase"
+              placeholder="per plate / per set"
+              value={newFacility.unit}
+              onChange={(e) => setNewFacility({...newFacility, unit: e.target.value})}
+            />
+          </div>
+          <div>
+             <ImageUpload 
+              label="Photo" 
+              onUpload={(url) => setNewFacility(prev => ({...prev, photoUrl: url || ''}))}
+            />
+             {newFacility.photoUrl && (
+               <div className="relative w-10 h-10 mt-1">
+                 <img src={newFacility.photoUrl} className="w-full h-full object-cover rounded-lg border" />
+                 <button onClick={() => setNewFacility(prev => ({...prev, photoUrl: ''}))} className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-0.5">
+                   <X size={10} />
+                 </button>
+               </div>
+             )}
+          </div>
+        </div>
+        <button 
+          type="button"
+          onClick={handleAdd}
+          className="w-full bg-orange-600 text-white py-2 rounded-xl text-sm font-bold hover:bg-orange-700 transition-all flex items-center justify-center space-x-2"
+        >
+          <Plus size={16} />
+          <span>Add to List</span>
+        </button>
+      </div>
+
+      {facilities.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+          <table className="w-full text-left border-collapse bg-white">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">Sr No.</th>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">Facility Name</th>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Rate</th>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Unit</th>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Photo</th>
+                <th className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {facilities.map((f, i) => (
+                <tr key={f.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-4 py-3 text-xs font-bold text-gray-500">{i + 1}</td>
+                  <td className="px-4 py-3 text-xs font-black text-gray-900 uppercase">{f.name}</td>
+                  <td className="px-4 py-3 text-xs font-black text-orange-600 text-center">₹{f.rate}</td>
+                  <td className="px-4 py-3 text-[10px] text-gray-500 font-bold uppercase text-center">{f.unit}</td>
+                  <td className="px-4 py-3 text-center">
+                    {f.photoUrl ? (
+                      <img src={f.photoUrl} className="w-8 h-8 rounded-lg object-cover mx-auto" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="text-[10px] text-gray-300 italic uppercase">None</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemove(f.id)}
+                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: ServiceProvider[] }) => {
   const [activeType, setActiveType] = useState<'venue' | 'service'>(venues.length > 0 ? 'venue' : 'service');
   const [selectedId, setSelectedId] = useState<string>(
@@ -9590,6 +9826,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     images: [] as string[],
     video_url: '',
     facilities: [] as string[],
+    facilityDetails: [] as FacilityItem[],
     availableFor: [] as string[],
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
@@ -9608,6 +9845,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         images: formData.images.filter(i => i !== ''),
         video_url: formData.video_url,
         facilities: formData.facilities,
+        facility_details: formData.facilityDetails,
         available_for: formData.availableFor,
         latitude: formData.latitude,
         longitude: formData.longitude,
@@ -9776,15 +10014,11 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Facilities Offered (Manual Entry)</label>
-            <textarea 
-              rows={3}
-              placeholder="Enter facilities offered (e.g. High Quality Sound, Experienced Team, Latest Equipment)"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none uppercase"
-              value={formData.facilities?.join(', ')}
-              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')})}
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
             />
-            <p className="text-[10px] text-gray-400 mt-1">Separate multiple facilities with commas (,)</p>
           </div>
         </div>
         <button 
@@ -9824,6 +10058,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
           video_url: data.video_url || '',
           availableFor: data.available_for || [],
           facilities: data.facilities || [],
+          facilityDetails: data.facility_details || [],
           latitude: data.latitude,
           longitude: data.longitude
         });
@@ -9847,6 +10082,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         video_url: formData.video_url,
         available_for: formData.availableFor,
         facilities: formData.facilities,
+        facility_details: formData.facilityDetails,
         latitude: formData.latitude,
         longitude: formData.longitude
       }).eq('id', id);
@@ -10000,15 +10236,11 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Facilities Offered (Manual Entry)</label>
-            <textarea 
-              rows={3}
-              placeholder="Enter facilities offered (e.g. High Quality Sound, Experienced Team, Latest Equipment)"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none uppercase"
-              value={formData.facilities?.join(', ')}
-              onChange={(e) => setFormData({...formData, facilities: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')})}
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-purple-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
             />
-            <p className="text-[10px] text-gray-400 mt-1">Separate multiple facilities with commas (,)</p>
           </div>
         </div>
         <button 
@@ -10053,6 +10285,8 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
           video_url: data.video_url || '',
           availableFor: data.available_for || [],
           facilities: data.facilities || [],
+          facilityDetails: data.facility_details || [],
+          siteLevels: data.site_levels || [],
           latitude: data.latitude,
           longitude: data.longitude
         });
@@ -10077,7 +10311,9 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         images: formData.images,
         video_url: formData.video_url,
         facilities: formData.facilities,
+        facility_details: formData.facilityDetails,
         available_for: formData.availableFor,
+        site_levels: formData.siteLevels,
         latitude: formData.latitude,
         longitude: formData.longitude
       }).eq('id', id);
@@ -10244,18 +10480,25 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Facilities Offered (Select Amenities)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Venue Site Level (Select Available Areas)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {VENUE_FACILITIES.map(option => (
+              {VENUE_SITE_LEVELS.map(option => (
                 <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.facilities?.includes(option)}
+                    checked={formData.siteLevels?.includes(option)}
                     onChange={(e) => {
-                      const current = formData.facilities || [];
-                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
-                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                      const current = formData.siteLevels || [];
+                      if (e.target.checked) setFormData({...formData, siteLevels: [...current, option]});
+                      else setFormData({...formData, siteLevels: current.filter(o => o !== option)});
                     }}
                   />
                   <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
@@ -10467,7 +10710,9 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     images: [] as string[],
     video_url: '',
     facilities: [] as string[],
+    facilityDetails: [] as FacilityItem[],
     availableFor: [] as string[],
+    siteLevels: [] as string[],
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
   });
@@ -10490,7 +10735,9 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         images: formData.images.filter(i => i !== ''),
         video_url: formData.video_url,
         facilities: formData.facilities,
+        facility_details: formData.facilityDetails,
         available_for: formData.availableFor,
+        site_levels: formData.siteLevels,
         latitude: formData.latitude,
         longitude: formData.longitude,
         owner_id: user?.uid,
@@ -10663,18 +10910,25 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Facilities Offered (Select Amenities)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Venue Site Level (Select Available Areas)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {VENUE_FACILITIES.map(option => (
+              {VENUE_SITE_LEVELS.map(option => (
                 <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.facilities?.includes(option)}
+                    checked={formData.siteLevels?.includes(option)}
                     onChange={(e) => {
-                      const current = formData.facilities || [];
-                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
-                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                      const current = formData.siteLevels || [];
+                      if (e.target.checked) setFormData({...formData, siteLevels: [...current, option]});
+                      else setFormData({...formData, siteLevels: current.filter(o => o !== option)});
                     }}
                   />
                   <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
@@ -11012,6 +11266,7 @@ const SearchResultsView = () => {
 const DatabaseMonitor = () => {
   const [status, setStatus] = useState<'checking' | 'connected' | 'disconnected' | 'mock'>('checking');
   const [errorCount, setErrorCount] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (!isSupabaseConnected) {
@@ -11023,15 +11278,22 @@ const DatabaseMonitor = () => {
       try {
         const { error } = await db.from('users').select('count', { count: 'exact', head: true });
         if (error) {
-          console.error('[DB MONITOR] Health check failed:', error.message);
+          const msg = error.message?.includes('fetch') 
+            ? 'Supabase Unreachable - Check your URL or Network.' 
+            : error.message || 'Connection lost.';
+          
+          console.error('[DB MONITOR] Health check failed:', msg);
+          setErrorMessage(msg);
           setStatus('disconnected');
           setErrorCount(prev => prev + 1);
         } else {
           setStatus('connected');
           setErrorCount(0);
+          setErrorMessage('');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[DB MONITOR] Critical error:', err);
+        setErrorMessage(err.message || 'System error reaching database.');
         setStatus('disconnected');
         setErrorCount(prev => prev + 1);
       }
@@ -11050,20 +11312,39 @@ const DatabaseMonitor = () => {
       animate={{ opacity: 1, y: 0 }}
       className="fixed bottom-6 left-6 z-[9999] max-w-sm"
     >
-      <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl flex items-center space-x-4 border border-red-500/20 backdrop-blur-md bg-opacity-90">
-        <div className="bg-red-700 p-2 rounded-xl animate-pulse">
-          <AlertCircle size={20} />
+      <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl space-y-3 border border-red-500/20 backdrop-blur-md bg-opacity-90">
+        <div className="flex items-center space-x-4">
+          <div className="bg-red-700 p-2 rounded-xl animate-pulse">
+            <AlertCircle size={20} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-sm">Database Connection Error</h3>
+            <p className="text-[10px] opacity-90 leading-tight">
+              {errorMessage || 'Disconnected from real-time database.'}
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h3 className="font-bold text-sm">Connection Warning</h3>
-          <p className="text-[10px] opacity-90 leading-tight">Supabase connection lost or intermittent. Data may not sync correctly.</p>
+        
+        <div className="flex gap-2">
+          <button 
+            onClick={() => window.location.reload()}
+            className="flex-1 bg-white text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-50"
+          >
+            Retry Sync
+          </button>
+          {errorCount >= 1 && (
+            <button 
+              onClick={() => {
+                setOfflineMode(true);
+                setStatus('mock');
+                toast.success('Switched to Offline Mode');
+              }}
+              className="flex-1 bg-red-800 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-900 border border-red-700 shadow-inner"
+            >
+              Use Offline Mode
+            </button>
+          )}
         </div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-white text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-50"
-        >
-          Reconnect
-        </button>
       </div>
     </motion.div>
   );
@@ -11412,6 +11693,20 @@ export default function App() {
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
                 <AppLogo size="lg" showText={false} />
                 <PoweredByCNZ />
+                <div className="flex items-center space-x-6">
+                  <a href="https://www.facebook.com/profile.php?id=61589249672289" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
+                    <Facebook size={24} />
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
+                    <Instagram size={24} />
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
+                    <Twitter size={24} />
+                  </a>
+                  <a href="https://www.youtube.com/@BestVanueOption" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
+                    <Youtube size={24} />
+                  </a>
+                </div>
                 <div className="text-gray-500 text-sm">
                   {t('footerCopyright')}
                 </div>

@@ -14,10 +14,14 @@ const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnon
 
 // Initialize real Supabase if keys are present
 let supabaseInstance: any = null;
+let forceOffline = false;
 
 const initSupabase = () => {
   if (rawUrl && rawKey && rawUrl.startsWith('http')) {
     try {
+      // Validate URL format
+      new URL(rawUrl);
+      
       return createClient(rawUrl, rawKey, {
         auth: {
           persistSession: true,
@@ -26,7 +30,7 @@ const initSupabase = () => {
         }
       });
     } catch (err) {
-      console.error('❌ Failed to create Supabase client:', err);
+      console.error('❌ Invalid Supabase URL configuration:', err);
       return null;
     }
   }
@@ -35,12 +39,31 @@ const initSupabase = () => {
 
 supabaseInstance = initSupabase();
 
+export const setOfflineMode = (offline: boolean) => {
+  forceOffline = offline;
+  if (offline) {
+    console.warn('📡 App is now running in OFFLINE MODE (Mock Data)');
+  } else {
+    console.log('📡 App is attempting to run in ONLINE MODE (Supabase)');
+  }
+};
+
+export const getIsOffline = () => forceOffline || !supabaseInstance;
+
 export const checkConnection = async () => {
-  if (!supabaseInstance) return false;
+  if (!supabaseInstance || forceOffline) return false;
   try {
     const { error } = await supabaseInstance.from('users').select('count', { count: 'exact', head: true });
-    return !error;
-  } catch {
+    if (error) {
+      // Treat network errors as disconnection
+      if (error.message?.includes('fetch') || error.message?.includes('Network')) {
+        return false;
+      }
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[DATABASE] Connection check error:', err);
     return false;
   }
 };
@@ -49,7 +72,7 @@ if (supabaseInstance) {
   console.log('✅ Supabase initialized successfully.');
   checkConnection().then(connected => {
     if (connected) console.log('📡 Live connection to Supabase active.');
-    else console.error('❌ Supabase Connection Error');
+    else console.error('❌ Supabase Connection Failed (Network or Keys)');
   });
 } else {
   console.warn('⚠️ Supabase URL or Anon Key is missing or invalid!');
@@ -229,4 +252,11 @@ const mockDataService = {
 
 export const supabase = supabaseInstance;
 export const isSupabaseConnected = !!supabase;
-export const dataService = supabase || mockDataService;
+
+// Proxy the dataService to allow runtime switching between Online/Offline modes
+export const dataService = new Proxy({} as any, {
+  get: (_, prop) => {
+    const activeService = (supabaseInstance && !forceOffline) ? supabaseInstance : mockDataService;
+    return activeService[prop];
+  }
+});
