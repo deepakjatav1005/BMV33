@@ -11536,33 +11536,41 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       // BACKGROUND
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+      // MAIN DECORATIVE BORDER
+      doc.setDrawColor(234, 88, 12); // Orange Theme
+      doc.setLineWidth(pageWidth * 0.015);
+      doc.rect(pageWidth * 0.02, pageWidth * 0.02, pageWidth * 0.96, pageHeight - (pageWidth * 0.04), 'S');
       
       const margin = pageWidth * 0.05;
-      const topY = pageHeight * 0.1;
+      const topY = pageHeight * 0.12;
       
       // 1. HEADER SECTION (Centered)
-      doc.setFontSize(pageHeight * 0.09);
+      // Highlight Box for Title
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, topY - (pageHeight * 0.06), pageWidth - (2 * margin), pageHeight * 0.1, 'F');
+      
+      doc.setFontSize(pageHeight * 0.13);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       const mainTitle = selectedType === 1 ? (item.name || "VENUE NAME") : (item.name || "SERVICE NAME");
       doc.text(mainTitle.toUpperCase(), pageWidth / 2, topY, { align: 'center' });
       
-      doc.setFontSize(pageHeight * 0.07);
+      doc.setFontSize(pageHeight * 0.08);
       const subTitle1 = selectedType === 1 ? (item.ownerName || "OWNER NAME") : (item.ownerName || "PROVIDER NAME");
-      doc.text(`(${subTitle1.toUpperCase()})`, pageWidth / 2, topY + (pageHeight * 0.085), { align: 'center' });
+      doc.text(`(${subTitle1.toUpperCase()})`, pageWidth / 2, topY + (pageHeight * 0.1), { align: 'center' });
 
       if (selectedType === 2) {
-        doc.setFontSize(pageHeight * 0.06);
-        doc.text(`(${item.serviceType || "SERVICE TYPE"})`.toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.16), { align: 'center' });
+        doc.setFontSize(pageHeight * 0.08);
+        doc.text(`(${item.serviceType || "SERVICE TYPE"})`.toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.19), { align: 'center' });
       }
 
       // 2. MAIN CONTENT AREA
-      const middleY = topY + (selectedType === 2 ? pageHeight * 0.28 : pageHeight * 0.22);
+      const middleY = topY + (selectedType === 2 ? pageHeight * 0.32 : pageHeight * 0.25);
       
       // LEFT PART: Available For & Amenities
-      const labelFontSize = pageHeight * 0.045;
-      const contentFontSize = pageHeight * 0.032;
-      const lineSpacing = pageHeight * 0.045;
+      const labelFontSize = pageHeight * 0.065;
+      const contentFontSize = pageHeight * 0.045;
       const leftColWidth = pageWidth * 0.55;
 
       doc.setFontSize(labelFontSize);
@@ -11573,10 +11581,10 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       
       doc.setFontSize(contentFontSize);
       doc.setFont("helvetica", "normal");
-      const availableText = (item.availableFor || []).slice(0, 10).join(", ");
-      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.035), { maxWidth: leftColWidth });
+      const availableText = (item.availableFor || []).slice(0, 8).join(", ");
+      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.05), { maxWidth: leftColWidth });
       
-      const amenitiesY = middleY + (pageHeight * 0.15);
+      const amenitiesY = middleY + (pageHeight * 0.22);
       doc.setFontSize(labelFontSize);
       doc.setFont("helvetica", "bold");
       const label2 = selectedType === 1 ? "(VANUE AMENITIES-)" : "(SERVICE AMENITIES-)";
@@ -11584,56 +11592,64 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       
       doc.setFontSize(contentFontSize);
       doc.setFont("helvetica", "normal");
-      const amenitiesText = (item.facilities || item.catalogue?.map((c: any) => c.level) || []).slice(0, 12).join(", ");
-      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.035), { maxWidth: leftColWidth });
+      const amenitiesText = (item.facilities || item.catalogue?.map((c: any) => c.level) || []).slice(0, 10).join(", ");
+      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.05), { maxWidth: leftColWidth });
 
-      // RIGHT PART: Large Photo with Border
-      const photoSize = pageHeight * 0.42;
+      // RIGHT PART: Large Photo with Border and Shadow
+      const photoSize = pageHeight * 0.5;
       const photoX = pageWidth - margin - photoSize;
-      const photoY = middleY - (pageHeight * 0.02);
+      const photoY = middleY - (pageHeight * 0.05);
       
+      // Simulated Shadow
+      doc.setFillColor(200, 200, 200);
+      doc.rect(photoX + 5, photoY + 5, photoSize, photoSize, 'F');
+
       doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(2);
-      doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
+      doc.setLineWidth(3);
+      doc.rect(photoX - 4, photoY - 4, photoSize + 8, photoSize + 8, 'S');
 
       if (item.images && item.images.length > 0) {
         try {
           doc.addImage(item.images[0], 'JPEG', photoX, photoY, photoSize, photoSize, undefined, 'FAST');
         } catch(e) {
-          doc.setFontSize(pageHeight * 0.03);
+          doc.setFontSize(pageHeight * 0.05);
           doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
         }
       } else {
-        doc.setFontSize(pageHeight * 0.03);
+        doc.setFontSize(pageHeight * 0.05);
         doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
       }
 
       // QR SECTION with Brackets
-      const qrSize = pageHeight * 0.28;
-      const qrCenterY = photoY + photoSize + (pageHeight * 0.18);
+      const qrSize = pageHeight * 0.35;
+      const qrCenterY = photoY + photoSize + (pageHeight * 0.25);
       const qrX = pageWidth - margin - (qrSize / 2);
-      const actualQrY = qrCenterY - (qrSize / 2) + (pageHeight * 0.02);
+      const actualQrY = qrCenterY - (qrSize / 2) + (pageHeight * 0.03);
+
+      // Highlight Box for QR Text
+      doc.setFillColor(255, 237, 213); // Light Orange
+      doc.roundedRect(qrX - (qrSize/2) - 10, qrCenterY - (qrSize/2) - (pageHeight * 0.09), qrSize + 20, pageHeight * 0.1, 5, 5, 'F');
       
-      doc.setFontSize(pageHeight * 0.032);
+      doc.setFontSize(pageHeight * 0.045);
       doc.setTextColor(234, 88, 12); // Orange Theme
       doc.setFont("helvetica", "bold");
-      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.045), { align: 'center' });
-      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.01), { align: 'center' });
+      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.07), { align: 'center' });
+      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize / 2) - (pageHeight * 0.02), { align: 'center' });
       
       // QR CODE Brackets
       doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(1.5);
-      const brS = qrSize * 0.15;
+      doc.setLineWidth(2.5);
+      const brS = qrSize * 0.2;
       const bQrX = qrX - (qrSize / 2);
       const bQrY = actualQrY;
-      doc.line(bQrX - 3, bQrY - 3, bQrX - 3 + brS, bQrY - 3);
-      doc.line(bQrX - 3, bQrY - 3, bQrX - 3, bQrY - 3 + brS);
-      doc.line(bQrX + qrSize + 3, bQrY - 3, bQrX + qrSize + 3 - brS, bQrY - 3);
-      doc.line(bQrX + qrSize + 3, bQrY - 3, bQrX + qrSize + 3, bQrY - 3 + brS);
-      doc.line(bQrX - 3, bQrY + qrSize + 3, bQrX - 3 + brS, bQrY + qrSize + 3);
-      doc.line(bQrX - 3, bQrY + qrSize + 3, bQrX - 3, bQrY + qrSize + 3 - brS);
-      doc.line(bQrX + qrSize + 3, bQrY + qrSize + 3, bQrX + qrSize + 3 - brS, bQrY + qrSize + 3);
-      doc.line(bQrX + qrSize + 3, bQrY + qrSize + 3, bQrX + qrSize + 3, bQrY + qrSize + 3 - brS);
+      doc.line(bQrX - 5, bQrY - 5, bQrX - 5 + brS, bQrY - 5);
+      doc.line(bQrX - 5, bQrY - 5, bQrX - 5, bQrY - 5 + brS);
+      doc.line(bQrX + qrSize + 5, bQrY - 5, bQrX + qrSize + 5 - brS, bQrY - 5);
+      doc.line(bQrX + qrSize + 5, bQrY - 5, bQrX + qrSize + 5, bQrY - 5 + brS);
+      doc.line(bQrX - 5, bQrY + qrSize + 5, bQrX - 5 + brS, bQrY + qrSize + 5);
+      doc.line(bQrX - 5, bQrY + qrSize + 5, bQrX - 5, bQrY + qrSize + 5 - brS);
+      doc.line(bQrX + qrSize + 5, bQrY + qrSize + 5, bQrX + qrSize + 5 - brS, bQrY + qrSize + 5);
+      doc.line(bQrX + qrSize + 5, bQrY + qrSize + 5, bQrX + qrSize + 5, bQrY + qrSize + 5 - brS);
 
       try {
         const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
@@ -11642,16 +11658,21 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       } catch(e) {}
 
       // 3. BOTTOM: Address
-      const addressY = pageHeight * 0.75;
-      doc.setFontSize(pageHeight * 0.055);
+      const addressY = pageHeight * 0.8;
+      
+      // Highlight Box for Address
+      doc.setFillColor(254, 243, 199); // Light Yellow
+      doc.roundedRect(margin, addressY - (pageHeight * 0.06), pageWidth - (2 * margin), pageHeight * 0.1, 10, 10, 'F');
+      
+      doc.setFontSize(pageHeight * 0.08);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       const addr = item.address || [item.block, item.district].filter(Boolean).join(", ");
-      doc.text(`(ADDRESS- ${addr.toUpperCase()} )`, pageWidth * 0.4, addressY, { align: 'center', maxWidth: pageWidth * 0.65 });
+      doc.text(`(ADDRESS- ${addr.toUpperCase()} )`, pageWidth / 2, addressY, { align: 'center', maxWidth: pageWidth * 0.8 });
 
       // 4. PLATFORM BRANDING
-      const brandY = pageHeight * 0.9;
-      const brandLogoSize = pageHeight * 0.15;
+      const brandY = pageHeight * 0.92;
+      const brandLogoSize = pageHeight * 0.18;
       if (appLogoUrl) {
         try {
           const bLogo = await imageUrlToBase64(appLogoUrl);
@@ -11659,113 +11680,238 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
         } catch(e) {}
       }
 
-      const bTextX = margin + brandLogoSize + 5;
-      doc.setFontSize(pageHeight * 0.08);
+      const bTextX = margin + brandLogoSize + 10;
+      doc.setFontSize(pageHeight * 0.13);
       doc.setTextColor(234, 88, 12); // Orange Name
       doc.setFont("helvetica", "bold");
       doc.text(appName.toUpperCase(), bTextX, brandY);
       
-      doc.setFontSize(pageHeight * 0.035);
+      doc.setFontSize(pageHeight * 0.05);
       doc.setTextColor(37, 99, 235); // Blue Tagline
       doc.setFont("helvetica", "normal");
-      doc.text(appTagline.toUpperCase(), bTextX, brandY + (pageHeight * 0.05));
+      doc.text(appTagline.toUpperCase(), bTextX, brandY + (pageHeight * 0.07));
 
       // 5. FOOTER LINK
-      doc.setFontSize(pageHeight * 0.028);
+      doc.setFontSize(pageHeight * 0.035);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text(`VISIT FOR ONLINE BOOKING- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.97, { align: 'center' });
+      doc.text(`VISIT FOR ONLINE BOOKING- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.985, { align: 'center' });
 
     } else if (selectedType === 3) {
-      // APP BRANDING BANNER (Same as Image 1)
+      // APP BRANDING BANNER - CUSTOM DESIGN (MATCHING REFERENCE IMAGE)
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      
+
       const margin = pageWidth * 0.05;
-      const logoSize = pageHeight * 0.2;
-      
-      // 1. Header
+      const topSectionY = pageHeight * 0.06;
+      const logoSize = pageHeight * 0.18;
+
+      // 1. HEADER (Top Left Logo + Centered Text)
       if (appLogoUrl) {
         try {
           const l64 = await imageUrlToBase64(appLogoUrl);
-          if (l64) doc.addImage(l64, 'PNG', margin, margin, logoSize, logoSize);
+          if (l64) doc.addImage(l64, 'PNG', margin, topSectionY, logoSize, logoSize);
         } catch(e) {}
       }
-      
-      doc.setFontSize(pageHeight * 0.12);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.35), { align: 'center' });
-      
-      doc.setFontSize(pageHeight * 0.04);
-      doc.setFont("helvetica", "normal");
-      doc.text(appTagline.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.6), { align: 'center' });
-      
-      doc.setFontSize(pageHeight * 0.022);
-      doc.setFont("helvetica", "bold");
-      const dText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
-      doc.text(dText.toUpperCase(), pageWidth / 2 + (logoSize / 2), margin + (logoSize * 0.85), { align: 'center', maxWidth: pageWidth * 0.8 });
 
-      // 2. Lists Area
-      const middleY = margin + logoSize + (pageHeight * 0.08);
-      const col1X = pageWidth * 0.22;
-      const col2X = pageWidth * 0.46;
-      const listHSpacing = pageHeight * 0.032;
+      // Title: "BEST VANUE OPTION" (Red/Blue)
+      const titleY = topSectionY + (logoSize * 0.4);
+      doc.setFontSize(pageHeight * 0.14);
+      doc.setFont("helvetica", "bold");
       
-      // PROVIDER IMAGE PLACEHOLDER
+      const titlePart1 = "BEST ";
+      const titlePart2 = "VANUE ";
+      const titlePart3 = "OPTION";
+      
+      const p1W = doc.getTextWidth(titlePart1);
+      const p2W = doc.getTextWidth(titlePart2);
+      const p3W = doc.getTextWidth(titlePart3);
+      const totalW = p1W + p2W + p3W;
+      const titleStartX = (pageWidth / 2) - (totalW / 2) + (logoSize / 3);
+
+      doc.setTextColor(30, 58, 138); // Dark Blue
+      doc.text(titlePart1, titleStartX, titleY);
+      doc.setTextColor(220, 38, 38); // Red
+      doc.text(titlePart2, titleStartX + p1W, titleY);
+      doc.setTextColor(30, 58, 138); // Dark Blue
+      doc.text(titlePart3, titleStartX + p1W + p2W, titleY);
+
+      // Sub-Header: "VANUE & EVENT & SERVICE PROVIDERS"
+      const subTitleY = titleY + (pageHeight * 0.06);
+      doc.setFontSize(pageHeight * 0.045);
+      doc.setTextColor(17, 24, 39);
+      doc.text("VANUE & EVENT & SERVICE PROVIDERS", pageWidth / 2 + (logoSize / 3), subTitleY, { align: 'center' });
+      
+      // Decorative line with dots around subtitle
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineWidth(1);
+      const lineLen = pageWidth * 0.25;
+      const subW = doc.getTextWidth("VANUE & EVENT & SERVICE PROVIDERS");
+      const lineX1 = (pageWidth / 2 + logoSize / 3) - (subW / 2) - 10 - lineLen;
+      const lineX2 = (pageWidth / 2 + logoSize / 3) + (subW / 2) + 10;
+      doc.line(lineX1, subTitleY - 2, lineX1 + lineLen, subTitleY - 2);
+      doc.line(lineX2, subTitleY - 2, lineX2 + lineLen, subTitleY - 2);
+      doc.circle(lineX1 + lineLen + 5, subTitleY - 2, 2, 'F');
+      doc.circle(lineX2 - 5, subTitleY - 2, 2, 'F');
+
+      // 2. PURPLE BELT (Platform Info)
+      const beltY = subTitleY + (pageHeight * 0.04);
+      const beltH = pageHeight * 0.08;
+      doc.setFillColor(152, 29, 219); // Purple/Violet
+      doc.roundedRect(pageWidth * 0.18, beltY, pageWidth * 0.75, beltH, 15, 15, 'F');
+      
+      doc.setFontSize(pageHeight * 0.028);
+      doc.setTextColor(255, 255, 255);
+      const beltText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
+      doc.text(beltText.toUpperCase(), (pageWidth * 0.18 + pageWidth * 0.93) / 2, beltY + (beltH * 0.5) + 3, { align: 'center', maxWidth: pageWidth * 0.7 });
+
+      // 3. MIDDLE AREA (Man Icon + Services List + Venue Types)
+      const middleY = beltY + beltH + (pageHeight * 0.05);
+      
+      // LEFT PART: Person/Provider Placeholder
       doc.setFillColor(243, 244, 246);
-      doc.rect(margin, middleY - 10, pageWidth * 0.15, pageHeight * 0.45, 'F');
+      doc.rect(margin, middleY, pageWidth * 0.18, pageHeight * 0.45, 'F');
+      // Simple stick-man head/body for visualization
+      doc.setFillColor(31, 41, 55);
+      doc.circle(margin + (pageWidth * 0.09), middleY + (pageHeight * 0.1), pageHeight * 0.04, 'F'); // Head
+      doc.rect(margin + (pageWidth * 0.04), middleY + (pageHeight * 0.15), pageWidth * 0.1, pageHeight * 0.25, 'F'); // Body
 
-      const services1 = ["CATERORS", "DHOL AND BAND", "DJ AND SOUND SERVICE", "DRONE PHOTO/VIDEO", "EVENT CLOTH/JWELLARY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR", "GHODA GADI", "GIFT ADN HAMPERS", "HALWAI", "HELPERS"];
-      const services2 = ["LOUNDRY SERVICES", "LIGHT DECORATOR", "MAKE UP ARTISTS", "MAHENDI ARTISTS", "MUSICAL GROUP", "PHOTO AND VIDEO", "PUJARI JI", "STAGE DECORATOR", "TENT HOUSED", "VEHICLE ON RENT", "OTHER SERVICES"];
+      // CENTER PART: Two Columns of Services
+      const col1X = margin + (pageWidth * 0.22);
+      const col2X = col1X + (pageWidth * 0.28);
+      const serviceSize = pageHeight * 0.04;
+      const listHSpacing = pageHeight * 0.046;
 
-      doc.setFontSize(pageHeight * 0.024);
-      doc.setTextColor(0, 0, 0);
+      const services = [
+        { name: "CATERORS", color: [109, 40, 217] }, // Purple
+        { name: "DHOL AND BAND", color: [190, 24, 93] }, // Pink
+        { name: "DJ AND SOUND SERVICE", color: [30, 64, 175] }, // Blue
+        { name: "DRONE PHOTO AND VIDEOGRAPER", color: [29, 78, 216] }, // Light Blue
+        { name: "EVENT CLOTH AND JWELLARY", color: [2, 132, 199] }, // Cyan
+        { name: "EVENT MANAGER", color: [3, 105, 161] }, // Navy
+        { name: "FAST FOOD SERVICE", color: [5, 150, 105] }, // Green
+        { name: "FLOWER DECORATOR", color: [22, 163, 74] }, // Bright Green
+        { name: "GHODA GADI", color: [234, 88, 12] }, // Orange
+        { name: "GIFT ADN HAMPERS", color: [249, 115, 22] }, // Bright Orange
+        { name: "HALWAI", color: [185, 28, 28] }, // Red
+        { name: "HELPERS", color: [220, 38, 38] }, // Dark Red
+        { name: "LOUNDRY SERVICES", color: [109, 40, 217] },
+        { name: "LIGHT DECORATOR", color: [190, 24, 93] },
+        { name: "MAKE UP ARTISTS", color: [30, 64, 175] },
+        { name: "MAHENDI ARTISTS", color: [29, 78, 216] },
+        { name: "MUSICAL GROUP", color: [2, 132, 199] },
+        { name: "PHOTO AND VIDEO GRAPHER", color: [3, 105, 161] },
+        { name: "PUJARI JI", color: [5, 150, 105] },
+        { name: "STAGE DECORATOR", color: [22, 163, 74] },
+        { name: "TENT HOUSED", color: [234, 88, 12] },
+        { name: "VEHICLE ON RENT", color: [249, 115, 22] },
+        { name: "OTHER RELATED SERVICES", color: [185, 28, 28] }
+      ];
+
+      doc.setFontSize(pageHeight * 0.026);
       doc.setFont("helvetica", "bold");
-      services1.forEach((s, i) => doc.text(`${i + 1}. ${s}`, col1X, middleY + (i * listHSpacing)));
-      services2.forEach((s, i) => doc.text(`${i + 13}. ${s}`, col2X, middleY + (i * listHSpacing)));
+      services.forEach((s, i) => {
+        const x = i < 12 ? col1X : col2X;
+        const y = middleY + ((i % 12) * listHSpacing);
+        
+        // Icon Circle
+        doc.setFillColor(...s.color);
+        doc.circle(x + (serviceSize / 2), y, serviceSize / 2, 'F');
+        
+        // Separator line
+        doc.setDrawColor(...s.color);
+        doc.setLineWidth(1.5);
+        doc.line(x - 5, y - (serviceSize / 2), x - 5, y + (serviceSize / 2));
+        
+        // Text
+        doc.setTextColor(31, 41, 55);
+        doc.text(`${i + 1}. ${s.name}`, x + serviceSize + 5, y + 2.5);
+      });
 
-      // 3. Right Divider Column
-      const dividerX = pageWidth * 0.74;
-      const barH = pageHeight * 0.5;
+      // RIGHT PART: Venue Categories
+      const rightX = pageWidth * 0.74;
+      const vHSpacing = pageHeight * 0.12;
+      const vBoxW = pageWidth * 0.22;
+      const vBoxH = pageHeight * 0.1;
       
-      // Multi-Tone Bar
-      doc.setFillColor(236, 72, 153); // Pink
-      doc.rect(dividerX, middleY - 10, pageWidth * 0.012, barH * 0.5, 'F');
-      doc.setFillColor(234, 88, 12); // Orange
-      doc.rect(dividerX, middleY - 10 + (barH * 0.5), pageWidth * 0.012, barH * 0.5, 'F');
-      
-      const vRightX = dividerX + (pageWidth * 0.04);
-      
-      // VENUE ICON PLACEHOLDER
-      doc.setFillColor(243, 244, 246);
-      doc.roundedRect(vRightX, middleY - 10, pageWidth * 0.18, pageHeight * 0.18, 5, 5, 'F');
+      // Vertical Orange Separator
+      doc.setFillColor(249, 115, 22);
+      doc.rect(rightX - (pageWidth * 0.015), middleY, pageWidth * 0.01, pageHeight * 0.65, 'F');
 
-      const vTypes = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HOTEL", "RESHORT", "COMMUNITY HALL"];
-      doc.setFontSize(pageHeight * 0.035);
-      vTypes.forEach((v, i) => doc.text(`${i + 1}. ${v}`, vRightX, middleY + (pageHeight * 0.22) + (i * pageHeight * 0.055)));
+      const vTypes = [
+        { name: "HOTEL", color: [124, 58, 237] }, // Purple
+        { name: "MARRIAGE GARDEN", color: [219, 39, 119] }, // Pink
+        { name: "MARRIAGE HOTEL", color: [37, 99, 235] }, // Blue
+        { name: "RESHORT", color: [101, 163, 13] }, // Lime
+        { name: "COMMUNITY HALL", color: [245, 158, 11] } // Orange
+      ];
 
-      // 4. Footer
-      doc.setFontSize(pageHeight * 0.022);
-      const fCta1 = "ARE YOU OPERATE ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING";
-      const fCta2 = "MANAGEMENT AND BOOST YOUR BUSINESS NOW";
-      doc.text(fCta1.toUpperCase(), pageWidth / 2, pageHeight * 0.88, { align: 'center' });
-      doc.text(fCta2.toUpperCase(), pageWidth / 2, pageHeight * 0.91, { align: 'center' });
+      vTypes.forEach((v, i) => {
+        const y = middleY + (pageHeight * 0.08) + (i * vHSpacing);
+        
+        // Box Shadow
+        doc.setFillColor(229, 231, 235);
+        doc.roundedRect(rightX, y, vBoxW, vBoxH, 5, 5, 'F');
+        
+        // Number Box
+        doc.setFillColor(...v.color);
+        doc.roundedRect(rightX, y, vBoxW * 0.25, vBoxH, 5, 5, 'F');
+        
+        doc.setFontSize(pageHeight * 0.06);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`${i + 1}`, rightX + (vBoxW * 0.125), y + (vBoxH * 0.7), { align: 'center' });
+        
+        // Name
+        doc.setFontSize(pageHeight * 0.04);
+        doc.setTextColor(31, 41, 55);
+        doc.text(v.name, rightX + (vBoxW * 0.35), y + (vBoxH * 0.65), { maxWidth: vBoxW * 0.6 });
+      });
+
+      // 4. FOOTER (Two Bars)
+      const footerBar1Y = pageHeight * 0.85;
+      const footerBar1H = pageHeight * 0.08;
+      doc.setFillColor(15, 23, 42); // Dark Blue / Navy
+      doc.roundedRect(margin, footerBar1Y, pageWidth - (2 * margin), footerBar1H, 20, 20, 'F');
       
       doc.setFontSize(pageHeight * 0.026);
-      doc.setTextColor(234, 88, 12);
-      doc.text(`FOR REGISTRATION VISIT NOW- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.96, { align: 'center' });
+      doc.setTextColor(255, 255, 255);
+      const fCta = "ARE YOU OPERATE ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING MANAGEMENT AND BOOST YOUR BUSINESS NOW";
+      doc.text(fCta, pageWidth / 2, footerBar1Y + (footerBar1H * 0.6), { align: 'center', maxWidth: pageWidth * 0.85 });
+      
+      // Rocket Icon (Triangle)
+      doc.setFillColor(255, 255, 255);
+      const rX = margin + 20;
+      const rY = footerBar1Y + (footerBar1H / 2);
+      doc.triangle(rX, rY - 10, rX - 8, rY + 8, rX + 8, rY + 8, 'F');
+
+      const footerBar2Y = pageHeight * 0.94;
+      doc.setFillColor(153, 27, 27); // Maroon/Dark Red
+      doc.rect(0, footerBar2Y, pageWidth, pageHeight * 0.06, 'F');
+      
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      const visitText = `FOR REGISTRATION VISIT NOW- | WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`;
+      doc.text(visitText, pageWidth / 2, footerBar2Y + (pageHeight * 0.04), { align: 'center' });
+
 
     } else if (selectedType === 4) {
-      // APP RATING BANNER (Same as Image 3)
+      // APP RATING BANNER
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+      // Decorative Border
+      doc.setDrawColor(37, 99, 235); // Blue
+      doc.setLineWidth(pageWidth * 0.02);
+      doc.rect(pageWidth * 0.03, pageWidth * 0.03, pageWidth * 0.94, pageHeight - (pageWidth * 0.06), 'S');
       
       const margin = pageWidth * 0.05;
-      const topY = pageHeight * 0.08;
+      const topY = pageHeight * 0.1;
       
-      // Header
-      const headerLogoSize = pageHeight * 0.24;
+      // Header Box
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, topY - (pageHeight * 0.02), pageWidth - (2 * margin), pageHeight * 0.25, 'F');
+      const headerLogoSize = pageHeight * 0.32;
       if (appLogoUrl) {
         try {
           const l64 = await imageUrlToBase64(appLogoUrl);
@@ -11774,54 +11920,58 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       }
 
       const midTextX = margin + headerLogoSize + (pageWidth * 0.08);
-      doc.setFontSize(pageHeight * 0.1);
+      doc.setFontSize(pageHeight * 0.14);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.text(appName.toUpperCase(), midTextX, topY + (headerLogoSize * 0.4));
       
-      doc.setFontSize(pageHeight * 0.045);
+      doc.setFontSize(pageHeight * 0.07);
       doc.setTextColor(31, 41, 55);
       doc.setFont("helvetica", "normal");
       doc.text(appTagline.toUpperCase(), midTextX, topY + (headerLogoSize * 0.7));
 
       // Main Text
-      doc.setFontSize(pageHeight * 0.05);
+      // Highlight Box for "PLEASE RATE"
+      doc.setFillColor(239, 246, 255); // Soft Blue
+      doc.rect(margin, pageHeight * 0.38, pageWidth - (2 * margin), pageHeight * 0.18, 'F');
+
+      doc.setFontSize(pageHeight * 0.08);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.4, { align: 'center' });
-      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.46, { align: 'center' });
+      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.44, { align: 'center' });
+      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.52, { align: 'center' });
 
       // QR Code with Brackets
-      const qrSize = pageHeight * 0.35;
+      const qrSize = pageHeight * 0.45;
       const bQrX = (pageWidth - qrSize) / 2;
-      const bQrY = pageHeight * 0.52;
+      const bQrY = pageHeight * 0.6;
       
       doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(2);
-      const brS = qrSize * 0.15;
-      doc.line(bQrX - 4, bQrY - 4, bQrX - 4 + brS, bQrY - 4);
-      doc.line(bQrX - 4, bQrY - 4, bQrX - 4, bQrY - 4 + brS);
-      doc.line(bQrX + qrSize + 4, bQrY - 4, bQrX + qrSize + 4 - brS, bQrY - 4);
-      doc.line(bQrX + qrSize + 4, bQrY - 4, bQrX + qrSize + 4, bQrY - 4 + brS);
-      doc.line(bQrX - 4, bQrY + qrSize + 4, bQrX - 4 + brS, bQrY + qrSize + 4);
-      doc.line(bQrX - 4, bQrY + qrSize + 4, bQrX - 4, bQrY + qrSize + 4 - brS);
-      doc.line(bQrX + qrSize + 4, bQrY + qrSize + 4, bQrX + qrSize + 4 - brS, bQrY + qrSize + 4);
-      doc.line(bQrX + qrSize + 4, bQrY + qrSize + 4, bQrX + qrSize + 4, bQrY + qrSize + 4 - brS);
+      doc.setLineWidth(3);
+      const brS = qrSize * 0.2;
+      doc.line(bQrX - 6, bQrY - 6, bQrX - 6 + brS, bQrY - 6);
+      doc.line(bQrX - 6, bQrY - 6, bQrX - 6, bQrY - 6 + brS);
+      doc.line(bQrX + qrSize + 6, bQrY - 6, bQrX + qrSize + 6 - brS, bQrY - 6);
+      doc.line(bQrX + qrSize + 6, bQrY - 6, bQrX + qrSize + 6, bQrY - 6 + brS);
+      doc.line(bQrX - 6, bQrY + qrSize + 6, bQrX - 6 + brS, bQrY + qrSize + 6);
+      doc.line(bQrX - 6, bQrY + qrSize + 6, bQrX - 6, bQrY + qrSize + 6 - brS);
+      doc.line(bQrX + qrSize + 6, bQrY + qrSize + 6, bQrX + qrSize + 6 - brS, bQrY + qrSize + 6);
+      doc.line(bQrX + qrSize + 6, bQrY + qrSize + 6, bQrX + qrSize + 6, bQrY + qrSize + 6 - brS);
 
       try {
         const qr = await QRCode.toDataURL(window.location.origin + "/app-rating", { width: 1000, margin: 4 });
         doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
 
-      doc.setFontSize(pageHeight * 0.045);
+      doc.setFontSize(pageHeight * 0.07);
       doc.setTextColor(31, 41, 55);
       doc.setFont("helvetica", "bold");
-      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, bQrY + qrSize + (pageHeight * 0.1), { align: 'center' });
+      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, bQrY + qrSize + (pageHeight * 0.15), { align: 'center' });
 
       // Footer
-      doc.setFontSize(pageHeight * 0.04);
+      doc.setFontSize(pageHeight * 0.05);
       doc.setTextColor(0, 0, 0);
-      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.95, { align: 'center' });
+      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.97, { align: 'center' });
     }
 
     doc.save(`Flex_${selectedType}_${sizeObj.value}_${Date.now()}.pdf`);
