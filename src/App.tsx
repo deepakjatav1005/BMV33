@@ -2536,7 +2536,7 @@ const CategoryDisplay = () => {
                 {(cat.image && (cat.image.includes('.mp4') || cat.image.includes('video'))) ? (
                   <video 
                     src={cat.image} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                     autoPlay 
                     muted 
                     loop 
@@ -2546,7 +2546,7 @@ const CategoryDisplay = () => {
                   <img 
                     src={cat.image} 
                     alt={cat.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                     referrerPolicy="no-referrer"
                   />
                 )}
@@ -3830,12 +3830,14 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: 
               onClick={() => navigate(`/registration?role=provider&type=${encodeURIComponent(p.serviceType)}`)}
               className="flex-shrink-0 w-64 h-80 relative rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-2xl"
             >
-              <img 
-                src={p.imageUrl} 
-                alt={p.serviceType} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                referrerPolicy="no-referrer"
-              />
+              <div className="w-full h-full bg-gray-50 flex items-center justify-center p-2">
+                <img 
+                  src={p.imageUrl} 
+                  alt={p.serviceType} 
+                  className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
+                  referrerPolicy="no-referrer"
+                />
+              </div>
               <div className="absolute inset-x-0 bottom-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-100/50 flex items-center justify-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
                 <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.2em] text-center line-clamp-1">{p.serviceType}</h3>
               </div>
@@ -4855,11 +4857,11 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                       <p className="text-gray-600 text-sm leading-relaxed">{item.description}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {item.images.map((img, imgIdx) => (
-                          <div key={imgIdx} className="aspect-square rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                          <div key={imgIdx} className="aspect-square rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-gray-50 border border-gray-100">
                             <img 
                               src={img} 
                               alt={`${item.level} ${imgIdx + 1}`} 
-                              className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" 
+                              className="w-full h-full object-contain hover:scale-105 transition-transform duration-500" 
                               referrerPolicy="no-referrer"
                             />
                           </div>
@@ -4868,7 +4870,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                           <div key={vidIdx} className="aspect-square rounded-2xl overflow-hidden shadow-sm bg-black relative group">
                             <video 
                               src={vid} 
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               controls
                             />
                           </div>
@@ -5574,11 +5576,11 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                       <p className="text-gray-600 text-sm">{item.description}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {item.images.map((img, imgIdx) => (
-                          <div key={imgIdx} className="aspect-square rounded-xl overflow-hidden border border-gray-100">
+                          <div key={imgIdx} className="aspect-square rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
                             <img 
                               src={img} 
                               alt={`${item.level} ${imgIdx + 1}`} 
-                              className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" 
+                              className="w-full h-full object-contain hover:scale-105 transition-transform duration-500" 
                               referrerPolicy="no-referrer"
                             />
                           </div>
@@ -5587,7 +5589,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                           <div key={vidIdx} className="aspect-square rounded-xl overflow-hidden border border-gray-100 bg-black relative group">
                             <video 
                               src={vid} 
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               controls
                             />
                           </div>
@@ -9462,8 +9464,8 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 />
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {newItem.images?.filter(img => img !== '').map((img, i) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
-                      <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center p-1">
+                      <img src={img} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                       <button 
                         onClick={() => setNewItem(prev => ({...prev, images: prev.images?.filter((_, idx) => idx !== i)}))}
                         className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
@@ -9483,8 +9485,8 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 />
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {newItem.videos?.map((vid, i) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100">
-                      <video src={vid} className="w-full h-full object-cover" />
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center p-1">
+                      <video src={vid} className="w-full h-full object-contain" />
                       <button 
                         onClick={() => setNewItem(prev => ({...prev, videos: prev.videos?.filter((_, idx) => idx !== i)}))}
                         className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
@@ -9512,15 +9514,17 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                   <div className="w-full md:w-48 space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       {item.images.slice(0, 4).map((img, idx) => (
-                        <img key={idx} src={img} className="w-full aspect-square object-cover rounded-xl shadow-sm" referrerPolicy="no-referrer" />
+                        <div key={idx} className="w-full aspect-square bg-gray-50 rounded-xl shadow-sm overflow-hidden flex items-center justify-center p-1 border border-gray-100">
+                          <img src={img} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                        </div>
                       ))}
                     </div>
                     {item.videos && item.videos.length > 0 && (
                       <div className="grid grid-cols-2 gap-2">
                         {item.videos.slice(0, 2).map((vid, idx) => (
-                          <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black flex items-center justify-center">
-                            <video src={vid} className="w-full h-full object-cover opacity-80" />
-                            <Play size={16} className="absolute text-white" />
+                          <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-1 border border-gray-100">
+                            <video src={vid} className="w-full h-full object-contain opacity-80" />
+                            <Play size={16} className="absolute text-white drop-shadow-md" />
                           </div>
                         ))}
                       </div>
