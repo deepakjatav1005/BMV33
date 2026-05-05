@@ -3315,7 +3315,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
       const { data: users, error } = await db
         .from('users')
         .select('*')
-        .eq('registration_id', regId.toUpperCase());
+        .eq('registration_id', (regId || "").toUpperCase());
       
       if (error) throw error;
       
@@ -3904,7 +3904,7 @@ const TermsView = () => {
 };
 
 
-const HomeView = ({ user }: { user: any }) => {
+const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: boolean }) => {
   const { t } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.1);
   const topProvidersScrollRef = useAutoScroll(0.08);
@@ -3913,6 +3913,8 @@ const HomeView = ({ user }: { user: any }) => {
   const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activeTab, setActiveTab] = useState(0);
+  const [isAppRatingOpen, setIsAppRatingOpen] = useState(forceRateOpen);
   const [loading, setLoading] = useState(true);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
@@ -4491,6 +4493,16 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         }
     }, [profile]);
 
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      if (params.get('review') === 'true') {
+        setTimeout(() => {
+          const rs = document.getElementById('reviews');
+          if (rs) rs.scrollIntoView({ behavior: 'smooth' });
+        }, 1000);
+      }
+    }, [location]);
+
   const fetchVenue = async () => {
     if (!id) return;
     const { data, error } = await db
@@ -4890,6 +4902,30 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
               </div>
             )}
 
+            {venue.catalogue && venue.catalogue.length > 0 && (
+              <div className="mt-16">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900 underline decoration-orange-500 decoration-4 underline-offset-8 italic uppercase tracking-tighter">Amenities Category Offered</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {venue.catalogue.map((cat, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100 group hover:border-orange-300 transition-all hover:shadow-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-white rounded-xl border border-orange-200 flex items-center justify-center text-orange-600 shadow-sm">
+                          <CheckCircle size={20} />
+                        </div>
+                        <div>
+                          <span className="block text-xs font-black text-orange-700 uppercase tracking-widest leading-none mb-1">{cat.level}</span>
+                          <p className="text-[9px] text-gray-500 font-black uppercase tracking-tight italic">{cat.description || 'Verified Facility'}</p>
+                        </div>
+                      </div>
+                      <div className="bg-white px-3 py-1.5 rounded-xl border border-orange-200 shadow-inner group-hover:scale-105 transition-transform">
+                        <span className="text-xs font-black text-orange-600">₹{cat.priceRate?.toLocaleString() || 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-16">
               <ReviewSection 
                 targetId={venue.id} 
@@ -4982,7 +5018,12 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                     </div>
 
                     <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-3">
-                      <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                        <div className="bg-white px-3 py-1 rounded-full border border-orange-200">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Available Amenities Category</span>
+                        </div>
+                      </div>
                       <div className="flex gap-2">
                         <button 
                           type="button"
@@ -5008,7 +5049,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
                       {bookingMode === 'partial' && venue.catalogue && (
                         <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
-                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities</label>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
                           <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
                             {venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
                               <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
@@ -5132,6 +5173,8 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   const [visitorMobile, setVisitorMobile] = useState(profile?.mobileNumber || '');
   const [eventType, setEventType] = useState('');
   const [visitorAddress, setVisitorAddress] = useState(profile?.pincode ? `${profile.state || ''}, ${profile.district || ''}, ${profile.block || ''}, ${profile.pincode || ''}` : '');
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [bookingMode, setBookingMode] = useState<'complete' | 'partial'>('complete');
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [providerProfile, setProviderProfile] = useState<any>(null);
@@ -5146,6 +5189,16 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       }
     }
   }, [profile]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('review') === 'true') {
+      setTimeout(() => {
+        const rs = document.getElementById('reviews');
+        if (rs) rs.scrollIntoView({ behavior: 'smooth' });
+      }, 1000);
+    }
+  }, [location]);
 
   const fetchService = async () => {
     if (!id) return;
@@ -5277,25 +5330,45 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       const priceMatch = service?.priceRange?.match(/\d+/);
       const basePrice = priceMatch ? parseInt(priceMatch[0]) : 0;
 
+      let totalAmount = 0;
+      const start = new Date(date);
+      const end = endDate ? new Date(endDate) : start;
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (bookingMode === 'complete') {
+        totalAmount = basePrice * diffDays;
+      } else {
+        const selectedAmenities = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+        totalAmount = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
+      }
+
+      const selectedAmenitiesList = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+      const extraServices = selectedAmenitiesList.map(item => ({ 
+        name: item.level, 
+        amount: (item.priceRate || 0) * diffDays 
+      }));
+
       const bookingData = {
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
         target_type: 'service',
-        target_name: service?.name,
+        target_name: service?.name + (bookingMode === 'partial' ? ' (Selected Amenities)' : ''),
         owner_id: service?.providerId,
         event_date: date,
         end_date: endDate || date,
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: basePrice,
-        updated_amount: basePrice,
+        total_amount: totalAmount,
+        updated_amount: totalAmount,
         message: message || '',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
         party_address: visitorAddress,
         event_type: eventType,
-        transaction_id: tid
+        transaction_id: tid,
+        extra_services: extraServices
       };
 
       const { error } = await db.from('bookings').insert([bookingData]);
@@ -5540,6 +5613,49 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
               </section>
             )}
 
+            {service.catalogue && service.catalogue.length > 0 && (
+              <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900 underline decoration-purple-500 decoration-4 underline-offset-8 italic uppercase tracking-tighter">Services & Package Categories</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {service.catalogue.map((cat, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100 group hover:border-purple-300 transition-all hover:shadow-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-white rounded-xl border border-purple-200 flex items-center justify-center text-purple-600 shadow-sm">
+                          <Sparkles size={20} />
+                        </div>
+                        <div>
+                          <span className="block text-xs font-black text-purple-700 uppercase tracking-widest leading-none mb-1">{cat.level}</span>
+                          <p className="text-[9px] text-gray-500 font-black uppercase tracking-tight italic">{cat.description || 'Premium Service'}</p>
+                        </div>
+                      </div>
+                      <div className="bg-white px-3 py-1.5 rounded-xl border border-purple-200 shadow-inner group-hover:scale-105 transition-transform">
+                        <span className="text-xs font-black text-purple-600">₹{cat.priceRate?.toLocaleString() || 0}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {service.catalogue && service.catalogue.length > 0 && (
+              <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                <h3 className="text-2xl font-bold mb-6 text-gray-900">Service Categories & Amenities</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {service.catalogue.map((cat, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100 group hover:border-purple-300 transition-colors">
+                      <div>
+                        <span className="block text-xs font-black text-purple-600 uppercase tracking-widest mb-1">{cat.level}</span>
+                        <p className="text-[10px] text-gray-500 uppercase font-black">{cat.description || 'PROFESSIONAL PACKAGE'}</p>
+                      </div>
+                      <div className="bg-white px-4 py-2 rounded-xl border border-purple-200 shadow-sm group-hover:scale-105 transition-transform">
+                        <span className="text-sm font-black text-purple-600">₹{cat.priceRate?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
               <ReviewSection 
                 targetId={service.id} 
@@ -5554,7 +5670,16 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
           <div className="space-y-8">
             <div className="bg-white p-8 rounded-3xl shadow-2xl border border-orange-100 sticky top-24">
-              <h3 className="text-2xl font-bold mb-6 text-gray-900">Book this Service</h3>
+              <div className="flex items-baseline space-x-2 mb-6">
+                <span className="text-3xl font-bold text-gray-900">
+                  {bookingMode === 'complete' 
+                    ? service.priceRange
+                    : `₹${(service?.catalogue?.filter(c => selectedItems.includes(c.id || '')).reduce((sum, item) => sum + (item.priceRate || 0), 0) || 0).toLocaleString()}`
+                  }
+                </span>
+                <span className="text-gray-500">/ package</span>
+              </div>
+              <h3 className="text-2xl font-bold mb-6 text-gray-900 sr-only">Book this Service</h3>
               
               {bookingStatus === 'success' ? (
                 <div className="text-center py-8">
@@ -5625,6 +5750,66 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                       onChange={(e) => setVisitorAddress(e.target.value)}
                     />
                   </div>
+
+                  <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-xs font-black text-purple-600 uppercase tracking-widest">Booking Mode</label>
+                      <div className="bg-white px-3 py-1 rounded-full border border-purple-200">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Available Amenities Category</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setBookingMode('complete')}
+                        className={cn(
+                          "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                          bookingMode === 'complete' ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                        )}
+                      >
+                        Complete Package
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setBookingMode('partial')}
+                        className={cn(
+                          "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                          bookingMode === 'partial' ? "bg-purple-600 text-white border-purple-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                        )}
+                      >
+                        Select Amenities
+                      </button>
+                    </div>
+
+                    {bookingMode === 'partial' && service.catalogue && (
+                      <div className="space-y-2 mt-4 pt-4 border-t border-purple-100">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
+                        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
+                          {service.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                            <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-300 transition-colors">
+                              <div className="flex items-center space-x-2">
+                                <input 
+                                  type="checkbox"
+                                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                  checked={selectedItems.includes(item.id || '')}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedItems([...selectedItems, item.id || '']);
+                                    else setSelectedItems(selectedItems.filter(id => id !== item.id));
+                                  }}
+                                />
+                                <span className="text-xs font-bold text-gray-700 uppercase">{item.level}</span>
+                              </div>
+                              <span className="text-xs font-black text-purple-600">₹{item.priceRate?.toLocaleString()}</span>
+                            </label>
+                          ))}
+                          {(!service.catalogue || service.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                            <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 leading-none">Date Start From</label>
@@ -5765,29 +5950,35 @@ const BookingManagerView = ({
   const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
 
   useEffect(() => {
-    if (manualBooking.bookingMode === 'partial' && manualBooking.targetId) {
-      const targetVenue = venues.find(v => v.id === manualBooking.targetId);
-      if (targetVenue?.catalogue) {
+    const item = [...venues, ...services].find(i => i.id === manualBooking.targetId);
+    if (manualBooking.bookingMode === 'partial' && item) {
+      if (item.catalogue) {
         const start = new Date(manualBooking.eventDate);
         const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         
-        const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
+        const selectedAmenities = item.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
         const amenitiesTotal = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
         setManualBooking(prev => ({ ...prev, totalAmount: amenitiesTotal }));
       }
-    } else if (manualBooking.bookingMode === 'complete' && manualBooking.targetId) {
-       const targetVenue = venues.find(v => v.id === manualBooking.targetId);
-       if (targetVenue) {
-         const start = new Date(manualBooking.eventDate);
-         const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
-         const diffTime = Math.abs(end.getTime() - start.getTime());
-         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-         setManualBooking(prev => ({ ...prev, totalAmount: (targetVenue.pricePerDay || 0) * diffDays }));
+    } else if (manualBooking.bookingMode === 'complete' && item) {
+       const start = new Date(manualBooking.eventDate);
+       const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+       const diffTime = Math.abs(end.getTime() - start.getTime());
+       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+       
+       let basePrice = 0;
+       if ('pricePerDay' in item) {
+         basePrice = (item as Venue).pricePerDay || 0;
+       } else if ('priceRange' in item) {
+         const priceMatch = (item as ServiceProvider).priceRange?.match(/\d+/);
+         basePrice = priceMatch ? parseInt(priceMatch[0]) : 0;
        }
+       
+       setManualBooking(prev => ({ ...prev, totalAmount: basePrice * diffDays }));
     }
-  }, [manualBooking.bookingMode, manualBooking.selectedItems, manualBooking.eventDate, manualBooking.endDate, manualBooking.targetId, venues]);
+  }, [manualBooking.bookingMode, manualBooking.selectedItems, manualBooking.eventDate, manualBooking.endDate, manualBooking.targetId, venues, services]);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
@@ -6024,6 +6215,29 @@ const BookingManagerView = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const item = [...venues, ...services].find(v => v.id === manualBooking.targetId);
+    if (!item) return;
+
+    let total = 0;
+    const start = new Date(manualBooking.eventDate);
+    const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+    const diffTime = Math.max(0, end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (manualBooking.bookingMode === 'complete') {
+      const basePrice = 'pricePerDay' in item ? (item.pricePerDay || 0) : (parseInt(item.priceRange?.match(/\d+/)?.[0] || '0'));
+      total = basePrice * diffDays;
+    } else {
+      const selectedAmenities = item.catalogue?.filter(c => manualBooking.selectedItems.includes(c.id || '')) || [];
+      total = selectedAmenities.reduce((sum, i) => sum + (i.priceRate || 0), 0) * diffDays;
+    }
+
+    if (total !== manualBooking.totalAmount) {
+      setManualBooking(prev => ({ ...prev, totalAmount: total }));
+    }
+  }, [manualBooking.targetId, manualBooking.eventDate, manualBooking.endDate, manualBooking.bookingMode, manualBooking.selectedItems]);
 
   const handleManualBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6489,61 +6703,71 @@ const BookingManagerView = ({
                       </select>
                     </div>
 
-                    {venues.find(v => v.id === manualBooking.targetId) && (
-                      <div className="md:col-span-2 bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-4">
-                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
-                        <div className="flex gap-2">
-                          <button 
-                            type="button"
-                            onClick={() => setManualBooking({...manualBooking, bookingMode: 'complete'})}
-                            className={cn(
-                              "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
-                              manualBooking.bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
-                            )}
-                          >
-                            Complete Venue
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setManualBooking({...manualBooking, bookingMode: 'partial'})}
-                            className={cn(
-                              "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
-                              manualBooking.bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
-                            )}
-                          >
-                            Select Amenities
-                          </button>
-                        </div>
-
-                        {manualBooking.bookingMode === 'partial' && (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
-                              {venues.find(v => v.id === manualBooking.targetId)?.catalogue?.filter(c => c.priceRate && c.priceRate > 0).map(item => (
-                                <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
-                                  <div className="flex items-center space-x-2">
-                                    <input 
-                                      type="checkbox"
-                                      className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                                      checked={manualBooking.selectedItems.includes(item.id || '')}
-                                      onChange={(e) => {
-                                        if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, item.id || '']});
-                                        else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== item.id)});
-                                      }}
-                                    />
-                                    <span className="text-[10px] font-bold text-gray-700 uppercase">{item.level}</span>
-                                  </div>
-                                  <span className="text-[10px] font-black text-orange-600">₹{item.priceRate?.toLocaleString()}</span>
-                                </label>
-                              ))}
-                              {(!venues.find(v => v.id === manualBooking.targetId)?.catalogue || venues.find(v => v.id === manualBooking.targetId)?.catalogue?.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
-                                <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
-                              )}
+                    {(() => {
+                      const item = [...venues, ...services].find(v => v.id === manualBooking.targetId);
+                      if (!item) return null;
+                      
+                      return (
+                        <div className="md:col-span-2 bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-4">
+                          <div className="flex justify-between items-center">
+                            <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                            <div className="bg-white px-3 py-1 rounded-full border border-orange-200">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase">Available Amenities Category</span>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+                          <div className="flex gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => setManualBooking({...manualBooking, bookingMode: 'complete'})}
+                              className={cn(
+                                "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                                manualBooking.bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                              )}
+                            >
+                              Complete {'venueType' in item ? 'Venue' : 'Package'}
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setManualBooking({...manualBooking, bookingMode: 'partial'})}
+                              className={cn(
+                                "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
+                                manualBooking.bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                              )}
+                            >
+                              Select Amenities
+                            </button>
+                          </div>
+
+                          {manualBooking.bookingMode === 'partial' && (
+                            <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
+                                {item.catalogue?.filter(c => c.priceRate && c.priceRate > 0).map(catItem => (
+                                  <label key={catItem.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
+                                    <div className="flex items-center space-x-2">
+                                      <input 
+                                        type="checkbox"
+                                        className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                                        checked={manualBooking.selectedItems.includes(catItem.id || '')}
+                                        onChange={(e) => {
+                                          if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, catItem.id || '']});
+                                          else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== catItem.id)});
+                                        }}
+                                      />
+                                      <span className="text-[10px] font-bold text-gray-700 uppercase">{catItem.level}</span>
+                                    </div>
+                                    <span className="text-[10px] font-black text-orange-600">₹{catItem.priceRate?.toLocaleString()}</span>
+                                  </label>
+                                ))}
+                                {(!item.catalogue || item.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                                  <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Total Amount (₹)</label>
@@ -6762,11 +6986,31 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
 
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
   const doc = new jsPDF();
+  
+  // Fetch App Branding from admin_settings
+  let appLogoUrl = '/logo.png';
+  let appName = 'BEST VANUE OPTION';
+  let appTagline = 'VANUE & EVENT & SERVICE PROVIDERS';
+  
+  try {
+    const { data: settings } = await db.from('admin_settings').select('*');
+    if (settings) {
+      const logo = settings.find(s => s.key === 'app_logo_url')?.value;
+      const name = settings.find(s => s.key === 'app_name')?.value;
+      const tagline = settings.find(s => s.key === 'app_tagline')?.value;
+      if (logo) appLogoUrl = logo;
+      if (name) appName = name;
+      if (tagline) appTagline = tagline;
+    }
+  } catch (e) {
+    console.warn('Error fetching app settings for invoice:', e);
+  }
+
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
   const fullTotalRecord = booking.updatedAmount || booking.totalAmount || 0;
-  const extraServicesTotal = booking.extra_services?.reduce((sum, s) => sum + s.amount, 0) || 0;
+  const extraServicesTotal = (booking.extra_services || []).reduce((sum, s) => sum + (s.amount || 0), 0);
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
-  const subTotal = fullTotalRecord + expenditure; // Since fullTotalRecord already includes extraServicesTotal (base + extra)
+  const subTotal = fullTotalRecord + (expenditure || 0);
   const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
   const totalAdvanceLegacy = (booking.advance_amount || 0);
   // Fix double counting: If we have individual payments, advance_amount is likely synced to the sum.
@@ -6786,77 +7030,95 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     return status.toUpperCase();
   };
   
-  // --- Letterhead Header ---
-  // Venue/Service Name as Heading
-  doc.setFontSize(24);
+  // --- Letterhead Header with App Logo ---
+  try {
+    const logoBase64 = await imageUrlToBase64(appLogoUrl);
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'PNG', 160, 10, 30, 30);
+    }
+  } catch (e) {
+    console.warn('Failed to add app logo to invoice:', e);
+  }
+
+  // App Name & Tagline (Platform Branding)
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.setFont("helvetica", "bold");
+  doc.text(appName.toUpperCase(), 20, 15);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text(appTagline.toUpperCase(), 20, 20);
+
+  // Business Name as Heading
+  doc.setFontSize(22);
   doc.setTextColor(234, 88, 12); // orange-600
   doc.setFont("helvetica", "bold");
-  doc.text(booking.targetName.toUpperCase(), 105, 20, { align: 'center' });
+  doc.text((booking.targetName || "BUSINESS").toUpperCase(), 105, 35, { align: 'center' });
   
   // Left side: Owner/Provider Name & Mobile
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "normal");
-  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 30);
-  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 35);
+  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 45);
+  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 50);
   
-  // Right side: Address
+  // Right side: Business Address
   if (providerProfile) {
     const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
-    doc.text(address, 190, 30, { align: 'right', maxWidth: 80 });
+    doc.text(address, 190, 45, { align: 'right', maxWidth: 80 });
   }
   
   doc.setDrawColor(234, 88, 12);
   doc.setLineWidth(0.5);
-  doc.line(20, 42, 190, 42);
+  doc.line(20, 55, 190, 55);
   
   // --- Invoice Body ---
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("INVOICE", 20, 55);
+  doc.text("INVOICE", 20, 65);
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + booking.id.substring(0, 8).toUpperCase())}`, 140, 55);
-  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 140, 60);
-  doc.text(`Time: ${formatTime12h(timestamp.split(' ')[1])}`, 140, 65);
+  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + (booking.id || '').substring(0, 8).toUpperCase())}`, 140, 65);
+  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 140, 70);
+  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 140, 75);
   
   // Customer Details (Bill To)
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("BILL TO:", 20, 75);
+  doc.text("BILL TO:", 20, 85);
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Name: ${partyName}`, 20, 83);
-  doc.text(`Mobile: ${partyMobile}`, 20, 88);
+  doc.text(`Name: ${partyName || 'N/A'}`, 20, 93);
+  doc.text(`Mobile: ${partyMobile || 'N/A'}`, 20, 98);
   if (booking.partyAddress) {
-    doc.text(`Address: ${booking.partyAddress}`, 20, 93);
+    doc.text(`Address: ${booking.partyAddress}`, 20, 103);
   }
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 98);
-  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 103);
+  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 108);
+  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 113);
   if (booking.startTime) {
-    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 108);
+    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 118);
   }
 
   // Booking Status
   doc.setFont("helvetica", "bold");
-  doc.text(`Booking Status: ${getDisplayStatus()}`, 140, 75);
-  doc.text(`Payment Status: ${(isPaid ? 'paid' : 'pending').toUpperCase()}`, 140, 81);
+  doc.text(`Booking Status: ${getDisplayStatus()}`, 140, 85);
+  doc.text(`Payment Status: ${(isPaid ? 'paid' : 'pending').toUpperCase()}`, 140, 91);
   doc.setFont("helvetica", "normal");
 
   // Table Header
   doc.setFillColor(245, 245, 245);
-  doc.rect(20, 120, 170, 10, 'F');
+  doc.rect(20, 130, 170, 10, 'F');
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("Description", 25, 127);
-  doc.text("Amount (INR)", 160, 127, { align: 'right' });
+  doc.text("Description", 25, 137);
+  doc.text("Amount (INR)", 160, 137, { align: 'right' });
 
   // Table Rows
-  let currentY = 140;
+  let currentY = 150;
   if (baseAmount > 0) {
     doc.setFont("helvetica", "normal");
     doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY);
@@ -6942,53 +7204,32 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.line(20, 265, 190, 265);
   
   // App Logo in footer
-  let logoBase64 = null;
   try {
-    const { data: logoSetting } = await db.from('admin_settings').select('value').eq('key', 'app_logo').maybeSingle();
-    if (logoSetting?.value) {
-      logoBase64 = await imageUrlToBase64(logoSetting.value);
+    const logoBase64 = await imageUrlToBase64(appLogoUrl);
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
+      doc.setDrawColor(77, 121, 255);
+      doc.circle(26, 276, 7, 'S');
     }
   } catch (err) {
-    console.warn('Could not fetch app logo for invoice');
+    console.warn('Could not fetch app logo for invoice footer');
   }
 
-  // Split name for colors
-  const splitName = (name: string) => {
-    if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
-    const words = name.split(' ');
+  // Helper to split branding name
+  const splitBrandingName = (name: string) => {
+    if (!name) return { part1: '', part2: '' };
+    const n = String(name);
+    if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+    const words = n.split(' ');
     if (words.length > 1) {
       const mid = Math.ceil(words.length / 2);
       return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
     }
     return { part1: name, part2: '' };
   };
-  const appDisplayName = "BEST VANUE OPTION"; // Or fetch from settings if available in this scope
-  const nameParts = splitName(appDisplayName);
 
-  if (logoBase64) {
-    try {
-      // Add a small circle/frame for the logo
-      doc.setDrawColor(77, 121, 255);
-      doc.circle(26, 276, 7, 'S');
-      doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
-    } catch (err) {
-      // Fallback if addImage fails
-      doc.setFillColor(77, 121, 255);
-      doc.circle(25, 275, 6, 'F');
-      doc.setFontSize(8);
-      doc.setTextColor(255);
-      doc.setFont("helvetica", "bold");
-      doc.text("B", 25, 276, { align: 'center' });
-    }
-  } else {
-    doc.setFillColor(77, 121, 255);
-    doc.circle(25, 275, 6, 'F');
-    doc.setFontSize(8);
-    doc.setTextColor(255);
-    doc.setFont("helvetica", "bold");
-    doc.text("B", 25, 276, { align: 'center' });
-  }
-
+  // Branding Details
+  const nameParts = splitBrandingName(appName);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(77, 121, 255); // Blue
@@ -7002,12 +7243,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(8);
   doc.setTextColor(100);
   doc.setFont("helvetica", "normal");
-  doc.text("ALL IN ONE BOOKING PLAT FORM FOR YOUR SPECIAL TIME", 35, 281);
+  doc.text(appTagline.toUpperCase(), 35, 281);
   
   doc.setTextColor(234, 88, 12);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("www.bestvanueoption.in", 190, 276, { align: 'right' });
+  doc.text("WWW.BESTVANUEOPTION.COM", 190, 276, { align: 'right' });
 
   return doc.output('blob');
 };
@@ -7054,7 +7295,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 
   useEffect(() => {
     if (selectedId) {
-      const url = `${window.location.origin}${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}#reviews`;
+      const url = `${window.location.origin}${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
       QRCode.toDataURL(url, { 
         width: 600, 
         margin: 2,
@@ -7091,12 +7332,14 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text(name.toUpperCase(), 52.5, 20, { align: 'center', maxWidth: 85 });
+    const finalName = (name || "BUSINESS NAME").toUpperCase();
+    doc.text(finalName, 52.5, 20, { align: 'center', maxWidth: 85 });
     
     if (typeLabel) {
       doc.setFontSize(10);
       doc.setTextColor(234, 88, 12);
-      doc.text(typeLabel.toUpperCase(), 52.5, 26, { align: 'center' });
+      const finalType = String(typeLabel).toUpperCase();
+      doc.text(finalType, 52.5, 26, { align: 'center' });
     }
 
     doc.setFontSize(8);
@@ -7119,8 +7362,10 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     
     // Split name for colors
     const splitName = (name: string) => {
-      if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
-      const words = name.split(' ');
+      if (!name) return { part1: '', part2: '' };
+      const n = String(name);
+      if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+      const words = n.split(' ');
       if (words.length > 1) {
         const mid = Math.ceil(words.length / 2);
         return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
@@ -11078,6 +11323,7 @@ export default function App() {
           <main>
             <Routes>
               <Route path="/" element={<HomeView user={user} />} />
+              <Route path="/app-rating" element={<HomeView user={user} forceRateOpen={true} />} />
               <Route path="/venues" element={<VenueListView />} />
               <Route path="/venues/:id" element={<VenueDetailView user={user} profile={profile} />} />
               <Route path="/services" element={<ServiceListView user={user} />} />
@@ -11261,226 +11507,450 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const isLandscape = pageWidth > pageHeight;
 
     const splitName = (name: string) => {
-      if (name.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
-      const words = name.split(' ');
+      if (!name) return { part1: '', part2: '' };
+      const n = String(name);
+      if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+      const words = n.split(' ');
       if (words.length > 1) {
         const mid = Math.ceil(words.length / 2);
         return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
       }
-      return { part1: name, part2: '' };
+      return { part1: n, part2: '' };
     };
-    const nameParts = splitName(appName);
 
-    // 3D Text Helper (Shadow offset)
     const draw3DText = (text: string, x: number, y: number, options: any, color1: [number, number, number], color2: [number, number, number]) => {
+      const offset = pageHeight * 0.003;
       doc.setTextColor(color2[0], color2[1], color2[2]);
-      doc.text(text, x + 1, y + 1, options);
+      doc.text(text, x + offset, y + offset, options);
       doc.setTextColor(color1[0], color1[1], color1[2]);
       doc.text(text, x, y, options);
     };
 
-    // App Branding Footer with Logo
-    const addAppBranding = (yOffset = 0) => {
-      const footerY = pageHeight - (pageHeight * 0.1) + yOffset;
-      const footerH = pageHeight * 0.1;
-      
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, footerY - 5, pageWidth, footerH + 5, 'F');
-      
-      doc.setDrawColor(77, 121, 255);
-      doc.setLineWidth(2);
-      doc.line(0, footerY - 5, pageWidth, footerY - 5);
-      
-      const logoSize = footerH * 0.6;
-      const brandX = pageWidth * 0.1;
-      if (appLogoUrl) {
-        try { doc.addImage(appLogoUrl, 'PNG', brandX, footerY, logoSize, logoSize); } catch(e) {}
-      }
-      
-      doc.setFontSize(footerH * 0.4);
-      doc.setFont("helvetica", "bold");
-      const textStartX = brandX + logoSize + 5;
-      
-      doc.setTextColor(77, 121, 255);
-      doc.text(nameParts.part1, textStartX, footerY + (logoSize/2));
-      const p1W = doc.getTextWidth(nameParts.part1 + ' ');
-      doc.setTextColor(255, 77, 77);
-      doc.text(nameParts.part2, textStartX + p1W, footerY + (logoSize/2));
-
-      doc.setFontSize(footerH * 0.15);
-      doc.setTextColor(154, 52, 18);
-      doc.text(appTagline, textStartX, footerY + (logoSize/2) + (footerH * 0.2));
-      
-      doc.setTextColor(77, 121, 255);
-      doc.setFontSize(footerH * 0.2);
-      doc.text("www.bestvanueoption.com", pageWidth - (pageWidth * 0.1), footerY + (logoSize/2), { align: 'right' });
-    };
-
-    // Background
-    doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, pageWidth, pageHeight, 'F');
-    
-    // Border
-    doc.setDrawColor(234, 88, 12);
-    doc.setLineWidth(pageWidth * 0.01);
-    doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
-
-    if (selectedType === 1 || selectedType === 2) {
+    if (selectedType === 1) {
       const item: any = selectedItem;
       if (!item) return;
 
-      // Title/Type Banner
-      doc.setFillColor(234, 88, 12);
-      doc.rect(5, 5, pageWidth - 10, pageHeight * 0.12, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(pageHeight * 0.06);
-      doc.setFont("helvetica", "bold");
-      const promoText = selectedType === 1 ? "EXCELLENT VENUE DESTINATION" : "PROFESSIONAL SERVICE PROVIDER";
-      doc.text(promoText.toUpperCase(), pageWidth/2, pageHeight * 0.08, { align: 'center' });
-
-      // Information Section
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(pageHeight * 0.1);
-      doc.setFont("helvetica", "bold");
-      doc.text(item.name.toUpperCase(), 20, pageHeight * 0.25, { maxWidth: pageWidth * 0.6 });
-
-      doc.setFontSize(pageHeight * 0.04);
-      doc.setTextColor(234, 88, 12);
-      const typeLabel = selectedType === 1 ? item.venueType : item.serviceType;
-      doc.text(`CAT: ${typeLabel.toUpperCase()}`, 20, pageHeight * 0.32);
-
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(pageHeight * 0.03);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Manager/Owner: ${item.ownerName}`, 20, pageHeight * 0.38);
+      // Background
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      const address = item.address || [item.block, item.district, item.state].filter(Boolean).join(", ");
-      doc.text(`Location: ${address}`, 20, pageHeight * 0.43, { maxWidth: pageWidth * 0.5 });
+      const margin = pageWidth * 0.05;
+      const topY = pageHeight * 0.12;
+      
+      // 1. Top Section (Centered Venue Info)
+      doc.setFontSize(pageHeight * 0.1);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text((item.name || "UNNAMED VENUE").toUpperCase(), pageWidth / 2, topY, { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.07);
+      doc.text((`(${item.ownerName || "OWNER NAME"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.09), { align: 'center' });
 
-      // Details
-      let detailsY = pageHeight * 0.52;
-      if (item.availableFor?.length) {
-        doc.setTextColor(234, 88, 12);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(pageHeight * 0.035);
-        doc.text("IDEAL FOR:", 20, detailsY);
-        doc.setTextColor(50, 50, 50);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(pageHeight * 0.025);
-        doc.text(item.availableFor.join(" | "), 20, detailsY + (pageHeight * 0.04), { maxWidth: pageWidth * 0.5 });
-        detailsY += pageHeight * 0.12;
-      }
+      // 2. Main Content Area
+      const middleY = topY + (pageHeight * 0.22);
+      
+      // Left Details: Available For & Amenities
+      doc.setFontSize(pageHeight * 0.05);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("(VANUE AVAILABLE FOR-)", margin, middleY);
+      
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setFont("helvetica", "normal");
+      const availableText = (item.availableFor || []).slice(0, 8).join(", ");
+      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.05), { maxWidth: pageWidth * 0.55 });
+      
+      const amenitiesY = middleY + (pageHeight * 0.15);
+      doc.setFontSize(pageHeight * 0.05);
+      doc.setFont("helvetica", "bold");
+      doc.text("(VANUE AMENITIES-)", margin, amenitiesY);
+      
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setFont("helvetica", "normal");
+      const amenitiesText = (item.facilities || []).slice(0, 10).join(", ");
+      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.05), { maxWidth: pageWidth * 0.55 });
 
-      if (item.facilities?.length) {
-        doc.setTextColor(234, 88, 12);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(pageHeight * 0.035);
-        doc.text("SERVICES & AMENITIES:", 20, detailsY);
-        doc.setTextColor(50, 50, 50);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(pageHeight * 0.025);
-        doc.text(item.facilities.join(" \u2022 "), 20, detailsY + (pageHeight * 0.04), { maxWidth: pageWidth * 0.5 });
-      }
-
-      // Photos
-      if (item.images?.[0]) {
+      // Right: Venue Main Photo
+      const photoSize = pageHeight * 0.42;
+      const photoX = pageWidth - margin - photoSize;
+      const photoY = middleY - (pageHeight * 0.02);
+      
+      if (item.images && item.images.length > 0) {
         try {
-          doc.addImage(item.images[0], 'JPEG', pageWidth * 0.6, pageHeight * 0.15, pageWidth * 0.35, pageHeight * 0.5);
+          // Decorative Border
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(1.5);
+          doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
+          
+          doc.addImage(item.images[0], 'JPEG', photoX, photoY, photoSize, photoSize, undefined, 'FAST');
+        } catch(e) {
+          doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+          doc.text("PHOTO", photoX + photoSize/2, photoY + photoSize/2, { align: 'center' });
+        }
+      } else {
+        doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+      }
+
+      // Bottom Right: QR Section
+      const qrSize = pageHeight * 0.28;
+      const qrCenterY = photoY + photoSize + (pageHeight * 0.18);
+      const qrX = pageWidth - margin - (qrSize / 2);
+      
+      doc.setFontSize(pageHeight * 0.03);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.04), { align: 'center' });
+      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.005), { align: 'center' });
+      
+      const actualQrY = qrCenterY - (qrSize/2) + (pageHeight * 0.02);
+      try {
+        const url = `${window.location.origin}/venues/${item.id}`;
+        const qr = await QRCode.toDataURL(url, { width: 1000, margin: 2 });
+        doc.addImage(qr, 'PNG', qrX - (qrSize / 2), actualQrY, qrSize, qrSize);
+      } catch(e) {}
+
+      // 3. Bottom: Address
+      const addressY = pageHeight * 0.72;
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      const venueAddr = item.address || [item.block, item.district].filter(Boolean).join(", ");
+      doc.text(`(ADDRESS- ${venueAddr.toUpperCase()} )`, pageWidth * 0.45, addressY, { align: 'center', maxWidth: pageWidth * 0.6 });
+
+      // 4. Platform Branding (Bottom Left)
+      const brandingY = pageHeight * 0.88;
+      const brandingLogoSize = pageHeight * 0.14;
+      
+      if (appLogoUrl) {
+        try {
+          const bLogo64 = await imageUrlToBase64(appLogoUrl);
+          if (bLogo64) doc.addImage(bLogo64, 'PNG', margin, brandingY - (brandingLogoSize/2), brandingLogoSize, brandingLogoSize);
+        } catch(e) {}
+      }
+      
+      const brandingTextX = margin + brandingLogoSize + 5;
+      doc.setFontSize(pageHeight * 0.08);
+      doc.setTextColor(234, 88, 12); // orange-600
+      doc.setFont("helvetica", "bold");
+      doc.text(appName.toUpperCase(), brandingTextX, brandingY);
+      
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(31, 41, 55);
+      doc.text(appTagline.toUpperCase(), brandingTextX, brandingY + (pageHeight * 0.05));
+
+      // 5. Final Footer
+      doc.setFontSize(pageHeight * 0.028);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("VISIT FOR ONLINE BOOKING- WWW.BESTVANUEOPTION.COM", pageWidth / 2, pageHeight * 0.97, { align: 'center' });
+
+    } else if (selectedType === 2) {
+      const item: any = selectedItem;
+      if (!item) return;
+
+      // SERVICE BRANDING BANNER (Matching the uploaded design)
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      const margin = pageWidth * 0.05;
+      const topY = pageHeight * 0.1;
+      
+      // 1. Top Section (Centered Service Info)
+      doc.setFontSize(pageHeight * 0.09);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text((item.name || "UNNAMED SERVICE").toUpperCase(), pageWidth / 2, topY, { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.06);
+      doc.text((`(${item.ownerName || "PROVIDER NAME"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.08), { align: 'center' });
+
+      doc.setFontSize(pageHeight * 0.06);
+      doc.text((`(${item.serviceType || "SERVICE TYPE"})`).toUpperCase(), pageWidth / 2, topY + (pageHeight * 0.16), { align: 'center' });
+
+      // 2. Main Content Area
+      const middleY = topY + (pageHeight * 0.28);
+      
+      // Left Details: Available For & Amenities
+      doc.setFontSize(pageHeight * 0.05);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("(SERVICE AVAILABLE FOR-)", margin, middleY);
+      
+      doc.setFontSize(pageHeight * 0.032);
+      doc.setFont("helvetica", "normal");
+      const availableText = (item.availableFor || []).slice(0, 8).join(", ");
+      doc.text(availableText.toUpperCase(), margin, middleY + (pageHeight * 0.045), { maxWidth: pageWidth * 0.55 });
+      
+      const amenitiesY = middleY + (pageHeight * 0.15);
+      doc.setFontSize(pageHeight * 0.05);
+      doc.setFont("helvetica", "bold");
+      doc.text("(SERVICE AMENITIES-)", margin, amenitiesY);
+      
+      doc.setFontSize(pageHeight * 0.032);
+      doc.setFont("helvetica", "normal");
+      const amenitiesText = (item.facilities || item.catalogue?.map((c: any) => c.level) || []).slice(0, 10).join(", ");
+      doc.text(amenitiesText.toUpperCase(), margin, amenitiesY + (pageHeight * 0.045), { maxWidth: pageWidth * 0.55 });
+
+      // Right: Service Main Photo
+      const photoSize = pageHeight * 0.42;
+      const photoX = pageWidth - margin - photoSize;
+      const photoY = middleY - (pageHeight * 0.02);
+      
+      if (item.images && item.images.length > 0) {
+        try {
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(1.5);
+          doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4, 'S');
+          doc.addImage(item.images[0], 'JPEG', photoX, photoY, photoSize, photoSize, undefined, 'FAST');
+        } catch(e) {
+          doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+        }
+      } else {
+        doc.rect(photoX, photoY, photoSize, photoSize, 'S');
+      }
+
+      // Bottom Right: QR Section
+      const qrSize = pageHeight * 0.28;
+      const qrCenterY = photoY + photoSize + (pageHeight * 0.18);
+      const qrX = pageWidth - margin - (qrSize / 2);
+      
+      doc.setFontSize(pageHeight * 0.03);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("SCAN BARE CODE", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.04), { align: 'center' });
+      doc.text("FOR BOOKING", qrX, qrCenterY - (qrSize/2) - (pageHeight * 0.005), { align: 'center' });
+      
+      const actualQrY = qrCenterY - (qrSize/2) + (pageHeight * 0.02);
+      try {
+        const url = `${window.location.origin}/services/${item.id}`;
+        const qr = await QRCode.toDataURL(url, { width: 1000, margin: 2 });
+        doc.addImage(qr, 'PNG', qrX - (qrSize / 2), actualQrY, qrSize, qrSize);
+      } catch(e) {}
+
+      // 3. Bottom: Address
+      const addressY = pageHeight * 0.72;
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      const serviceAddr = item.address || [item.block, item.district].filter(Boolean).join(", ");
+      doc.text(`(ADDRESS- ${serviceAddr.toUpperCase()} )`, pageWidth * 0.45, addressY, { align: 'center', maxWidth: pageWidth * 0.6 });
+
+      // 4. Platform Branding (Bottom Left)
+      const brandingY = pageHeight * 0.88;
+      const brandingLogoSize = pageHeight * 0.14;
+      
+      if (appLogoUrl) {
+        try {
+          const bLogo64 = await imageUrlToBase64(appLogoUrl);
+          if (bLogo64) doc.addImage(bLogo64, 'PNG', margin, brandingY - (brandingLogoSize/2), brandingLogoSize, brandingLogoSize);
+        } catch(e) {}
+      }
+      
+      const brandingTextX = margin + brandingLogoSize + 5;
+      doc.setFontSize(pageHeight * 0.08);
+      doc.setTextColor(234, 88, 12); // orange-600
+      doc.setFont("helvetica", "bold");
+      doc.text(appName.toUpperCase(), brandingTextX, brandingY);
+      
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(31, 41, 55);
+      doc.text(appTagline.toUpperCase(), brandingTextX, brandingY + (pageHeight * 0.05));
+
+      // 5. Final Footer
+      doc.setFontSize(pageHeight * 0.028);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("VISIT FOR ONLINE BOOKING- WWW.BESTVANUEOPTION.COM", pageWidth / 2, pageHeight * 0.97, { align: 'center' });
+
+    } else if (selectedType === 3) {
+      // APP BRANDING FLEX (Matching the uploaded design with App Color Theme)
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      const margin = pageWidth * 0.05;
+      
+      // 1. Top Section: Logo and Title
+      const logoSize = pageHeight * 0.22;
+      if (appLogoUrl) {
+        try {
+          const logo64 = await imageUrlToBase64(appLogoUrl);
+          if (logo64) doc.addImage(logo64, 'PNG', margin, margin, logoSize, logoSize);
+        } catch(e) {
+          doc.setDrawColor(37, 99, 235); // Blue
+          doc.setLineWidth(2);
+          doc.circle(margin + logoSize/2, margin + logoSize/2, logoSize/2, 'S');
+          doc.setFontSize(logoSize * 0.3);
+          doc.setTextColor(234, 88, 12); // Orange
+          doc.text("BV", margin + logoSize/2, margin + logoSize/2 + 3, { align: 'center' });
+        }
+      }
+
+      // Main Title (App Theme: Orange)
+      doc.setFontSize(pageHeight * 0.09);
+      doc.setTextColor(234, 88, 12); // orange-600
+      doc.setFont("helvetica", "bold");
+      doc.text(appName.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.35), { align: 'center' });
+
+      // Subtitle (App Theme: Blue/Black)
+      doc.setFontSize(pageHeight * 0.04);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont("helvetica", "normal");
+      doc.text(appTagline.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.65), { align: 'center' });
+
+      // Description
+      doc.setFontSize(pageHeight * 0.024);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      const descText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
+      doc.text(descText.toUpperCase(), pageWidth / 2 + (logoSize/2), margin + (logoSize * 0.85), { align: 'center', maxWidth: pageWidth * 0.7 });
+
+      // 2. Middle Section
+      const middleY = margin + logoSize + (pageHeight * 0.08);
+      const listCol1X = pageWidth * 0.22;
+      const listCol2X = pageWidth * 0.46;
+      const listLineSpacing = pageHeight * 0.035;
+      
+      // Member Placeholder
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, middleY - 10, pageWidth * 0.16, pageHeight * 0.45, 'F');
+      doc.setTextColor(156, 163, 175);
+      doc.setFontSize(pageHeight * 0.02);
+      doc.text("PROVIDER", margin + (pageWidth * 0.08), middleY + (pageHeight * 0.2), { align: 'center' });
+
+      // Service Lists
+      const pServices = [
+        "CATERORS", "DHOL AND BAND", "DJ AND SOUND SERVICE", "DRONE PHOTO AND VIDEOGRAPER",
+        "EVENT CLOTH AND JWELLARY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR",
+        "GHODA GADI", "GIFT ADN HAMPERS", "HALWAI", "HELPERS"
+      ];
+      const sServices = [
+        "LOUNDRY SERVICES", "LIGHT DECORATOR", "MAKE UP ARTISTS", "MAHENDI ARTISTS",
+        "MUSICAL GROUP", "PHOTO AND VIDEO GRAPHER", "PUJARI JI", "STAGE DECORATOR",
+        "TENT HOUSED", "VEHICLE ON RENT", "OTHER RELATED SERVICES"
+      ];
+
+      doc.setFontSize(pageHeight * 0.026);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      
+      pServices.forEach((s, i) => {
+        doc.text(`${i + 1}. ${s}`, listCol1X, middleY + (i * listLineSpacing));
+      });
+      
+      sServices.forEach((s, i) => {
+        doc.text(`${i + 13}. ${s}`, listCol2X, middleY + (i * listLineSpacing));
+      });
+
+      // 3. Right Side: Vertical Divider and Venue types
+      const dividerX = pageWidth * 0.74;
+      // Gradient approximation: Blue-Orange bar
+      doc.setFillColor(37, 99, 235); // Blue
+      doc.rect(dividerX, middleY - 10, pageWidth * 0.012, pageHeight * 0.5, 'F');
+      doc.setFillColor(234, 88, 12); // Orange overlay for gradient feel
+      doc.rect(dividerX, middleY + (pageHeight * 0.25), pageWidth * 0.012, pageHeight * 0.25, 'F');
+      
+      const vCats = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HOTEL", "RESHORT", "COMMUNITY HALL"];
+      const vRightX = dividerX + (pageWidth * 0.04);
+      
+      // Venue Icon Placeholder
+      doc.setFillColor(243, 244, 246);
+      doc.roundedRect(vRightX, middleY - 10, pageWidth * 0.16, pageHeight * 0.16, 5, 5, 'F');
+      doc.setFontSize(pageHeight * 0.02);
+      doc.setTextColor(156, 163, 175);
+      doc.text("VENUE", vRightX + (pageWidth * 0.08), middleY + (pageHeight * 0.06), { align: 'center' });
+
+      doc.setFontSize(pageHeight * 0.032);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      vCats.forEach((c, i) => {
+        doc.text(`${i + 1}. ${c}`, vRightX, middleY + (pageHeight * 0.2) + (i * pageHeight * 0.055));
+      });
+
+      // 4. Footer Section
+      doc.setFontSize(pageHeight * 0.024);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      const cta1 = "ARE YOU OPERAT ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING";
+      const cta2 = "MANAGEMENT AND BOOST YOUR BUSINESS NOW";
+      doc.text(cta1.toUpperCase(), pageWidth / 2, pageHeight * 0.88, { align: 'center' });
+      doc.text(cta2.toUpperCase(), pageWidth / 2, pageHeight * 0.91, { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.028);
+      doc.setTextColor(37, 99, 235); // Blue
+      doc.text(`FOR REGISTRATION VISIT NOW- WWW.BESTVANUEOPTION.COM`, pageWidth / 2, pageHeight * 0.96, { align: 'center', charSpace: 0.5 });
+
+    } else if (selectedType === 4) {
+      // APP RATING BANNER (Matching the uploaded design)
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      const margin = pageWidth * 0.05;
+      const topY = margin + (pageHeight * 0.03);
+      
+      // 1. Branding Header
+      const headerLogoSize = pageHeight * 0.22;
+      if (appLogoUrl) {
+        try {
+          const logo64 = await imageUrlToBase64(appLogoUrl);
+          if (logo64) doc.addImage(logo64, 'PNG', margin + (pageWidth * 0.05), topY, headerLogoSize, headerLogoSize);
         } catch(e) {}
       }
 
-      // QR Code
-      try {
-        const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
-        const qr = await QRCode.toDataURL(url, { width: 1000, color: { dark: '#ea580c' } });
-        doc.addImage(qr, 'PNG', pageWidth - (pageWidth * 0.2), pageHeight * 0.68, pageWidth * 0.15, pageWidth * 0.15);
-        doc.setFontSize(pageHeight * 0.02);
-        doc.setTextColor(234, 88, 12);
-        doc.text("SCAN TO BOOK & REVIEW", pageWidth - (pageWidth * 0.125), pageHeight * 0.85, { align: 'center' });
-      } catch(e) {}
-
-      addAppBranding();
-
-    } else if (selectedType === 3) {
-      // App Branding (Dedicated Flex)
-      doc.setFillColor(255, 247, 237);
-      doc.rect(5, 5, pageWidth - 10, pageHeight - 10, 'F');
-      
-      // Central Branding 3D
-      const brandFontSize = pageHeight * 0.15;
-      doc.setFontSize(brandFontSize);
+      const brandingTextX = margin + headerLogoSize + (pageWidth * 0.08);
+      doc.setFontSize(pageHeight * 0.09);
+      doc.setTextColor(0, 0, 0); // Bold Black for Name
       doc.setFont("helvetica", "bold");
+      doc.text(appName.toUpperCase(), brandingTextX, topY + (headerLogoSize * 0.4));
       
-      const totalW = doc.getTextWidth(nameParts.part1 + ' ' + nameParts.part2);
-      const startX = (pageWidth - totalW) / 2;
-      
-      draw3DText(nameParts.part1, startX, pageHeight * 0.3, {}, [77, 121, 255], [0, 0, 100]);
-      const p1Width = doc.getTextWidth(nameParts.part1 + ' ');
-      draw3DText(nameParts.part2, startX + p1Width, pageHeight * 0.3, {}, [255, 77, 77], [100, 0, 0]);
-      
-      doc.setFontSize(pageHeight * 0.06);
-      doc.setTextColor(154, 52, 18);
-      doc.text(appTagline, pageWidth/2, pageHeight * 0.4, { align: 'center' });
+      doc.setFontSize(pageHeight * 0.045);
+      doc.setTextColor(31, 41, 55); // Dark Gray for Tagline
+      doc.setFont("helvetica", "normal");
+      doc.text(appTagline.toUpperCase(), brandingTextX, topY + (headerLogoSize * 0.7));
 
-      if (appLogoUrl) {
-        try { doc.addImage(appLogoUrl, 'PNG', pageWidth/2 - (pageHeight * 0.15), pageHeight * 0.45, pageHeight * 0.3, pageHeight * 0.3); } catch(e) {}
-      }
-      
-      // Categories
-      doc.setFontSize(pageHeight * 0.04);
-      doc.setTextColor(234, 88, 12);
-      doc.text("OUR PARTNERS:", pageWidth/2, pageHeight * 0.8, { align: 'center' });
-      doc.setFontSize(pageHeight * 0.025);
-      doc.setTextColor(100, 100, 100);
-      const allCats = ['Hotel', 'Garden', 'Hall', 'DJ', 'Tent', 'Photo', 'Catering', 'Makeup', 'Band', 'Auto', 'Event Planner'];
-      doc.text(allCats.join(" | "), pageWidth/2, pageHeight * 0.85, { align: 'center' });
-
-      // Registration QR
-      try {
-        const qr = await QRCode.toDataURL(window.location.origin + "/registration", { width: 1000 });
-        doc.addImage(qr, 'PNG', pageWidth - (pageHeight*0.25), pageHeight * 0.7, pageHeight * 0.2, pageHeight * 0.2);
-        doc.setFontSize(pageHeight * 0.02);
-        doc.text("SCAN TO REGISTER BUSINESS", pageWidth - (pageHeight * 0.15), pageHeight * 0.92, { align: 'center' });
-      } catch(e) {}
-
-      doc.setFontSize(pageHeight * 0.04);
-      doc.setTextColor(77, 121, 255);
-      doc.text("www.bestvanueoption.com", pageWidth/2, pageHeight * 0.95, { align: 'center' });
-
-    } else if (selectedType === 4) {
-      // Rating Accept Card for App (Global)
-      doc.setFillColor(255, 248, 241);
-      doc.rect(5, 5, pageWidth - 10, pageHeight - 10, 'F');
-
-      // Top Branding
-      const logoSize = pageHeight * 0.2;
-      if (appLogoUrl) {
-         try { doc.addImage(appLogoUrl, 'PNG', 15, 10, logoSize, logoSize); } catch(e) {}
-      }
-      doc.setFontSize(pageHeight * 0.1);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(77, 121, 255);
-      doc.text(nameParts.part1, 15 + logoSize + 5, 20);
-      doc.setTextColor(255, 77, 77);
-      doc.text(nameParts.part2, 15 + logoSize + 5 + doc.getTextWidth(nameParts.part1 + ' '), 20);
+      // 2. Center Text
       doc.setFontSize(pageHeight * 0.05);
-      doc.setTextColor(154, 52, 18);
-      doc.text(appTagline, 15 + logoSize + 5, 28);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.38, { align: 'center' });
+      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.44, { align: 'center' });
 
-      doc.setFontSize(pageHeight * 0.12);
-      doc.setTextColor(234, 88, 12);
-      doc.text("RATE OUR PLATFORM", pageWidth/2, pageHeight * 0.45, { align: 'center' });
+      // 3. QR Code with stylized Corners
+      const qrSize = pageHeight * 0.34;
+      const qrX = (pageWidth - qrSize) / 2;
+      const qrY = pageHeight * 0.5;
+      
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(2);
+      const bS = 15;
+      // Corners
+      doc.line(qrX - 5, qrY - 5, qrX - 5 + bS, qrY - 5);
+      doc.line(qrX - 5, qrY - 5, qrX - 5, qrY - 5 + bS);
+      doc.line(qrX + qrSize + 5, qrY - 5, qrX + qrSize + 5 - bS, qrY - 5);
+      doc.line(qrX + qrSize + 5, qrY - 5, qrX + qrSize + 5, qrY - 5 + bS);
+      doc.line(qrX - 5, qrY + qrSize + 5, qrX - 5 + bS, qrY + qrSize + 5);
+      doc.line(qrX - 5, qrY + qrSize + 5, qrX - 5, qrY + qrSize + 5 - bS);
+      doc.line(qrX + qrSize + 5, qrY + qrSize + 5, qrX + qrSize + 5 - bS, qrY + qrSize + 5);
+      doc.line(qrX + qrSize + 5, qrY + qrSize + 5, qrX + qrSize + 5, qrY + qrSize + 5 - bS);
 
       try {
-        const qr = await QRCode.toDataURL(window.location.origin, { width: 500, color: { dark: '#ea580c' } });
-        doc.addImage(qr, 'PNG', pageWidth/2 - (pageHeight * 0.2), pageHeight * 0.5, pageHeight * 0.4, pageHeight * 0.4);
+        const qr = await QRCode.toDataURL(window.location.origin + "/app-rating", { width: 1000, margin: 4 });
+        doc.addImage(qr, 'PNG', qrX, qrY, qrSize, qrSize);
       } catch(e) {}
 
-      doc.setFontSize(pageHeight * 0.08);
-      doc.setTextColor(77, 121, 255);
-      doc.text("www.bestvanueoption.com", pageWidth/2, pageHeight * 0.95, { align: 'center' });
+      doc.setFontSize(pageHeight * 0.045);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont("helvetica", "bold");
+      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, qrY + qrSize + (pageHeight * 0.1), { align: 'center' });
+
+      // 4. Footer Link
+      doc.setFontSize(pageHeight * 0.04);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.95, { align: 'center', charSpace: 0.5 });
     }
 
     doc.save(`Flex_${selectedType}_${sizeObj.value}_${Date.now()}.pdf`);
@@ -11827,15 +12297,36 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         const { data: vData } = await db.from('venues').select('*');
         const { data: sData } = await db.from('service_providers').select('*');
         
-        // Fetch profile names separately to avoid relationship issues if they aren't configured
         const { data: pData } = await db.from('user_profiles').select('id, displayName');
         const profileMap = (pData || []).reduce((acc: any, p: any) => {
           acc[p.id] = p.displayName;
           return acc;
         }, {});
 
-        if (vData) setAdminVenues(vData.map((v: any) => ({ ...v, ownerName: profileMap[v.owner_id] || 'Owner' })));
-        if (sData) setAdminServices(sData.map((s: any) => ({ ...s, ownerName: profileMap[s.provider_id] || 'Provider' })));
+        if (vData) setAdminVenues(vData.map((v: any) => ({ 
+          ...v, 
+          ownerId: v.owner_id,
+          venueType: v.type,
+          pricePerDay: v.price_per_day,
+          availableFor: v.available_for || [],
+          catalogue: v.catalogue || [],
+          facilities: v.facilities || [],
+          ownerName: profileMap[v.owner_id] || 'Owner',
+          createdAt: v.created_at
+        } as Venue)));
+        
+        if (sData) setAdminServices(sData.map((s: any) => ({ 
+          ...s, 
+          providerId: s.owner_id,
+          serviceType: s.type,
+          priceRange: s.price_range,
+          priceLevel: s.price_level,
+          availableFor: s.available_for || [],
+          catalogue: s.catalogue || [],
+          facilities: s.facilities || [],
+          ownerName: profileMap[s.owner_id] || 'Provider',
+          createdAt: s.created_at
+        } as ServiceProvider)));
       }
 
       if (activeTab === 'settings') {
