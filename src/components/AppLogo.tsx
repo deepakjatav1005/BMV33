@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { dataService as db } from '../services/dataService';
 
+// Note: If you have a file at src/assets/logo.png, you can uncomment the next line
+// import logo from '../assets/logo.png';
+
 interface AppLogoProps {
   className?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -22,6 +25,13 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
       }
     };
     fetchLogo();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setLogoUrl(e.detail);
+    };
+
+    window.addEventListener('app_logo_updated', handleUpdate);
+    return () => window.removeEventListener('app_logo_updated', handleUpdate);
   }, []);
 
   const sizeClasses = {
@@ -34,21 +44,21 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
 
   return (
     <div className={`inline-flex items-center space-x-3 ${className}`}>
-      <div className={`${sizeClasses[size]} aspect-square rounded-full overflow-hidden flex items-center justify-center bg-white shadow-md border border-gray-100`}>
+      <div className={`${sizeClasses[size]} aspect-square rounded-full overflow-hidden flex items-center justify-center bg-white shadow-sm hover:shadow-md transition-shadow duration-300`}>
         <img 
           src={logoUrl} 
           alt="Best Vanue Option Logo" 
-          className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
+          className="w-full h-full object-contain p-1 transition-transform hover:scale-105 duration-500"
           referrerPolicy="no-referrer"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = '/logo.png';
+            (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/lucide-react/lucide/main/icons/map-pin.svg';
           }}
         />
       </div>
       {showText && (
         <div className="flex flex-col leading-none">
           <span className="text-2xl font-black font-sans tracking-tight">
-            <span className="text-[#4d79ff]">BEST VANUE</span> <span className="text-[#ff4d4d]">OPTION</span>
+            <span className="text-blue-600">BEST VANUE</span> <span className="text-red-500">OPTION</span>
           </span>
           <span className="text-[10px] font-bold tracking-[0.1em] uppercase text-gray-500 mt-1">
             VANUE & EVENT & SERVICE PROVIDERS

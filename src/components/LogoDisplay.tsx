@@ -1,0 +1,44 @@
+import React, { useState, useEffect } from 'react';
+import { dataService as db } from '../services/dataService';
+
+export const LogoDisplay: React.FC = () => {
+  const [logoUrl, setLogoUrl] = useState<string>('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=200');
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const { data } = await db.from('admin_settings').select('value').eq('key', 'app_logo_url').maybeSingle();
+        if (data?.value) {
+          setLogoUrl(data.value);
+        }
+      } catch (err) {
+        console.error('Error fetching logo:', err);
+      }
+    };
+    fetchLogo();
+
+    const handleUpdate = (e: any) => {
+      if (e.detail) setLogoUrl(e.detail);
+    };
+
+    window.addEventListener('app_logo_updated', handleUpdate);
+    return () => window.removeEventListener('app_logo_updated', handleUpdate);
+  }, []);
+
+  return (
+    <div className="flex justify-center p-4">
+      <div className="w-[200px] h-[200px] rounded-full overflow-hidden bg-white shadow-xl border-4 border-white">
+        <img 
+          src={logoUrl} 
+          alt="BV Logo" 
+          className="w-full h-full object-contain p-2"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/lucide-react/lucide/main/icons/map-pin.svg';
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default LogoDisplay;

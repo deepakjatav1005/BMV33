@@ -933,6 +933,7 @@ const LanguageContext = React.createContext({
 const useTranslation = () => React.useContext(LanguageContext);
 
 import { AppLogo } from './components/AppLogo';
+import { LogoDisplay } from './components/LogoDisplay';
 import { PoweredByCNZ } from './components/PoweredByCNZ';
 import { UserProfile, Venue, ServiceProvider, Booking, BookingPayment, UserRole, VenueType, Review, CatalogueItem, CatalogueLevel, SubscriptionPlan, UserSubscription, AppBanner, AppNotification, ServiceType, ServiceTypePhoto } from './types';
 
@@ -3553,7 +3554,7 @@ const AboutView = () => {
 );
 };
 
-const useAutoScroll = (speed = 0.5) => {
+const useAutoScroll = (speed = 0.2) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3598,7 +3599,7 @@ const useAutoScroll = (speed = 0.5) => {
 };
 
 const ServiceInfoStickers = () => {
-  const scrollRef = useAutoScroll(0.4);
+  const scrollRef = useAutoScroll(0.2);
   const services = [
     {
       title: "Grand Weddings",
@@ -3906,9 +3907,9 @@ const TermsView = () => {
 
 const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: boolean }) => {
   const { t } = useTranslation();
-  const venuesScrollRef = useAutoScroll(0.1);
-  const topProvidersScrollRef = useAutoScroll(0.08);
-  const categoriesScrollRef = useAutoScroll(0.06);
+  const venuesScrollRef = useAutoScroll(0.05);
+  const topProvidersScrollRef = useAutoScroll(0.04);
+  const categoriesScrollRef = useAutoScroll(0.03);
   const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
   const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
@@ -4084,6 +4085,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
             viewport={{ once: true }}
             className="mb-12"
           >
+            <LogoDisplay />
             <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 tracking-tighter uppercase">
               {t('heroTitle')}
             </h1>
@@ -4311,7 +4313,7 @@ const TestimonialsSection = () => {
             <motion.div 
               animate={{ x: [-100 * feedbacks.length, 0] }}
               transition={{ 
-                duration: Math.max(feedbacks.length * 4, 30), 
+                duration: Math.max(feedbacks.length * 8, 60), 
                 repeat: Infinity, 
                 ease: "linear" 
               }}
@@ -7030,25 +7032,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     return status.toUpperCase();
   };
   
-  // --- Letterhead Header with App Logo ---
-  try {
-    const logoBase64 = await imageUrlToBase64(appLogoUrl);
-    if (logoBase64) {
-      doc.addImage(logoBase64, 'PNG', 160, 10, 30, 30);
-    }
-  } catch (e) {
-    console.warn('Failed to add app logo to invoice:', e);
-  }
-
-  // App Name & Tagline (Platform Branding)
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.setFont("helvetica", "bold");
-  doc.text(appName.toUpperCase(), 20, 15);
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.text(appTagline.toUpperCase(), 20, 20);
-
+  // left blank to remove platform branding from invoice header as requested
+  
   // Business Name as Heading
   doc.setFontSize(22);
   doc.setTextColor(234, 88, 12); // orange-600
@@ -11421,6 +11406,7 @@ export default function App() {
                 </div>
               </div>
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
+                <AppLogo size="lg" showText={false} />
                 <PoweredByCNZ />
                 <div className="text-gray-500 text-sm">
                   {t('footerCopyright')}
@@ -11698,203 +11684,86 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.text(`VISIT FOR ONLINE BOOKING- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.985, { align: 'center' });
 
     } else if (selectedType === 3) {
-      // APP BRANDING BANNER - CUSTOM DESIGN (MATCHING REFERENCE IMAGE)
+      // APP BRANDING BANNER - MATCHING PROVIDED HTML/CSS STRUCTURE
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
-
+      
       const margin = pageWidth * 0.05;
-      const topSectionY = pageHeight * 0.06;
-      const logoSize = pageHeight * 0.18;
+      
+      // 1. HEADER (Centered as per HTML)
+      const headerY = pageHeight * 0.1;
+      doc.setFontSize(pageHeight * 0.1);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 58, 138); // Blue
+      doc.text("BEST VANUE OPTION", pageWidth / 2, headerY, { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.045);
+      doc.setTextColor(55, 65, 81); // Gray-700
+      doc.text("VANUE & EVENT & SERVICE PROVIDERS", pageWidth / 2, headerY + (pageHeight * 0.06), { align: 'center' });
+      
+      doc.setFontSize(pageHeight * 0.03);
+      doc.setFont("helvetica", "normal");
+      doc.text("All in one booking platform for marriage, party, meetings & special occasions".toUpperCase(), pageWidth / 2, headerY + (pageHeight * 0.1), { align: 'center' });
 
-      // 1. HEADER (Top Left Logo + Centered Text)
+      // 2. MAIN FLEX SECTION (1:2:1 Ratio structure)
+      const mainY = headerY + (pageHeight * 0.18);
+      
+      // -- LEFT: Service Provider Image --
+      const leftColX = margin;
+      const leftColW = pageWidth * 0.2;
+      doc.setFillColor(243, 244, 246);
+      doc.rect(leftColX, mainY, leftColW, pageHeight * 0.45, 'F');
+      // Stick man illustration
+      doc.setFillColor(31, 41, 55);
+      doc.circle(leftColX + (leftColW / 2), mainY + (pageHeight * 0.1), pageHeight * 0.04, 'F');
+      doc.rect(leftColX + (leftColW * 0.2), mainY + (pageHeight * 0.15), leftColW * 0.6, pageHeight * 0.25, 'F');
+      
+      // -- CENTER: Service Lists (2 Columns) --
+      const centerColX = leftColX + leftColW + (pageWidth * 0.05);
+      const centerColW = pageWidth * 0.45;
+      const col1X = centerColX;
+      const col2X = centerColX + (centerColW / 2);
+      const listHSpacing = pageHeight * 0.038;
+      
+      const services1 = ["CATERORS", "DHOL AND BAND", "DJ AND SOUND", "DRONE VIDEOGRAPHER", "EVENT CLOTH & JEWELLERY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR", "GHODA GADI", "GIFT HAMPERS", "HALWAI", "HELPERS"];
+      const services2 = ["LAUNDRY SERVICES", "LIGHT DECORATOR", "MAKEUP ARTISTS", "MEHENDI ARTISTS", "MUSICAL GROUP", "PHOTOGRAPHER", "PUJARI JI", "STAGE DECORATOR", "TENT HOUSE", "VEHICLE ON RENT", "OTHER SERVICES"];
+      
+      doc.setFontSize(pageHeight * 0.028);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(31, 41, 55);
+      services1.forEach((s, i) => doc.text(`${i + 1}. ${s}`, col1X, mainY + (i * listHSpacing)));
+      services2.forEach((s, i) => doc.text(`${i + 13}. ${s}`, col2X, mainY + (i * listHSpacing)));
+
+      // -- RIGHT: Logo + Venue Types --
+      const rightColX = centerColX + centerColW + (pageWidth * 0.05);
+      const rightColW = pageWidth * 0.2;
+      
+      // Logo Placeholder
       if (appLogoUrl) {
         try {
           const l64 = await imageUrlToBase64(appLogoUrl);
-          if (l64) doc.addImage(l64, 'PNG', margin, topSectionY, logoSize, logoSize);
+          if (l64) doc.addImage(l64, 'PNG', rightColX, mainY, rightColW, rightColW);
         } catch(e) {}
       }
 
-      // Title: "BEST VANUE OPTION" (Red/Blue)
-      const titleY = topSectionY + (logoSize * 0.4);
-      doc.setFontSize(pageHeight * 0.14);
-      doc.setFont("helvetica", "bold");
-      
-      const titlePart1 = "BEST ";
-      const titlePart2 = "VANUE ";
-      const titlePart3 = "OPTION";
-      
-      const p1W = doc.getTextWidth(titlePart1);
-      const p2W = doc.getTextWidth(titlePart2);
-      const p3W = doc.getTextWidth(titlePart3);
-      const totalW = p1W + p2W + p3W;
-      const titleStartX = (pageWidth / 2) - (totalW / 2) + (logoSize / 3);
-
-      doc.setTextColor(30, 58, 138); // Dark Blue
-      doc.text(titlePart1, titleStartX, titleY);
-      doc.setTextColor(220, 38, 38); // Red
-      doc.text(titlePart2, titleStartX + p1W, titleY);
-      doc.setTextColor(30, 58, 138); // Dark Blue
-      doc.text(titlePart3, titleStartX + p1W + p2W, titleY);
-
-      // Sub-Header: "VANUE & EVENT & SERVICE PROVIDERS"
-      const subTitleY = titleY + (pageHeight * 0.06);
-      doc.setFontSize(pageHeight * 0.045);
-      doc.setTextColor(17, 24, 39);
-      doc.text("VANUE & EVENT & SERVICE PROVIDERS", pageWidth / 2 + (logoSize / 3), subTitleY, { align: 'center' });
-      
-      // Decorative line with dots around subtitle
-      doc.setDrawColor(220, 38, 38);
-      doc.setLineWidth(1);
-      const lineLen = pageWidth * 0.25;
-      const subW = doc.getTextWidth("VANUE & EVENT & SERVICE PROVIDERS");
-      const lineX1 = (pageWidth / 2 + logoSize / 3) - (subW / 2) - 10 - lineLen;
-      const lineX2 = (pageWidth / 2 + logoSize / 3) + (subW / 2) + 10;
-      doc.line(lineX1, subTitleY - 2, lineX1 + lineLen, subTitleY - 2);
-      doc.line(lineX2, subTitleY - 2, lineX2 + lineLen, subTitleY - 2);
-      doc.circle(lineX1 + lineLen + 5, subTitleY - 2, 2, 'F');
-      doc.circle(lineX2 - 5, subTitleY - 2, 2, 'F');
-
-      // 2. PURPLE BELT (Platform Info)
-      const beltY = subTitleY + (pageHeight * 0.04);
-      const beltH = pageHeight * 0.08;
-      doc.setFillColor(152, 29, 219); // Purple/Violet
-      doc.roundedRect(pageWidth * 0.18, beltY, pageWidth * 0.75, beltH, 15, 15, 'F');
-      
-      doc.setFontSize(pageHeight * 0.028);
-      doc.setTextColor(255, 255, 255);
-      const beltText = "ALL IN ONE BOOKING PLATFORM FOR YOUR FOR- MARRIAGE, PARTY, MEETINGS, BUSINESS EVENTS, AND SEPCIAL OCCATIONS";
-      doc.text(beltText.toUpperCase(), (pageWidth * 0.18 + pageWidth * 0.93) / 2, beltY + (beltH * 0.5) + 3, { align: 'center', maxWidth: pageWidth * 0.7 });
-
-      // 3. MIDDLE AREA (Man Icon + Services List + Venue Types)
-      const middleY = beltY + beltH + (pageHeight * 0.05);
-      
-      // LEFT PART: Person/Provider Placeholder
-      doc.setFillColor(243, 244, 246);
-      doc.rect(margin, middleY, pageWidth * 0.18, pageHeight * 0.45, 'F');
-      // Simple stick-man head/body for visualization
-      doc.setFillColor(31, 41, 55);
-      doc.circle(margin + (pageWidth * 0.09), middleY + (pageHeight * 0.1), pageHeight * 0.04, 'F'); // Head
-      doc.rect(margin + (pageWidth * 0.04), middleY + (pageHeight * 0.15), pageWidth * 0.1, pageHeight * 0.25, 'F'); // Body
-
-      // CENTER PART: Two Columns of Services
-      const col1X = margin + (pageWidth * 0.22);
-      const col2X = col1X + (pageWidth * 0.28);
-      const serviceSize = pageHeight * 0.04;
-      const listHSpacing = pageHeight * 0.046;
-
-      const services = [
-        { name: "CATERORS", color: [109, 40, 217] }, // Purple
-        { name: "DHOL AND BAND", color: [190, 24, 93] }, // Pink
-        { name: "DJ AND SOUND SERVICE", color: [30, 64, 175] }, // Blue
-        { name: "DRONE PHOTO AND VIDEOGRAPER", color: [29, 78, 216] }, // Light Blue
-        { name: "EVENT CLOTH AND JWELLARY", color: [2, 132, 199] }, // Cyan
-        { name: "EVENT MANAGER", color: [3, 105, 161] }, // Navy
-        { name: "FAST FOOD SERVICE", color: [5, 150, 105] }, // Green
-        { name: "FLOWER DECORATOR", color: [22, 163, 74] }, // Bright Green
-        { name: "GHODA GADI", color: [234, 88, 12] }, // Orange
-        { name: "GIFT ADN HAMPERS", color: [249, 115, 22] }, // Bright Orange
-        { name: "HALWAI", color: [185, 28, 28] }, // Red
-        { name: "HELPERS", color: [220, 38, 38] }, // Dark Red
-        { name: "LOUNDRY SERVICES", color: [109, 40, 217] },
-        { name: "LIGHT DECORATOR", color: [190, 24, 93] },
-        { name: "MAKE UP ARTISTS", color: [30, 64, 175] },
-        { name: "MAHENDI ARTISTS", color: [29, 78, 216] },
-        { name: "MUSICAL GROUP", color: [2, 132, 199] },
-        { name: "PHOTO AND VIDEO GRAPHER", color: [3, 105, 161] },
-        { name: "PUJARI JI", color: [5, 150, 105] },
-        { name: "STAGE DECORATOR", color: [22, 163, 74] },
-        { name: "TENT HOUSED", color: [234, 88, 12] },
-        { name: "VEHICLE ON RENT", color: [249, 115, 22] },
-        { name: "OTHER RELATED SERVICES", color: [185, 28, 28] }
-      ];
-
-      doc.setFontSize(pageHeight * 0.026);
-      doc.setFont("helvetica", "bold");
-      services.forEach((s, i) => {
-        const x = i < 12 ? col1X : col2X;
-        const y = middleY + ((i % 12) * listHSpacing);
-        
-        // Icon Circle
-        doc.setFillColor(...s.color);
-        doc.circle(x + (serviceSize / 2), y, serviceSize / 2, 'F');
-        
-        // Separator line
-        doc.setDrawColor(...s.color);
-        doc.setLineWidth(1.5);
-        doc.line(x - 5, y - (serviceSize / 2), x - 5, y + (serviceSize / 2));
-        
-        // Text
-        doc.setTextColor(31, 41, 55);
-        doc.text(`${i + 1}. ${s.name}`, x + serviceSize + 5, y + 2.5);
-      });
-
-      // RIGHT PART: Venue Categories
-      const rightX = pageWidth * 0.74;
-      const vHSpacing = pageHeight * 0.12;
-      const vBoxW = pageWidth * 0.22;
-      const vBoxH = pageHeight * 0.1;
-      
-      // Vertical Orange Separator
-      doc.setFillColor(249, 115, 22);
-      doc.rect(rightX - (pageWidth * 0.015), middleY, pageWidth * 0.01, pageHeight * 0.65, 'F');
-
-      const vTypes = [
-        { name: "HOTEL", color: [124, 58, 237] }, // Purple
-        { name: "MARRIAGE GARDEN", color: [219, 39, 119] }, // Pink
-        { name: "MARRIAGE HOTEL", color: [37, 99, 235] }, // Blue
-        { name: "RESHORT", color: [101, 163, 13] }, // Lime
-        { name: "COMMUNITY HALL", color: [245, 158, 11] } // Orange
-      ];
-
-      vTypes.forEach((v, i) => {
-        const y = middleY + (pageHeight * 0.08) + (i * vHSpacing);
-        
-        // Box Shadow
-        doc.setFillColor(229, 231, 235);
-        doc.roundedRect(rightX, y, vBoxW, vBoxH, 5, 5, 'F');
-        
-        // Number Box
-        doc.setFillColor(...v.color);
-        doc.roundedRect(rightX, y, vBoxW * 0.25, vBoxH, 5, 5, 'F');
-        
-        doc.setFontSize(pageHeight * 0.06);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`${i + 1}`, rightX + (vBoxW * 0.125), y + (vBoxH * 0.7), { align: 'center' });
-        
-        // Name
-        doc.setFontSize(pageHeight * 0.04);
-        doc.setTextColor(31, 41, 55);
-        doc.text(v.name, rightX + (vBoxW * 0.35), y + (vBoxH * 0.65), { maxWidth: vBoxW * 0.6 });
-      });
-
-      // 4. FOOTER (Two Bars)
-      const footerBar1Y = pageHeight * 0.85;
-      const footerBar1H = pageHeight * 0.08;
-      doc.setFillColor(15, 23, 42); // Dark Blue / Navy
-      doc.roundedRect(margin, footerBar1Y, pageWidth - (2 * margin), footerBar1H, 20, 20, 'F');
-      
-      doc.setFontSize(pageHeight * 0.026);
-      doc.setTextColor(255, 255, 255);
-      const fCta = "ARE YOU OPERATE ONE OF ABOVE THEN REGISTER NOW FOR ONLINE BOOKING MANAGEMENT AND BOOST YOUR BUSINESS NOW";
-      doc.text(fCta, pageWidth / 2, footerBar1Y + (footerBar1H * 0.6), { align: 'center', maxWidth: pageWidth * 0.85 });
-      
-      // Rocket Icon (Triangle)
-      doc.setFillColor(255, 255, 255);
-      const rX = margin + 20;
-      const rY = footerBar1Y + (footerBar1H / 2);
-      doc.triangle(rX, rY - 10, rX - 8, rY + 8, rX + 8, rY + 8, 'F');
-
-      const footerBar2Y = pageHeight * 0.94;
-      doc.setFillColor(153, 27, 27); // Maroon/Dark Red
-      doc.rect(0, footerBar2Y, pageWidth, pageHeight * 0.06, 'F');
-      
+      const vTypes = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HALL", "RESORT", "COMMUNITY HALL"];
       doc.setFontSize(pageHeight * 0.035);
-      doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      const visitText = `FOR REGISTRATION VISIT NOW- | WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`;
-      doc.text(visitText, pageWidth / 2, footerBar2Y + (pageHeight * 0.04), { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+      vTypes.forEach((v, i) => {
+        doc.text(v, rightColX + (rightColW / 2), mainY + rightColW + (pageHeight * 0.08) + (i * pageHeight * 0.06), { align: 'center' });
+      });
 
-
+      // 3. FOOTER
+      const footerY = pageHeight * 0.88;
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      const fCta = "Register now for online booking & grow your business".toUpperCase();
+      doc.text(fCta, pageWidth / 2, footerY, { align: 'center' });
+      
+      doc.setTextColor(37, 99, 235); // Blue link
+      doc.text(`WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, footerY + (pageHeight * 0.05), { align: 'center' });
     } else if (selectedType === 4) {
       // APP RATING BANNER
       doc.setFillColor(255, 255, 255);
@@ -12726,10 +12595,11 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
       if (error) throw error;
       setAppLogoUrl(url);
       toast.success('App Logo updated successfully');
-      // Force reload to reflect change across app
-      window.location.reload();
-    } catch (err) {
-      toast.error('Failed to update app logo');
+      // Dispatch custom event so other components (like AppLogo) can update if they listen
+      window.dispatchEvent(new CustomEvent('app_logo_updated', { detail: url }));
+    } catch (err: any) {
+      console.error('Logo Update Error:', err);
+      toast.error(`Failed to update app logo: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

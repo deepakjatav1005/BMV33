@@ -15,34 +15,42 @@ const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnon
 // Initialize real Supabase if keys are present
 let supabaseInstance: any = null;
 
-if (rawUrl && rawKey && rawUrl.startsWith('http')) {
-  try {
-    supabaseInstance = createClient(rawUrl, rawKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
-      }
-    });
-  } catch (err) {
-    console.error('❌ Failed to create Supabase client:', err);
+const initSupabase = () => {
+  if (rawUrl && rawKey && rawUrl.startsWith('http')) {
+    try {
+      return createClient(rawUrl, rawKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      });
+    } catch (err) {
+      console.error('❌ Failed to create Supabase client:', err);
+      return null;
+    }
   }
-}
+  return null;
+};
+
+supabaseInstance = initSupabase();
+
+export const checkConnection = async () => {
+  if (!supabaseInstance) return false;
+  try {
+    const { error } = await supabaseInstance.from('users').select('count', { count: 'exact', head: true });
+    return !error;
+  } catch {
+    return false;
+  }
+};
 
 if (supabaseInstance) {
   console.log('✅ Supabase initialized successfully.');
-  // Add a simple connection check
-  supabaseInstance.from('users').select('count', { count: 'exact', head: true })
-    .then(({ error }: any) => {
-      if (error) {
-        console.error('❌ Supabase Connection Error:', error.message);
-      } else {
-        console.log('📡 Live connection to Supabase active.');
-      }
-    })
-    .catch((err: any) => {
-      console.error('❌ Supabase ping failed:', err);
-    });
+  checkConnection().then(connected => {
+    if (connected) console.log('📡 Live connection to Supabase active.');
+    else console.error('❌ Supabase Connection Error');
+  });
 } else {
   console.warn('⚠️ Supabase URL or Anon Key is missing or invalid!');
   console.warn('VITE_SUPABASE_URL:', supabaseUrl ? 'Defined' : 'MISSING');
