@@ -432,12 +432,9 @@ import {
   Layout,
   Users2,
   Globe,
+  MessageCircle,
   ArrowLeft,
   QrCode,
-  Facebook,
-  Instagram,
-  Twitter,
-  Youtube
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11717,16 +11714,16 @@ export default function App() {
                 <PoweredByCNZ />
                 <div className="flex items-center space-x-6">
                   <a href="https://www.facebook.com/profile.php?id=61589249672289" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Facebook size={24} />
+                    <Globe size={24} />
                   </a>
                   <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Instagram size={24} />
+                    <Camera size={24} />
                   </a>
                   <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Twitter size={24} />
+                    <MessageCircle size={24} />
                   </a>
                   <a href="https://www.youtube.com/@BestVanueOption" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Youtube size={24} />
+                    <Play size={24} />
                   </a>
                 </div>
                 <div className="text-gray-500 text-sm">
