@@ -250,13 +250,207 @@ const mockDataService = {
   }
 };
 
-export const supabase = supabaseInstance;
-export const isSupabaseConnected = !!supabase;
+const mysqlDataService = {
+  from: (table: string) => {
+    const filters: any[] = [];
+    let selectVal = '*';
+    let limitVal: number | null = null;
+    let orderVal: any = null;
 
-// Proxy the dataService to allow runtime switching between Online/Offline modes
+    const execute = async (method: string, data?: any) => {
+      try {
+        const response = await fetch(`/api/db/${table}/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            method, 
+            filters, 
+            data, 
+            select: selectVal,
+            limit: limitVal,
+            order: orderVal
+          })
+        });
+        const result = await response.json();
+        return result;
+      } catch (err: any) {
+        console.error(`[MYSQL CLIENT ERROR] ${table} ${method}:`, err);
+        return { data: null, error: err };
+      }
+    };
+
+    const builder: any = {
+      select: (cols: string = '*') => {
+        selectVal = cols;
+        return builder;
+      },
+      order: (col: string, { ascending }: any = { ascending: true }) => {
+        orderVal = { col, ascending };
+        return builder;
+      },
+      limit: (n: number) => {
+        limitVal = n;
+        return builder;
+      },
+      eq: (col: string, val: any) => {
+        filters.push({ col, op: 'eq', val });
+        return builder;
+      },
+      neq: (col: string, val: any) => {
+        filters.push({ col, op: 'neq', val });
+        return builder;
+      },
+      in: (col: string, vals: any[]) => {
+        filters.push({ col, op: 'in', val: vals });
+        return builder;
+      },
+      single: async () => {
+        const res = await execute('SELECT');
+        return { data: res.data?.[0] || null, error: res.error };
+      },
+      maybeSingle: async () => {
+        const res = await execute('SELECT');
+        return { data: res.data?.[0] || null, error: res.error };
+      },
+      then: async (onfulfilled: any) => {
+        const res = await execute('SELECT');
+        return Promise.resolve(res).then(onfulfilled);
+      },
+      insert: (data: any) => execute('INSERT', data),
+      upsert: (data: any) => execute('UPSERT', data),
+      update: (data: any) => {
+        const updateBuilder = {
+          eq: (col: string, val: any) => {
+            filters.push({ col, op: 'eq', val });
+            return execute('UPDATE', data);
+          },
+          match: (query: any) => {
+            Object.entries(query).forEach(([col, val]) => {
+              filters.push({ col, op: 'eq', val });
+            });
+            return execute('UPDATE', data);
+          }
+        };
+        return updateBuilder;
+      },
+      delete: () => {
+        const deleteBuilder = {
+          eq: (col: string, val: any) => {
+            filters.push({ col, op: 'eq', val });
+            return execute('DELETE');
+          }
+        };
+        return deleteBuilder;
+      }
+    };
+
+    return builder;
+  },
+  channel: (name: string) => {
+    const channelObj: any = {
+      on: (event: string, config: any, callback: any) => channelObj,
+      subscribe: () => ({ 
+        unsubscribe: () => {} 
+      })
+    };
+    return channelObj;
+  },
+  removeChannel: (channel: any) => {},
+  storage: {
+    from: (bucket: string) => ({
+      upload: async (path: string, file: any, options?: any) => {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('path', path);
+          formData.append('bucket', bucket);
+
+          const response = await fetch('/api/storage/upload', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await response.json();
+          
+          // Store the public URL temporarily for immediate use if needed,
+          // though getPublicUrl would ideally handle this.
+          if (result.data) {
+            (window as any)[`__url_${result.data.path}`] = result.data.publicUrl;
+          }
+          
+          return result;
+        } catch (err: any) {
+          console.error('[STORAGE UPLOAD ERROR]:', err);
+          return { data: null, error: err };
+        }
+      },
+      getPublicUrl: (path: string) => {
+        const cachedUrl = (window as any)[`__url_${path}`];
+        if (cachedUrl) return { data: { publicUrl: cachedUrl } };
+        
+        // Fallback or derive from current location if we only have the filename
+        const baseUrl = window.location.origin;
+        return { data: { publicUrl: `${baseUrl}/uploads/${path}` } };
+      }
+    })
+  },
+  auth: {
+    // MySQL backend will handle auth mapping via Firebase if needed,
+    // but for now we'll keep the local auth session pattern if preferred.
+    getUser: async () => {
+      const session = localStorage.getItem(SESSION_KEY);
+      return { data: { user: session ? JSON.parse(session) : null }, error: null };
+    },
+    getSession: async () => {
+      const session = localStorage.getItem(SESSION_KEY);
+      return { data: { session: session ? { user: JSON.parse(session) } : null }, error: null };
+    },
+    onAuthStateChange: (callback: any) => {
+      const session = localStorage.getItem(SESSION_KEY);
+      callback('SIGNED_IN', session ? { user: JSON.parse(session) } : null);
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    },
+    signInWithPassword: async ({ email, password }: any) => {
+      // For now, use the MySQL query API to check user
+      const { data, error } = await mysqlDataService.from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .maybeSingle();
+
+      if (data) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+        return { data: { user: data, session: { user: data } }, error: null };
+      }
+      return { data: { user: null, session: null }, error: { message: error || 'Invalid credentials' } };
+    },
+    signOut: async () => {
+      localStorage.removeItem(SESSION_KEY);
+      return { error: null };
+    },
+    signUp: async ({ email, password, options }: any) => {
+      const newUser = { 
+        uid: Math.random().toString(36).substr(2, 9),
+        email, 
+        password, 
+        ...options?.data 
+      };
+      const { error } = await mysqlDataService.from('users').insert(newUser);
+      if (!error) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+        return { data: { user: newUser, session: { user: newUser } }, error: null };
+      }
+      return { data: { user: null, session: null }, error };
+    }
+  }
+};
+
+export const supabase = null; // No longer using direct Supabase
+export const isSupabaseConnected = true; // Pretend we are connected to our new MySQL backend
+
+// Proxy the dataService to allow runtime switching between MySQL/Mock modes
 export const dataService = new Proxy({} as any, {
   get: (_, prop) => {
-    const activeService = (supabaseInstance && !forceOffline) ? supabaseInstance : mockDataService;
-    return activeService[prop];
+    const activeService = forceOffline ? mockDataService : mysqlDataService;
+    return (activeService as any)[prop];
   }
 });

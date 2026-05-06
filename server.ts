@@ -4,18 +4,40 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import Razorpay from "razorpay";
 import dotenv from "dotenv";
+import mysql from "mysql2/promise";
+import multer from "multer";
 
 console.log(">>> [BOOT] NODEJS PROCESS STARTED <<<");
 console.log(">>> [BOOT] NODE VERSION:", process.version);
 console.log(">>> [BOOT] CWD:", process.cwd());
 
-dotenv.config();
+dotenv.config({ override: true });
+dotenv.config({ path: 'data.env', override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// MySQL Connection Pool (Lazy initialization)
+let pool: mysql.Pool;
+
 async function startServer() {
   console.log(">>> [BOOT] Starting server initialization...");
+  
+  // Initialize pool inside startServer to ensure dotenv.config() has run
+  pool = mysql.createPool({
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    port: Number(process.env.MYSQL_PORT) || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    connectTimeout: 30000,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
   
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -30,8 +52,10 @@ async function startServer() {
 
   // Check for critical environment variables
   const requiredEnv = [
-    'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
+    'MYSQL_HOST',
+    'MYSQL_USER',
+    'MYSQL_PASSWORD',
+    'MYSQL_DATABASE',
     'VITE_RAZORPAY_KEY_ID',
     'RAZORPAY_KEY_SECRET'
   ];
@@ -67,18 +91,208 @@ async function startServer() {
     console.error(">>> [ERROR] Failed to initialize Razorpay:", err);
   }
 
+  // DB Test
+  try {
+    const connection = await pool.getConnection();
+    console.log(">>> [SUCCESS] MySQL Database connected successfully");
+    connection.release();
+  } catch (err) {
+    console.error(">>> [ERROR] MySQL Connection failed:", err);
+  }
+
   // API routes
-  app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV || 'development',
-      uptime: process.uptime()
-    });
+  app.get("/api/health", async (req, res) => {
+    try {
+      const connection = await pool.getConnection();
+      connection.release();
+      res.json({ 
+        status: "ok", 
+        database: "MySQL Connected",
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(503).json({ 
+        status: "error", 
+        database: "MySQL Disconnected",
+        error: err.message,
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
-  app.get("/api/test", (req, res) => {
-    res.send("Server is alive and reachable! Version 3.0");
+// Generic MySQL Query Proxy (Mimics Supabase logic)
+  app.post("/api/db/:table/query", async (req, res) => {
+    const { table } = req.params;
+    const { method, filters, data, select } = req.body;
+    console.log(`>>> [DB REQUEST] ${method} on ${table}`, { filters, select });
+
+    try {
+      // Auto-stringify arrays/objects for MySQL
+      const prepareData = (d: any) => {
+        const prepared = { ...d };
+        for (const key in prepared) {
+          if (prepared[key] !== null && typeof prepared[key] === 'object') {
+            prepared[key] = JSON.stringify(prepared[key]);
+          }
+        }
+        return prepared;
+      };
+
+      if (method === 'SELECT') {
+        const { limit, order } = req.body;
+        let sql = `SELECT ${select || '*'} FROM \`${table}\``;
+        const params: any[] = [];
+        
+        if (filters && filters.length > 0) {
+          sql += " WHERE " + filters.map((f: any) => {
+            if (f.op === 'eq') {
+              params.push(f.val);
+              return `\`${f.col}\` = ?`;
+            }
+            if (f.op === 'neq') {
+              params.push(f.val);
+              return `\`${f.col}\` != ?`;
+            }
+            if (f.op === 'in') {
+              params.push(...f.val);
+              return `\`${f.col}\` IN (${f.val.map(() => '?').join(',')})`;
+            }
+            return "1=1";
+          }).join(" AND ");
+        }
+
+        if (order && order.col) {
+          sql += ` ORDER BY \`${order.col}\` ${order.ascending ? 'ASC' : 'DESC'}`;
+        }
+
+        if (limit) {
+          sql += ` LIMIT ${Number(limit)}`;
+        }
+
+        const [rows]: any = await pool.query(sql, params);
+        
+        // Parse JSON strings back to objects
+        const parsedRows = rows.map((row: any) => {
+          const parsed = { ...row };
+          for (const key in parsed) {
+            const val = parsed[key];
+            if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+              try {
+                parsed[key] = JSON.parse(val);
+              } catch (e) { /* ignore */ }
+            }
+          }
+          return parsed;
+        });
+
+        return res.json({ data: parsedRows, error: null });
+      }
+
+      if (method === 'INSERT') {
+        const pd = prepareData(data);
+        const columns = Object.keys(pd).map(c => `\`${c}\``).join(', ');
+        const placeholders = Object.keys(pd).map(() => '?').join(', ');
+        const values = Object.values(pd);
+        
+        const [result]: any = await pool.query(
+          `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders})`,
+          values
+        );
+        
+        return res.json({ data: { id: result.insertId, ...data }, error: null });
+      }
+
+      if (method === 'UPDATE') {
+        const pd = prepareData(data);
+        const updates = Object.keys(pd).map(col => `\`${col}\` = ?`).join(', ');
+        const values = Object.values(pd);
+        
+        let sql = `UPDATE \`${table}\` SET ${updates}`;
+        const filterParams: any[] = [];
+
+        if (filters && filters.length > 0) {
+          sql += " WHERE " + filters.map((f: any) => {
+            filterParams.push(f.val);
+            return `\`${f.col}\` = ?`;
+          }).join(" AND ");
+        }
+
+        await pool.query(sql, [...values, ...filterParams]);
+        return res.json({ data: null, error: null });
+      }
+
+      if (method === 'UPSERT') {
+        const pd = prepareData(data);
+        const columns = Object.keys(pd).map(c => `\`${c}\``).join(', ');
+        const placeholders = Object.keys(pd).map(() => '?').join(', ');
+        const updates = Object.keys(pd).map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
+        const values = Object.values(pd);
+        
+        await pool.query(
+          `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updates}`,
+          [...values]
+        );
+        
+        return res.json({ data: data, error: null });
+      }
+
+      if (method === 'DELETE') {
+        let sql = `DELETE FROM \`${table}\``;
+        const filterParams: any[] = [];
+
+        if (filters && filters.length > 0) {
+          sql += " WHERE " + filters.map((f: any) => {
+            filterParams.push(f.val);
+            return `\`${f.col}\` = ?`;
+          }).join(" AND ");
+        }
+
+        await pool.query(sql, filterParams);
+        return res.json({ data: null, error: null });
+      }
+
+      res.status(400).json({ error: "Unsupported method" });
+    } catch (err: any) {
+      console.error(`> [DB ERROR] ${table} ${method}:`, err);
+      // Attempt to fix common column missing errors
+      if (err.code === 'ER_BAD_FIELD_ERROR' || err.message.includes('Unknown column')) {
+         console.warn(`>> DETECTED MISSING COLUMN in ${table}. Try adding it...`);
+         const match = err.message.match(/Unknown column '(.+?)' in/);
+         if (match && match[1]) {
+           try {
+             const col = match[1];
+             await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${col}\` LONGTEXT NULL`);
+             console.log(`>>> [SUCCESS] AUTO-ADDED column ${col} to ${table}`);
+             return res.status(500).json({ error: `Column ${col} was missing. I've added it. Please try again.` });
+           } catch (alterErr) {
+             console.error(`!!!! [MIGRATION FAILED] Could not add column ${match[1]}:`, alterErr);
+           }
+         }
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // File Upload Logic
+  const uploadDir = path.resolve(__dirname, "uploads");
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+  }
+  app.use("/uploads", express.static(uploadDir));
+
+  const storage = (multer as any).diskStorage({
+    destination: (req: any, file: any, cb: any) => cb(null, uploadDir),
+    filename: (req: any, file: any, cb: any) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  });
+  const upload = (multer as any)({ storage });
+
+  app.post("/api/storage/upload", upload.single("file"), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const publicUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    res.json({ data: { path: req.file.filename, publicUrl }, error: null });
   });
 
   app.post("/api/razorpay/order", async (req, res) => {

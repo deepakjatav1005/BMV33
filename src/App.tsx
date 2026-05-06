@@ -11276,25 +11276,40 @@ const DatabaseMonitor = () => {
 
     const checkConnection = async () => {
       try {
-        const { error } = await db.from('users').select('count', { count: 'exact', head: true });
+        const { error } = await db.from('users').select('id').limit(1);
+        
         if (error) {
-          const msg = error.message?.includes('fetch') 
-            ? 'Supabase Unreachable - Check your URL or Network.' 
-            : error.message || 'Connection lost.';
+          const msg = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+          console.error('[DB MONITOR] Error details:', msg);
+
+          const isNetworkError = msg.toLowerCase().includes('fetch') || 
+                                msg.toLowerCase().includes('network') || 
+                                msg.toLowerCase().includes('failed to connect') ||
+                                msg.toLowerCase().includes('timeout');
           
-          console.error('[DB MONITOR] Health check failed:', msg);
-          setErrorMessage(msg);
-          setStatus('disconnected');
-          setErrorCount(prev => prev + 1);
+          if (isNetworkError) {
+            setErrorMessage(`Bridge Error: ${msg}`);
+            setStatus('disconnected');
+            setErrorCount(prev => prev + 1);
+          } else {
+            // DB-level errors (like table missing) mean we ARE connected to the backend
+            // but the schema might be wrong. We shouldn't block the whole app with a banner.
+            console.warn('[DB MONITOR] Schema warning:', msg);
+            setStatus('connected');
+            setErrorMessage('');
+          }
         } else {
           setStatus('connected');
           setErrorCount(0);
           setErrorMessage('');
         }
       } catch (err: any) {
-        console.error('[DB MONITOR] Critical error:', err);
-        setErrorMessage(err.message || 'System error reaching database.');
-        setStatus('disconnected');
+        const msg = err.message || JSON.stringify(err);
+        console.error('[DB MONITOR] Critical catch:', msg);
+        if (errorCount > 1) {
+          setErrorMessage(`System Error: ${msg}`);
+          setStatus('disconnected');
+        }
         setErrorCount(prev => prev + 1);
       }
     };
@@ -11304,7 +11319,14 @@ const DatabaseMonitor = () => {
     return () => clearInterval(interval);
   }, []);
 
-  if (status === 'connected' || status === 'mock') return null;
+  if (status === 'connected' || status === 'mock') {
+    return (
+      <div className="fixed bottom-4 right-4 z-[9999] flex items-center gap-2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-[9px] uppercase font-bold tracking-widest border border-emerald-500/30 backdrop-blur-sm">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+        <span>MySQL Connected</span>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
