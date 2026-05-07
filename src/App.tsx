@@ -853,7 +853,7 @@ import { locations } from './data/locations';
 const LOCATION_DATA = locations;
 
 // Mock database to remove backend connection as requested
-import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl } from './services/dataService';
+import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
 
 import { cn } from './lib/utils';
 
@@ -1328,6 +1328,7 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
     setIsSubmitting(true);
     try {
       const feedbackData: any = {
+        id: generateUUID(),
         user_id: user?.uid || 'visitor',
         user_name: currentName,
         visitor_mobile: currentMobile,
@@ -1614,6 +1615,7 @@ const ReviewSection = ({
       const { data: existingReviewData } = await query.maybeSingle();
 
       const reviewPayload = {
+        id: generateUUID(),
         visitor_name: currentName,
         visitor_mobile: currentMobile,
         rating,
@@ -6409,6 +6411,7 @@ const BookingManagerView = ({
       }
 
       const { error } = await db.from('bookings').insert([{
+        id: generateUUID(),
         user_id: user?.uid,
         owner_id: user?.uid,
         target_id: manualBooking.targetId,
@@ -9284,6 +9287,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
 
           try {
             const { error } = await db.from('user_subscriptions').insert([{
+              id: generateUUID(),
               user_id: user?.uid,
               plan_id: plan.id,
               start_date: startDate.toISOString(),
@@ -9701,7 +9705,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {newItem.images?.filter(img => img !== '').map((img, i) => (
                     <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center p-1">
-                      <img src={img} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                      <img src={resolveUrl(img)} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                       <button 
                         onClick={() => setNewItem(prev => ({...prev, images: prev.images?.filter((_, idx) => idx !== i)}))}
                         className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
@@ -9722,7 +9726,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {newItem.videos?.map((vid, i) => (
                     <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center p-1">
-                      <video src={vid} className="w-full h-full object-contain" />
+                      <video src={resolveUrl(vid)} className="w-full h-full object-contain" />
                       <button 
                         onClick={() => setNewItem(prev => ({...prev, videos: prev.videos?.filter((_, idx) => idx !== i)}))}
                         className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-md"
@@ -9830,6 +9834,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     availableFor: [] as string[],
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
+    catalogue: [] as string[]
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -9837,8 +9842,9 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     setLoading(true);
     try {
       const { error } = await db.from('service_providers').insert([{
+        id: generateUUID(),
         name: formData.name,
-        type: formData.serviceType,
+        service_type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
@@ -9855,7 +9861,8 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         pincode: profile?.pincode || '',
         owner_id: user?.uid,
         rating: 0,
-        review_count: 0
+        review_count: 0,
+        catalogue: formData.catalogue
       }]);
       if (error) {
         console.error('Add Service Error:', error);
@@ -9980,7 +9987,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
                 {formData.images.map((img, idx) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={resolveUrl(img)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
                       onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_, i) => i !== idx)}))}
@@ -10202,7 +10209,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
                 {formData.images.map((img: string, idx: number) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={resolveUrl(img)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
                       onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_: any, i: number) => i !== idx)}))}
@@ -10446,7 +10453,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
                 {formData.images.map((img: string, idx: number) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={resolveUrl(img)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
                       onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_: any, i: number) => i !== idx)}))}
@@ -10715,6 +10722,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     siteLevels: [] as string[],
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
+    catalogue: [] as string[]
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -10722,8 +10730,9 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
     setLoading(true);
     try {
       const { error } = await db.from('venues').insert([{
+        id: generateUUID(),
         name: formData.name,
-        type: formData.venueType,
+        venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
         state: profile?.state || '',
@@ -10742,7 +10751,8 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
         longitude: formData.longitude,
         owner_id: user?.uid,
         rating: 0,
-        review_count: 0
+        review_count: 0,
+        catalogue: formData.catalogue
       }]);
       
       console.log('Submitting venue to DB:', { name: formData.name, owner: user.uid });
@@ -10876,7 +10886,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
                 {formData.images.map((img, idx) => (
                   <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img src={resolveUrl(img)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button 
                       type="button"
                       onClick={() => setFormData(prev => ({...prev, images: (prev.images || []).filter((_, i) => i !== idx)}))}
@@ -11269,7 +11279,7 @@ const DatabaseMonitor = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (!isSupabaseConnected) {
+    if (!isSupabaseConnected || getIsOffline()) {
       setStatus('mock');
       return;
     }
@@ -12292,7 +12302,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                        <p className="text-gray-900">Full list displayed in PDF...</p>
                     </div>
                     <div className="w-full h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-100">
-                      {selectedItem?.images?.[0] ? <img src={selectedItem.images[0]} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-4 text-gray-300" />}
+                      {selectedItem?.images?.[0] ? <img src={resolveUrl(selectedItem.images[0])} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-4 text-gray-300" />}
                     </div>
                  </div>
                  <div className="mt-4 flex flex-col items-center">
@@ -12762,6 +12772,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     
     try {
       const inserts = messages.map(msg => ({
+        id: generateUUID(),
         title: newNotification.title || 'System Update',
         message: msg.trim(),
         target_role: 'all',
@@ -12775,6 +12786,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         // Retry without target_role if schema is old
         if (error.message?.includes('column "target_role" does not exist') || error.message?.includes('schema cache')) {
            const retryInserts = messages.map(msg => ({
+            id: generateUUID(),
             title: newNotification.title || 'System Update',
             message: msg.trim(),
             is_active: true
@@ -12810,7 +12822,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         if (uploadError) throw uploadError;
         
         const { data: { publicUrl } } = db.storage.from('images').getPublicUrl(filePath);
-        return { title: file.name, image_url: publicUrl, is_active: true };
+        return { id: generateUUID(), title: file.name, image_url: publicUrl, is_active: true };
       });
       
       const bannerData = await Promise.all(uploadPromises);

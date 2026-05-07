@@ -250,6 +250,14 @@ const mockDataService = {
   }
 };
 
+// Helper to generate a UUID v4
+export const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const mysqlDataService = {
   from: (table: string) => {
     const filters: any[] = [];
@@ -278,6 +286,36 @@ const mysqlDataService = {
         return result;
       } catch (err: any) {
         console.error(`[MYSQL CLIENT ERROR] ${table} ${method}:`, err);
+        // Automatically switch to offline mode on fetch failures (e.g. backend down or no network)
+        if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+          console.warn('⚠️ Detected connection failure. Switching to OFFLINE MOCK DATA.');
+          setOfflineMode(true);
+          
+          // Re-attempt using mock data service with correct lower-case methods and arguments
+          const mockTable = mockDataService.from(table);
+          if (method === 'SELECT') {
+            const builder = mockTable.select(selectVal);
+            if (limitVal) builder.limit(limitVal);
+            // EQ filters
+            filters.forEach(f => {
+              if (f.op === 'eq') builder.eq(f.col, f.val);
+              else if (f.op === 'neq') builder.neq(f.col, f.val);
+            });
+            return builder; // Builders in mockDataService are thenable and resolve to {data, error}
+          }
+          if (method === 'INSERT') return mockTable.insert(data);
+          if (method === 'UPDATE') {
+            const query: any = {};
+            filters.forEach(f => { if (f.op === 'eq') query[f.col] = f.val; });
+            return mockTable.update(data).match(query);
+          }
+          if (method === 'DELETE') {
+             const col = filters[0]?.col;
+             const val = filters[0]?.val;
+             return (mockTable as any).delete().eq(col, val);
+          }
+          if (method === 'UPSERT') return mockTable.upsert(data);
+        }
         return { data: null, error: { message: err.message || String(err) } };
       }
     };
@@ -434,7 +472,15 @@ const mysqlDataService = {
       return { data: { subscription: { unsubscribe: () => {} } } };
     },
     signInWithPassword: async ({ email, password }: any) => {
-      // For now, use the MySQL query API to check user
+      if (forceOffline) {
+        const user = DEFAULT_MOCK_DATA.users.find(u => u.email === email && u.password === password);
+        if (user) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+          return Promise.resolve({ data: { user, session: { user } }, error: null });
+        }
+        return Promise.resolve({ data: { user: null, session: null }, error: { message: 'Invalid credentials' } });
+      }
+
       const { data, error } = await mysqlDataService.from('users')
         .select('*')
         .eq('email', email)
@@ -445,7 +491,7 @@ const mysqlDataService = {
         localStorage.setItem(SESSION_KEY, JSON.stringify(data));
         return { data: { user: data, session: { user: data } }, error: null };
       }
-      return { data: { user: null, session: null }, error: { message: error || 'Invalid credentials' } };
+      return { data: { user: null, session: null }, error: { message: error?.message || error || 'Invalid credentials' } };
     },
     signOut: async () => {
       localStorage.removeItem(SESSION_KEY);
@@ -453,11 +499,20 @@ const mysqlDataService = {
     },
     signUp: async ({ email, password, options }: any) => {
       const newUser = { 
-        uid: Math.random().toString(36).substr(2, 9),
+        uid: generateUUID(),
         email, 
         password, 
+        created_at: new Date().toISOString(),
         ...options?.data 
       };
+      if (forceOffline) {
+        const data = getLocalData();
+        data.users.push(newUser);
+        saveLocalData(data);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+        return Promise.resolve({ data: { user: newUser, session: { user: newUser } }, error: null });
+      }
+      
       const { error } = await mysqlDataService.from('users').insert(newUser);
       if (!error) {
         localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
@@ -479,8 +534,8 @@ export const dataService = new Proxy({} as any, {
   }
 });
 
-export const resolveUrl = (path: string | null | undefined): string => {
-  if (!path) return '';
+export const resolveUrl = (path: string | null | undefined): string | null => {
+  if (!path || path === '') return null;
   // Ensure we don't double-resolve if it's already a full URL or relative path
   if (path.startsWith('http') || path.startsWith('/') || path.startsWith('data:')) {
     return path;

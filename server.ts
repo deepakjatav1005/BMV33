@@ -39,7 +39,7 @@ async function startServer() {
   });
   
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000;
 
   // Request logging middleware
   app.use((req, res, next) => {
@@ -272,9 +272,10 @@ async function startServer() {
   });
 
   // File Upload Logic
-  const uploadDir = path.resolve(__dirname, "uploads");
+  const uploadDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log(`>>> [STORAGE] Created upload directory at: ${uploadDir}`);
   }
   app.use("/uploads", express.static(uploadDir));
 
