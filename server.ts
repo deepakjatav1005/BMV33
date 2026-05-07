@@ -18,13 +18,43 @@ const __dirname = path.dirname(__filename);
 
 // MySQL Connection Pool (Lazy initialization)
 let pool: mysql.Pool;
+let isDbHealthy = true;
+let lastDbCheck = 0;
+const DB_CHECK_INTERVAL = 30000; // 30 seconds
+
+async function checkDbHealth() {
+  const now = Date.now();
+  if (now - lastDbCheck < DB_CHECK_INTERVAL) return isDbHealthy;
+  
+  lastDbCheck = now;
+  try {
+    const connection = await pool.getConnection();
+    connection.release();
+    isDbHealthy = true;
+    return true;
+  } catch (err) {
+    console.warn(">>> [HEALTH CHECK] MySQL Database is unreachable. Enabling fail-fast mode.");
+    isDbHealthy = false;
+    return false;
+  }
+}
 
 async function startServer() {
   console.log(">>> [BOOT] Starting server initialization...");
   
+  // Validate configuration before initializing
+  if (!process.env.MYSQL_HOST || !process.env.MYSQL_USER || !process.env.MYSQL_DATABASE) {
+    console.error(">>> [CRITICAL] Missing MySQL configuration! Please check your environment variables.");
+    console.error(`>>> [CONFIG] HOST: ${process.env.MYSQL_HOST ? 'SET' : 'MISSING'}`);
+    console.error(`>>> [CONFIG] USER: ${process.env.MYSQL_USER ? 'SET' : 'MISSING'}`);
+    console.error(`>>> [CONFIG] DB: ${process.env.MYSQL_DATABASE ? 'SET' : 'MISSING'}`);
+    // We continue so the server starts, but it will be in fail-fast/offline mode
+    isDbHealthy = false;
+  }
+
   // Initialize pool inside startServer to ensure dotenv.config() has run
   pool = mysql.createPool({
-    host: process.env.MYSQL_HOST,
+    host: process.env.MYSQL_HOST || 'localhost',
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
@@ -32,11 +62,15 @@ async function startServer() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    connectTimeout: 30000,
+    connectTimeout: 5000,   // Fail fast (5s instead of 30s)
+    acquireTimeout: 5000,   // Fail fast
     ssl: {
       rejectUnauthorized: false
     }
   });
+
+  // Init health check
+  checkDbHealth();
   
   const app = express();
   const PORT = 3000;
@@ -101,8 +135,14 @@ async function startServer() {
   // API routes
   app.get("/api/health", async (req, res) => {
     try {
-      const connection = await pool.getConnection();
-      connection.release();
+      const healthy = await checkDbHealth();
+      if (!healthy) {
+        return res.status(503).json({
+          status: "error",
+          database: "MySQL Unreachable (Fail-Fast)",
+          timestamp: new Date().toISOString()
+        });
+      }
       res.json({ 
         status: "ok", 
         database: "MySQL Connected",
@@ -123,6 +163,15 @@ async function startServer() {
     const { table } = req.params;
     const { method, filters, data, select } = req.body;
     console.log(`>>> [DB REQUEST] ${method} on ${table}`, { filters, select });
+
+    // Check health before trying
+    if (!isDbHealthy) {
+      console.warn(`>>> [FAIL-FAST] Skipping ${method} on ${table} due to known DB downtime.`);
+      return res.status(503).json({ 
+        error: "Database currently unreachable. Working in offline mode.",
+        code: "DB_UNREACHABLE"
+      });
+    }
 
     try {
       // Auto-stringify arrays/objects for MySQL
@@ -252,6 +301,13 @@ async function startServer() {
       res.status(400).json({ error: "Unsupported method" });
     } catch (err: any) {
       console.error(`> [DB ERROR] ${table} ${method}:`, err);
+      
+      // Update health if we got a connection error
+      if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED' || err.message.includes('connect')) {
+        isDbHealthy = false;
+        lastDbCheck = Date.now(); // Reset check timer
+      }
+
       // Attempt to fix common column missing errors
       if (err.code === 'ER_BAD_FIELD_ERROR' || err.message.includes('Unknown column')) {
          console.warn(`>> DETECTED MISSING COLUMN in ${table}. Try adding it...`);

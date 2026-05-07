@@ -279,6 +279,25 @@ const mysqlDataService = {
             order: orderVal
           })
         });
+
+        // Handle non-OK responses from the server
+        if (!response.ok) {
+          const errorResult = await response.json().catch(() => ({ error: 'Unknown server error' }));
+          
+          // Detect database connection errors (like ETIMEDOUT, ECONNREFUSED)
+          const dbErrorKeywords = ['connect', 'ETIMEDOUT', 'ECONNREFUSED', 'ER_ACCESS_DENIED_ERROR', 'database', 'MySQL Disconnected'];
+          const isDbError = typeof errorResult.error === 'string' && 
+                          dbErrorKeywords.some(k => errorResult.error.toLowerCase().includes(k.toLowerCase()));
+
+          if (isDbError || response.status === 503) {
+            console.warn(`📡 Detected MySQL Connection Failure (${errorResult.error}). Switching to OFFLINE MOCK DATA.`);
+            setOfflineMode(true);
+            return handleOfflineFallback(method, data);
+          }
+          
+          throw new Error(errorResult.error || `Server returned ${response.status}`);
+        }
+
         const result = await response.json();
         if (result.error && typeof result.error === 'string') {
           result.error = { message: result.error };
@@ -287,37 +306,41 @@ const mysqlDataService = {
       } catch (err: any) {
         console.error(`[MYSQL CLIENT ERROR] ${table} ${method}:`, err);
         // Automatically switch to offline mode on fetch failures (e.g. backend down or no network)
-        if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-          console.warn('⚠️ Detected connection failure. Switching to OFFLINE MOCK DATA.');
+        if (err.message === 'Failed to fetch' || err.name === 'TypeError' || err.message.includes('network')) {
+          console.warn('⚠️ Detected network failure. Switching to OFFLINE MOCK DATA.');
           setOfflineMode(true);
-          
-          // Re-attempt using mock data service with correct lower-case methods and arguments
-          const mockTable = mockDataService.from(table);
-          if (method === 'SELECT') {
-            const builder = mockTable.select(selectVal);
-            if (limitVal) builder.limit(limitVal);
-            // EQ filters
-            filters.forEach(f => {
-              if (f.op === 'eq') builder.eq(f.col, f.val);
-              else if (f.op === 'neq') builder.neq(f.col, f.val);
-            });
-            return builder; // Builders in mockDataService are thenable and resolve to {data, error}
-          }
-          if (method === 'INSERT') return mockTable.insert(data);
-          if (method === 'UPDATE') {
-            const query: any = {};
-            filters.forEach(f => { if (f.op === 'eq') query[f.col] = f.val; });
-            return mockTable.update(data).match(query);
-          }
-          if (method === 'DELETE') {
-             const col = filters[0]?.col;
-             const val = filters[0]?.val;
-             return (mockTable as any).delete().eq(col, val);
-          }
-          if (method === 'UPSERT') return mockTable.upsert(data);
+          return handleOfflineFallback(method, data);
         }
         return { data: null, error: { message: err.message || String(err) } };
       }
+    };
+
+    // Helper for consistency in fallback
+    const handleOfflineFallback = (method: string, data?: any) => {
+      const mockTable = mockDataService.from(table);
+      if (method === 'SELECT') {
+        const builder = mockTable.select(selectVal);
+        if (limitVal) builder.limit(limitVal);
+        filters.forEach(f => {
+          if (f.op === 'eq') builder.eq(f.col, f.val);
+          else if (f.op === 'neq') builder.neq(f.col, f.val);
+          else if (f.op === 'in') builder.in(f.col, f.val);
+        });
+        return builder;
+      }
+      if (method === 'INSERT') return mockTable.insert(data);
+      if (method === 'UPDATE') {
+        const query: any = {};
+        filters.forEach(f => { if (f.op === 'eq') query[f.col] = f.val; });
+        return mockTable.update(data).match(query);
+      }
+      if (method === 'DELETE') {
+         const col = filters[0]?.col;
+         const val = filters[0]?.val;
+         return (mockTable as any).delete().eq(col, val);
+      }
+      if (method === 'UPSERT') return mockTable.upsert(data);
+      return { data: null, error: { message: 'Mock fallback incomplete' } };
     };
 
     const builder: any = {

@@ -1603,25 +1603,43 @@ const ReviewSection = ({
     
     setIsSubmitting(true);
     try {
-      // Check if this visitor/user already reviewed this target using OR condition
-      let query = db.from('reviews').select('id').eq('target_id', targetId);
+      // Check if this visitor/user already reviewed this target
+      let existingReviewData = null;
       
       if (user?.uid) {
-        query = query.or(`user_id.eq.${user.uid},visitor_mobile.eq.${currentMobile}`);
+        const { data: byUser } = await db.from('reviews')
+          .select('id')
+          .eq('target_id', targetId)
+          .eq('user_id', user.uid)
+          .maybeSingle();
+        
+        if (byUser) {
+          existingReviewData = byUser;
+        } else {
+          // Fallback to mobile if user record not found but mobile matches
+          const { data: byMobile } = await db.from('reviews')
+            .select('id')
+            .eq('target_id', targetId)
+            .eq('visitor_mobile', currentMobile)
+            .maybeSingle();
+          existingReviewData = byMobile;
+        }
       } else {
-        query = query.eq('visitor_mobile', currentMobile);
+        const { data: byMobile } = await db.from('reviews')
+          .select('id')
+          .eq('target_id', targetId)
+          .eq('visitor_mobile', currentMobile)
+          .maybeSingle();
+        existingReviewData = byMobile;
       }
-      
-      const { data: existingReviewData } = await query.maybeSingle();
 
       const reviewPayload = {
-        id: generateUUID(),
         visitor_name: currentName,
         visitor_mobile: currentMobile,
         rating,
         comment,
         user_id: user?.uid || null,
-        created_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
       };
 
       if (existingReviewData) {
@@ -1630,23 +1648,24 @@ const ReviewSection = ({
         toast.success('Your review has been updated!');
       } else {
         const { error } = await db.from('reviews').insert([{
+          id: generateUUID(),
           ...reviewPayload,
-          target_id: targetId
+          target_id: targetId,
+          created_at: new Date().toISOString()
         }]);
         if (error) throw error;
         toast.success('Review submitted successfully!');
       }
       
       // Update the average rating and review count on the target
-      // This is simplified; ideally server-side or more robust fetch
-      fetchTargetData();
+      await fetchTargetData();
       
       setComment('');
       if (!user) {
         setVisitorName('');
         setVisitorMobile('');
       }
-      fetchReviews();
+      await fetchReviews();
       onReviewAdded();
     } catch (err) {
       toast.error('Failed to submit review');
@@ -6194,12 +6213,26 @@ const BookingManagerView = ({
       const vQuery = db.from('venues').select('*');
       if (profile?.role !== 'admin') vQuery.eq('owner_id', user?.uid);
       const { data: vData } = await vQuery;
-      if (vData) setVenues(vData.map(d => ({ id: d.id, ...d } as any)));
+      if (vData) setVenues(vData.map(d => ({ 
+        id: d.id, 
+        ...d,
+        reviewCount: d.review_count,
+        ownerId: d.owner_id,
+        venueType: d.venue_type,
+        pricePerDay: d.price_per_day
+      } as any)));
       
       const sQuery = db.from('service_providers').select('*');
       if (profile?.role !== 'admin') sQuery.eq('provider_id', user?.uid);
       const { data: sData } = await sQuery;
-      if (sData) setServices(sData.map(d => ({ id: d.id, ...d } as any)));
+      if (sData) setServices(sData.map(d => ({ 
+        id: d.id, 
+        ...d,
+        reviewCount: d.review_count,
+        providerId: d.owner_id,
+        serviceType: d.type,
+        priceRange: d.price_range
+      } as any)));
     };
 
     fetchMyItems();
