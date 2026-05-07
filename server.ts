@@ -12,7 +12,6 @@ console.log(">>> [BOOT] NODE VERSION:", process.version);
 console.log(">>> [BOOT] CWD:", process.cwd());
 
 dotenv.config({ override: true });
-dotenv.config({ path: 'data.env', override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,14 +90,13 @@ async function startServer() {
     console.error(">>> [ERROR] Failed to initialize Razorpay:", err);
   }
 
-  // DB Test
-  try {
-    const connection = await pool.getConnection();
+  // DB Test (Non-blocking)
+  pool.getConnection().then(connection => {
     console.log(">>> [SUCCESS] MySQL Database connected successfully");
     connection.release();
-  } catch (err) {
+  }).catch(err => {
     console.error(">>> [ERROR] MySQL Connection failed:", err);
-  }
+  });
 
   // API routes
   app.get("/api/health", async (req, res) => {
@@ -280,19 +278,46 @@ async function startServer() {
   }
   app.use("/uploads", express.static(uploadDir));
 
+  // Modified storage to handle relative paths if we want to support subbundles
   const storage = (multer as any).diskStorage({
-    destination: (req: any, file: any, cb: any) => cb(null, uploadDir),
+    destination: (req: any, file: any, cb: any) => {
+      // Check if the request has a 'path' field to determine subdirectory
+      const requestedPath = req.body.path || "";
+      let targetDir = uploadDir;
+      
+      if (requestedPath) {
+        // Extract directory part of the path
+        const subDir = path.dirname(requestedPath);
+        if (subDir !== ".") {
+          targetDir = path.join(uploadDir, subDir);
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+        }
+      }
+      cb(null, targetDir);
+    },
     filename: (req: any, file: any, cb: any) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
+      const requestedPath = req.body.path || "";
+      if (requestedPath) {
+        // Use the basename of the requested path
+        cb(null, path.basename(requestedPath));
+      } else {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+      }
     }
   });
   const upload = (multer as any)({ storage });
 
-  app.post("/api/storage/upload", upload.single("file"), (req, res) => {
+  app.post("/api/storage/upload", upload.single("file"), (req: any, res: any) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const publicUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-    res.json({ data: { path: req.file.filename, publicUrl }, error: null });
+    
+    // Get the relative path from the uploads directory
+    const relativePath = path.relative(uploadDir, req.file.path).replace(/\\/g, '/');
+    const publicUrl = `/uploads/${relativePath}`;
+    
+    res.json({ data: { path: relativePath, publicUrl }, error: null });
   });
 
   app.post("/api/razorpay/order", async (req, res) => {

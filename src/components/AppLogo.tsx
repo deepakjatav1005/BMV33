@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dataService as db } from '../services/dataService';
+import { dataService as db, resolveUrl } from '../services/dataService';
 
 // Note: If you have a file at src/assets/logo.png, you can uncomment the next line
 // import logo from '../assets/logo.png';
@@ -46,7 +46,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
     <div className={`inline-flex items-center space-x-3 ${className}`}>
       <div className={`${sizeClasses[size]} aspect-square rounded-full overflow-hidden flex items-center justify-center bg-white shadow-sm hover:shadow-md transition-shadow duration-300`}>
         <img 
-          src={logoUrl} 
+          src={resolveUrl(logoUrl)} 
           alt="Best Vanue Option Logo" 
           className="w-full h-full object-contain p-1 transition-transform hover:scale-105 duration-500"
           referrerPolicy="no-referrer"

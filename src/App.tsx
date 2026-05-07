@@ -853,7 +853,7 @@ import { locations } from './data/locations';
 const LOCATION_DATA = locations;
 
 // Mock database to remove backend connection as requested
-import { dataService as db, isSupabaseConnected, setOfflineMode } from './services/dataService';
+import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl } from './services/dataService';
 
 import { cn } from './lib/utils';
 
@@ -1895,7 +1895,7 @@ const VideoUpload = ({
       <div className="flex items-center space-x-4">
         <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group">
           {currentVideo ? (
-            <video src={currentVideo} className="w-full h-full object-cover" />
+            <video src={resolveUrl(currentVideo)} className="w-full h-full object-cover" />
           ) : (
             <Video className="text-gray-300" size={32} />
           )}
@@ -2061,7 +2061,7 @@ const ImageUpload = ({
         <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group">
           {currentImage ? (
             <div className="relative w-full h-full group">
-              <img src={currentImage} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={resolveUrl(currentImage)} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               <button 
                 type="button"
                 onClick={(e) => {
@@ -2191,7 +2191,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-orange-200">
                       {profile?.photoURL ? (
                         <img 
-                          src={profile.photoURL} 
+                          src={resolveUrl(profile.photoURL)} 
                           alt={profile.displayName} 
                           className="w-full h-full object-cover" 
                           referrerPolicy="no-referrer"
@@ -2346,7 +2346,7 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 2 }}
-            src={banners[currentBanner]?.imageUrl || defaultBanner} 
+            src={resolveUrl(banners[currentBanner]?.imageUrl) || defaultBanner} 
             alt="Wedding Venue" 
             className="w-full h-full object-cover brightness-50"
             referrerPolicy="no-referrer"
@@ -2544,7 +2544,7 @@ const CategoryDisplay = () => {
               <div className="block w-full h-full text-left">
                 {(cat.image && (cat.image.includes('.mp4') || cat.image.includes('video'))) ? (
                   <video 
-                    src={cat.image} 
+                    src={resolveUrl(cat.image)} 
                     className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                     autoPlay 
                     muted 
@@ -2553,7 +2553,7 @@ const CategoryDisplay = () => {
                   />
                 ) : (
                   <img 
-                    src={cat.image} 
+                    src={resolveUrl(cat.image)} 
                     alt={cat.name}
                     className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                     referrerPolicy="no-referrer"
@@ -2580,6 +2580,9 @@ const CategoryDisplay = () => {
   );
 };
 
+// --- Utilities ---
+
+
 const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
   <motion.div 
     whileHover={{ y: -5 }}
@@ -2588,7 +2591,7 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
     <Link to={`/venues/${venue.id}`}>
       <div className="relative h-56">
         <img 
-          src={venue.images?.[0] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
+          src={resolveUrl(venue.images?.[0]) || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
           alt={venue.name} 
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
@@ -2636,7 +2639,7 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
       <Link to={`/services/${service.id}`}>
         <div className="relative h-48">
           <img 
-            src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
+            src={resolveUrl(service.images?.[0]) || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
             alt={service.name} 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -3090,10 +3093,10 @@ const RegistrationView = () => {
       const { error } = await db.from('users').insert([profileData]);
       if (error) {
         console.error('Registration Error:', error);
-        if (error.message.includes('column "venue_type" does not exist') || error.message.includes('schema cache')) {
+        if (error.message?.includes('column "venue_type" does not exist') || error.message?.includes('schema cache')) {
           toast.error('Registration failed: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
         } else {
-          toast.error(`Registration failed: ${error.message}`);
+          toast.error(`Registration failed: ${error.message || 'Unknown error'}`);
         }
         throw error;
       }
@@ -3511,9 +3514,9 @@ const GalleryView = () => {
                 className="aspect-square rounded-2xl overflow-hidden shadow-lg bg-gray-100"
               >
                 {url.includes('.mp4') || url.includes('video') ? (
-                  <video src={url} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                  <video src={resolveUrl(url)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                 ) : (
-                  <img src={url} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={resolveUrl(url)} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 )}
               </motion.div>
             ))}
@@ -3666,7 +3669,7 @@ const ServiceInfoStickers = () => {
               <div className="mb-6 relative h-48 flex items-center justify-center">
                 <div className="absolute inset-0 bg-white/60 blur-3xl rounded-full scale-125 group-hover:scale-110 transition-transform duration-500" />
                 <img 
-                  src={service.image} 
+                  src={resolveUrl(service.image)} 
                   alt={service.title} 
                   className="w-full h-full object-contain relative z-10 drop-shadow-[0_20px_30px_rgba(0,0,0,0.15)] group-hover:drop-shadow-[0_25px_35px_rgba(0,0,0,0.2)] transition-all duration-500"
                   referrerPolicy="no-referrer"
@@ -3757,7 +3760,7 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boole
             >
               {m.type === 'video' || (m.media_url && m.media_url.includes('.mp4')) ? (
                 <video 
-                  src={m.media_url} 
+                  src={resolveUrl(m.media_url)} 
                   className="w-full h-full object-cover" 
                   autoPlay 
                   muted 
@@ -3766,7 +3769,7 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boole
                 />
               ) : (
                 <img 
-                  src={m.media_url} 
+                  src={resolveUrl(m.media_url)} 
                   alt="Moment" 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
@@ -3841,7 +3844,7 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: 
             >
               <div className="w-full h-full bg-gray-50 flex items-center justify-center p-2">
                 <img 
-                  src={p.imageUrl} 
+                  src={resolveUrl(p.imageUrl)} 
                   alt={p.serviceType} 
                   className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
                   referrerPolicy="no-referrer"
@@ -4060,7 +4063,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
                 onMouseLeave={() => setIsAutoScrollEnabled(true)}
               >
                 <img 
-                  src={banners[currentBannerIndex].imageUrl} 
+                  src={resolveUrl(banners[currentBannerIndex].imageUrl)} 
                   alt={banners[currentBannerIndex].title}
                   className="w-full h-full object-cover brightness-[0.7]"
                   referrerPolicy="no-referrer"
@@ -4718,7 +4721,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       <div className="mb-10">
         <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl relative group h-[300px] md:h-[500px]">
           <img 
-            src={venue.images?.[0]} 
+            src={resolveUrl(venue.images?.[0])} 
             alt={venue.name} 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
             referrerPolicy="no-referrer"
@@ -4745,7 +4748,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
           <div className="flex items-center justify-center md:justify-start space-x-4">
             <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-white shrink-0">
               <img 
-                src={ownerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.display_name || venue.name}`} 
+                src={resolveUrl(ownerProfile?.photo_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${ownerProfile?.display_name || venue.name}`} 
                 alt={ownerProfile?.display_name || venue.name} 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
@@ -4923,7 +4926,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                           <td className="px-6 py-4 text-center">
                             {f.photoUrl ? (
                               <div className="relative inline-block">
-                                <img src={f.photoUrl} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md mx-auto group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" alt={f.name} />
+                                <img src={resolveUrl(f.photoUrl)} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md mx-auto group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" alt={f.name} />
                                 <div className="absolute inset-0 rounded-2xl ring-1 ring-black/5" />
                               </div>
                             ) : (
@@ -5472,7 +5475,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       <div className="max-w-7xl mx-auto px-4 mt-8">
         <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl relative group h-[300px] md:h-[500px]">
           <img 
-            src={service.images?.[0] || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
+            src={resolveUrl(service.images?.[0]) || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=1920'} 
             alt={service.name} 
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
             referrerPolicy="no-referrer"
@@ -5504,7 +5507,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
              <div className="flex items-center justify-center md:justify-start space-x-4">
                <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-white shrink-0">
                  <img 
-                   src={providerProfile?.photo_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerProfile?.display_name || service.name}`} 
+                   src={resolveUrl(providerProfile?.photo_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerProfile?.display_name || service.name}`} 
                    alt={providerProfile?.display_name || service.name} 
                    className="w-full h-full object-cover"
                    referrerPolicy="no-referrer"
@@ -5639,7 +5642,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                           <td className="px-6 py-4 text-center">
                             {f.photoUrl ? (
                               <div className="relative inline-block group-hover/row:scale-110 transition-transform duration-300">
-                                <img src={f.photoUrl} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-lg mx-auto" referrerPolicy="no-referrer" alt={f.name} />
+                                <img src={resolveUrl(f.photoUrl)} className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-lg mx-auto" referrerPolicy="no-referrer" alt={f.name} />
                                 <div className="absolute inset-0 rounded-2xl ring-1 ring-black/5" />
                               </div>
                             ) : (
@@ -5680,7 +5683,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                         {item.images.map((img, imgIdx) => (
                           <div key={imgIdx} className="aspect-square rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
                             <img 
-                              src={img} 
+                              src={resolveUrl(img)} 
                               alt={`${item.level} ${imgIdx + 1}`} 
                               className="w-full h-full object-contain hover:scale-105 transition-transform duration-500" 
                               referrerPolicy="no-referrer"
@@ -5690,7 +5693,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                         {item.videos?.map((vid, vidIdx) => (
                           <div key={vidIdx} className="aspect-square rounded-xl overflow-hidden border border-gray-100 bg-black relative group">
                             <video 
-                              src={vid} 
+                              src={resolveUrl(vid)} 
                               className="w-full h-full object-contain"
                               controls
                             />
@@ -8158,7 +8161,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-white/20 shadow-xl">
                         {profile?.photoURL ? (
                           <img 
-                            src={profile.photoURL} 
+                            src={resolveUrl(profile.photoURL)} 
                             alt={profile.displayName} 
                             className="w-full h-full object-cover" 
                             referrerPolicy="no-referrer"
@@ -8764,10 +8767,10 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
             
             if (error) {
               console.error('Razorpay Payment Update Error:', error);
-              if (error.message.includes('column "payment_status" does not exist') || error.message.includes('schema cache')) {
+              if (error.message?.includes('column "payment_status" does not exist') || error.message?.includes('schema cache')) {
                 toast.error('Database schema error: payment_status column missing or cache stale.');
               } else {
-                toast.error(`Failed to update payment status: ${error.message}`);
+                toast.error(`Failed to update payment status: ${error.message || 'Unknown error'}`);
               }
               throw error;
             }
@@ -9435,7 +9438,7 @@ const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityI
             />
              {newFacility.photoUrl && (
                <div className="relative w-10 h-10 mt-1">
-                 <img src={newFacility.photoUrl} className="w-full h-full object-cover rounded-lg border" />
+                 <img src={resolveUrl(newFacility.photoUrl)} className="w-full h-full object-cover rounded-lg border" />
                  <button onClick={() => setNewFacility(prev => ({...prev, photoUrl: ''}))} className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full p-0.5">
                    <X size={10} />
                  </button>
@@ -9475,7 +9478,7 @@ const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityI
                   <td className="px-4 py-3 text-[10px] text-gray-500 font-bold uppercase text-center">{f.unit}</td>
                   <td className="px-4 py-3 text-center">
                     {f.photoUrl ? (
-                      <img src={f.photoUrl} className="w-8 h-8 rounded-lg object-cover mx-auto" referrerPolicy="no-referrer" />
+                      <img src={resolveUrl(f.photoUrl)} className="w-8 h-8 rounded-lg object-cover mx-auto" referrerPolicy="no-referrer" />
                     ) : (
                       <span className="text-[10px] text-gray-300 italic uppercase">None</span>
                     )}
@@ -9748,7 +9751,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                     <div className="grid grid-cols-2 gap-2">
                       {item.images.slice(0, 4).map((img, idx) => (
                         <div key={idx} className="w-full aspect-square bg-gray-50 rounded-xl shadow-sm overflow-hidden flex items-center justify-center p-1 border border-gray-100">
-                          <img src={img} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                          <img src={resolveUrl(img)} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                         </div>
                       ))}
                     </div>
@@ -9756,7 +9759,7 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                       <div className="grid grid-cols-2 gap-2">
                         {item.videos.slice(0, 2).map((vid, idx) => (
                           <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-1 border border-gray-100">
-                            <video src={vid} className="w-full h-full object-contain opacity-80" />
+                            <video src={resolveUrl(vid)} className="w-full h-full object-contain opacity-80" />
                             <Play size={16} className="absolute text-white drop-shadow-md" />
                           </div>
                         ))}
@@ -9856,10 +9859,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
       }]);
       if (error) {
         console.error('Add Service Error:', error);
-        if (error.message.includes('column "facilities" does not exist') || error.message.includes('schema cache')) {
+        if (error.message?.includes('column "facilities" does not exist') || error.message?.includes('schema cache')) {
           toast.error('Failed to add service: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
         } else {
-          toast.error(`Failed to add service: ${error.message}`);
+          toast.error(`Failed to add service: ${error.message || 'Unknown error'}`);
         }
         throw error;
       }
@@ -11316,6 +11319,8 @@ const DatabaseMonitor = () => {
     return () => clearInterval(interval);
   }, []);
 
+  if (status === 'checking') return null;
+
   if (status === 'connected' || status === 'mock') {
     return (
       <div className="fixed bottom-4 right-4 z-[9999] flex items-center gap-2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-[9px] uppercase font-bold tracking-widest border border-emerald-500/30 backdrop-blur-sm">
@@ -11440,6 +11445,16 @@ export default function App() {
     let authSubscription: any = null;
 
     const initAndSeed = async () => {
+      const loadingTimeout = setTimeout(() => {
+        setLoading(current => {
+          if (current) {
+            console.warn('Initialization taking too long, forcing loading to false');
+            return false;
+          }
+          return current;
+        });
+      }, 5000);
+
       try {
         // Check local storage for custom session first
         const savedUser = localStorage.getItem('custom_user');
@@ -11527,6 +11542,7 @@ export default function App() {
       } catch (err) {
         console.error('Initialization error:', err);
       } finally {
+        clearTimeout(loadingTimeout);
         setLoading(false);
       }
     };
@@ -12757,7 +12773,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
         console.error('Add Notification Error:', error);
         
         // Retry without target_role if schema is old
-        if (error.message.includes('column "target_role" does not exist') || error.message.includes('schema cache')) {
+        if (error.message?.includes('column "target_role" does not exist') || error.message?.includes('schema cache')) {
            const retryInserts = messages.map(msg => ({
             title: newNotification.title || 'System Update',
             message: msg.trim(),
@@ -13517,7 +13533,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {banners.map(b => (
                       <div key={b.id} className="group relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                        <img src={b.imageUrl} alt="Banner" className="w-full h-48 object-cover" referrerPolicy="no-referrer" />
+                        <img src={resolveUrl(b.imageUrl)} alt="Banner" className="w-full h-48 object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
                             onClick={() => deleteBanner(b.id)}
@@ -13571,9 +13587,9 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     {servicePhotos.map(p => (
                       <div key={p.id} className="group relative aspect-video rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
                         {p.imageUrl.includes('.mp4') || p.imageUrl.includes('video') ? (
-                          <video src={p.imageUrl} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                          <video src={resolveUrl(p.imageUrl)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                         ) : (
-                          <img src={p.imageUrl} alt={p.serviceType} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={resolveUrl(p.imageUrl)} alt={p.serviceType} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         )}
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                           <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">{p.serviceType}</p>
@@ -13627,9 +13643,9 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     {moments.map(m => (
                       <div key={m.id} className="group relative aspect-square rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
                         {m.type === 'video' || m.media_url.includes('.mp4') ? (
-                          <video src={m.media_url} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                          <video src={resolveUrl(m.media_url)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                         ) : (
-                          <img src={m.media_url} alt="Moment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={resolveUrl(m.media_url)} alt="Moment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         )}
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button 
@@ -13661,7 +13677,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       <div className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 flex flex-col items-center space-y-6">
                         <div className="bg-white p-6 rounded-3xl shadow-sm border border-orange-200">
                           <img 
-                            src={appLogoUrl} 
+                            src={resolveUrl(appLogoUrl)} 
                             alt="Current App Logo" 
                             className="h-32 w-auto object-contain" 
                             referrerPolicy="no-referrer"

@@ -272,10 +272,13 @@ const mysqlDataService = {
           })
         });
         const result = await response.json();
+        if (result.error && typeof result.error === 'string') {
+          result.error = { message: result.error };
+        }
         return result;
       } catch (err: any) {
         console.error(`[MYSQL CLIENT ERROR] ${table} ${method}:`, err);
-        return { data: null, error: err };
+        return { data: null, error: { message: err.message || String(err) } };
       }
     };
 
@@ -361,9 +364,9 @@ const mysqlDataService = {
       upload: async (path: string, file: any, options?: any) => {
         try {
           const formData = new FormData();
-          formData.append('file', file);
           formData.append('path', path);
           formData.append('bucket', bucket);
+          formData.append('file', file);
 
           const response = await fetch('/api/storage/upload', {
             method: 'POST',
@@ -371,9 +374,9 @@ const mysqlDataService = {
           });
           const result = await response.json();
           
-          // Store the public URL temporarily for immediate use if needed,
-          // though getPublicUrl would ideally handle this.
           if (result.data) {
+            // Cache by original path requested and the returned filename
+            (window as any)[`__url_${path}`] = result.data.publicUrl;
             (window as any)[`__url_${result.data.path}`] = result.data.publicUrl;
           }
           
@@ -384,12 +387,33 @@ const mysqlDataService = {
         }
       },
       getPublicUrl: (path: string) => {
+        if (!path) return { data: { publicUrl: '' } };
+
+        // If it's already a full URL or relative path handled by browser
+        if (path.startsWith('http') || path.startsWith('/') || path.startsWith('data:')) {
+          // Fix broken localhost URLs from previous versions
+          if (path.includes('localhost:3000') || path.includes('127.0.0.1:3000')) {
+            const relativePart = path.split('/uploads/')[1];
+            if (relativePart) {
+              return { data: { publicUrl: `/uploads/${relativePart}` } };
+            }
+          }
+          return { data: { publicUrl: path } };
+        }
+
         const cachedUrl = (window as any)[`__url_${path}`];
         if (cachedUrl) return { data: { publicUrl: cachedUrl } };
         
-        // Fallback or derive from current location if we only have the filename
+        // Derive from current location. Ensure path doesn't have duplicate slashes
         const baseUrl = window.location.origin;
-        return { data: { publicUrl: `${baseUrl}/uploads/${path}` } };
+        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+        
+        // If the path contains 'uploads/', it's already structured
+        if (cleanPath.includes('uploads/')) {
+          return { data: { publicUrl: `${baseUrl}/${cleanPath}` } };
+        }
+        
+        return { data: { publicUrl: `${baseUrl}/uploads/${cleanPath}` } };
       }
     })
   },
@@ -454,3 +478,12 @@ export const dataService = new Proxy({} as any, {
     return (activeService as any)[prop];
   }
 });
+
+export const resolveUrl = (path: string | null | undefined): string => {
+  if (!path) return '';
+  // Ensure we don't double-resolve if it's already a full URL or relative path
+  if (path.startsWith('http') || path.startsWith('/') || path.startsWith('data:')) {
+    return path;
+  }
+  return dataService.storage.from('images').getPublicUrl(path).data.publicUrl;
+};
