@@ -1189,7 +1189,7 @@ const AppRatingModal = ({ isOpen, onClose, user }: { isOpen: boolean, onClose: (
     try {
       const feedbackData: any = {
         id: generateUUID(),
-        user_id: user?.uid || 'visitor',
+        user_id: user?.uid || null,
         user_name: currentName,
         visitor_mobile: currentMobile,
         rating,
@@ -6130,6 +6130,12 @@ const BookingManagerView = ({
   const [services, setServices] = useState<ServiceProvider[]>(parentServices || []);
 
   useEffect(() => {
+    if (parentVenues) setVenues(parentVenues);
+    if (parentServices) setServices(parentServices);
+    if (parentBookings) setBookings(parentBookings);
+  }, [parentVenues, parentServices, parentBookings]);
+
+  useEffect(() => {
     const item = [...venues, ...services].find(i => i.id === manualBooking.targetId);
     if (manualBooking.bookingMode === 'partial' && item) {
       if (item.catalogue) {
@@ -6273,14 +6279,14 @@ const BookingManagerView = ({
       } as any)));
       
       const sQuery = db.from('service_providers').select('*');
-      if (profile?.role !== 'admin') sQuery.eq('provider_id', user?.uid);
+      if (profile?.role !== 'admin') sQuery.eq('owner_id', user?.uid);
       const { data: sData } = await sQuery;
       if (sData) setServices(sData.map(d => ({ 
         id: d.id, 
         ...d,
         reviewCount: d.review_count,
-        providerId: d.owner_id,
-        serviceType: d.type,
+        ownerId: d.owner_id,
+        serviceType: d.service_type || d.type,
         priceRange: d.price_range
       } as any)));
     };
@@ -6292,7 +6298,6 @@ const BookingManagerView = ({
   }, [user]);
 
   const filteredBookings = bookings.filter(b => {
-    const matchesManual = b.isManual;
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
@@ -6300,7 +6305,7 @@ const BookingManagerView = ({
                          (statusFilter === 'cancelled' && b.status === 'cancelled') ||
                          (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
-    return matchesManual && matchesStatus && matchesDate;
+    return matchesStatus && matchesDate;
   });
 
   const sortedBookings = [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -8715,7 +8720,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
 
-  const visitorBookings = useMemo(() => bookings.filter(b => !b.isManual), [bookings]);
+  const visitorBookings = bookings;
   
   const filteredBookings = useMemo(() => visitorBookings.filter(b => {
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
@@ -12293,7 +12298,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.line(bQrX + qrSize + 6, bQrY + qrSize + 6, bQrX + qrSize + 6, bQrY + qrSize + 6 - brS);
 
       try {
-        const qr = await QRCode.toDataURL(window.location.origin + "/app-rating", { width: 1000, margin: 4 });
+        const qr = await QRCode.toDataURL(window.location.origin + "/#/app-rating", { width: 1000, margin: 4 });
         doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
 
@@ -12963,13 +12968,17 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     if (!url) return;
     setLoading(true);
     try {
-      // Allow multiple photos as requested
+      let finalType = 'image';
+      if (url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+      
       const { error } = await db.from('service_type_photos').insert([{ 
         service_type: newServicePhoto.serviceType, 
-        image_url: url 
+        image_url: finalType === 'image' ? url : null,
+        video_url: finalType === 'video' ? url : null,
+        type: finalType
       }]);
       if (error) throw error;
-      toast.success(`Media added for ${newServicePhoto.serviceType}`);
+      toast.success(`${finalType.toUpperCase()} added for ${newServicePhoto.serviceType}`);
       fetchData();
     } catch (err: any) {
       console.error('Service Photo Save Error:', err);
