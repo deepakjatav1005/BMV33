@@ -2051,6 +2051,7 @@ const DatabaseStatusIndicator = () => {
           <ul className="text-[8px] text-gray-600 list-disc pl-3 space-y-0.5">
             <li>Go to CPanel/Hostinger -&gt; Remote MySQL</li>
             <li>Add <code className="bg-gray-100 px-0.5 rounded">%</code> to whitelist all IPs</li>
+            <li>If that fails, check the server logs (F12 -&gt; Console) for <strong className="text-red-700">WHITELIST THIS IP</strong> and add that specific IP.</li>
             <li>Verify Host, Port, and Credentials</li>
           </ul>
         </div>
@@ -3009,15 +3010,38 @@ const RegistrationView = () => {
         return;
       }
 
-      // Fetch current count for the specific role to generate ID
-      const { count, error: countError } = await db
+      // Fetch the highest registration ID for the specific role to generate next ID
+      // Instead of count, find the max numerical part of existing IDs
+      const { data: usersWithRole, error: roleError } = await db
         .from('users')
-        .select('*', { count: 'exact', head: true })
+        .select('registration_id')
         .eq('role', formData.role);
       
-      if (countError) throw countError;
+      if (roleError) throw roleError;
 
-      const nextNum = (count || 0) + 1;
+      let nextNum = 1;
+      if (usersWithRole && usersWithRole.length > 0) {
+        // Extract numbers and find max
+        const nums = usersWithRole.map(u => {
+          const idStr = u.registration_id || '';
+          const match = idStr.match(/\d+$/);
+          return match ? parseInt(match[0]) : 0;
+        }).filter(n => n > 0);
+        
+        if (nums.length > 0) {
+          const maxNum = Math.max(...nums);
+          if (formData.role === 'owner') {
+            nextNum = (maxNum - 900000) + 1;
+          } else if (formData.role === 'provider') {
+            nextNum = (maxNum - 800000) + 1;
+          } else {
+            nextNum = nums.length + 1;
+          }
+        }
+      }
+
+      if (nextNum <= 0) nextNum = 1;
+
       let regId = '';
       if (formData.role === 'owner') {
         regId = 'BVOVO' + (900000 + nextNum).toString();
@@ -3027,8 +3051,8 @@ const RegistrationView = () => {
         regId = 'UTSAV' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
       }
       
-      // We'll use a dummy UID for this custom auth system or just a random one
-      const uid = 'custom_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      // Use the helper to generate a UUID for better uniqueness
+      const uid = generateUUID();
       
       const profileData: any = {
         uid,
@@ -3037,6 +3061,7 @@ const RegistrationView = () => {
         father_name: formData.fatherName,
         mobile_number: formData.mobileNumber,
         email: formData.email || null,
+        password: formData.mobileNumber, // Set mobile number as initial password
         photo_url: formData.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + regId,
         role: formData.role,
         state: formData.state,
@@ -3051,12 +3076,25 @@ const RegistrationView = () => {
       const { error } = await db.from('users').insert([profileData]);
       if (error) {
         console.error('Registration Error:', error);
-        if (error.message?.includes('column "venue_type" does not exist') || error.message?.includes('schema cache')) {
-          toast.error('Registration failed: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
+        
+        // Comprehensive error handling for duplicate values
+        const errMsg = error.message || String(error);
+        if (errMsg.includes('Duplicate entry')) {
+          if (errMsg.includes('registration_id')) {
+            toast.error('Registration ID conflict. Please try again (the ID will be recalculated).');
+          } else if (errMsg.includes('mobile_number')) {
+            toast.error('This mobile number is already registered.');
+          } else if (errMsg.includes('PRIMARY')) {
+            toast.error('System ID conflict. Please try again.');
+          } else {
+            toast.error(`Duplicate value error: ${errMsg}`);
+          }
+        } else if (errMsg.includes('column "venue_type" does not exist') || errMsg.includes('schema cache')) {
+          toast.error('Registration failed: DB schema outdated. Please run the MASTER SQL SCRIPT migration section.', { duration: 10000 });
         } else {
-          toast.error(`Registration failed: ${error.message || 'Unknown error'}`);
+          toast.error(`Registration failed: ${errMsg}`);
         }
-        throw error;
+        throw new Error(errMsg);
       }
       
       // Send WhatsApp Message (Mocked)

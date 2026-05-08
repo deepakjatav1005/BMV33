@@ -20,16 +20,36 @@ const __dirname = path.dirname(__filename);
 let pool: mysql.Pool;
 let isDbHealthy = true;
 let lastDbCheck = 0;
+let lastOutboundIp = "Checking...";
 const DB_CHECK_INTERVAL = 5000; // Check every 5s if requested
+
+async function getOutboundIp() {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (err) {
+    console.error(">>> [NETWORK] Failed to fetch outbound IP");
+    return "Error fetching IP";
+  }
+}
 
 async function checkDbHealth(force = false) {
   const now = Date.now();
+  
+  if (force || lastOutboundIp === "Checking...") {
+    lastOutboundIp = await getOutboundIp();
+    console.log(">>> [NETWORK] Current Outbound IP:", lastOutboundIp);
+  }
+
   if (!force && now - lastDbCheck < DB_CHECK_INTERVAL) return isDbHealthy;
   
   lastDbCheck = now;
   try {
     console.log(">>> [HEALTH CHECK] Testing MySQL connection...");
+    // Use a quick query to test connection
     const connection = await pool.getConnection();
+    await connection.query('SELECT 1');
     connection.release();
     console.log(">>> [HEALTH CHECK] Connection successful.");
     isDbHealthy = true;
@@ -42,6 +62,7 @@ async function checkDbHealth(force = false) {
       console.error(">>> [CRITICAL ADVICE] Your MySQL host is not responding. This is 99% a Firewall/IP whitelisting issue.");
       console.error(">>> [ACTION REQUIRED] Go to your Hosting Panel (Hostinger/CPanel) -> Remote MySQL -> Add '%' as an allowed host.");
       console.error(">>> [CURRENT_HOST]:", process.env.MYSQL_HOST);
+      console.error(">>> [WHITELIST THIS IP]:", lastOutboundIp);
     }
     
     console.warn(">>> [HEALTH CHECK] MySQL Database is unreachable. Enabling fail-fast mode.");
@@ -195,13 +216,14 @@ async function startServer() {
           status: "error",
           database: "MySQL Unreachable",
           host: maskedHost,
+          outbound_ip: lastOutboundIp,
           error_code: "ETIMEDOUT",
           troubleshooting: [
-            "1. Ensure Remote MySQL access is enabled in your CPanel/Hostinger dashboard.",
-            "2. Add '%' (percent symbol) to the list of allowed hosts in 'Remote MySQL'.",
-            "3. Double-check that MYSQL_HOST is the correct DB server address - some hosts use a separate hostname like 'sql123.hostinger.com' instead of the website IP.",
-            "4. Verify that MYSQL_PORT (usually 3306) and credentials are correct.",
-            "5. If using a firewall (CSF/LFD), ensure port 3306 outbound is allowed."
+            "1. Double-check that '%' is whitelisted in Hostinger/CPanel Remote MySQL.",
+            `2. If '%' doesn't work, try whitelisting specific IP: ${lastOutboundIp}`,
+            "3. Ensure your DB user has permissions for the specific database.",
+            "4. Verify if your host requires SSL (some do). If so, set MYSQL_SSL=true.",
+            "5. Make sure the port is actually 3306."
           ],
           timestamp: new Date().toISOString()
         });
@@ -210,6 +232,7 @@ async function startServer() {
         status: "ok", 
         database: "MySQL Connected",
         host: maskedHost,
+        outbound_ip: lastOutboundIp,
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
@@ -240,6 +263,7 @@ async function startServer() {
     try {
       // Auto-stringify arrays/objects for MySQL
       const prepareData = (d: any) => {
+        if (!d) return d;
         const prepared = { ...d };
         for (const key in prepared) {
           if (prepared[key] !== null && typeof prepared[key] === 'object') {
@@ -280,6 +304,7 @@ async function startServer() {
           sql += ` LIMIT ${Number(limit)}`;
         }
 
+        console.log(`>>> [SQL] SELECT on ${table}`);
         const [rows]: any = await pool.query(sql, params);
         
         // Parse JSON strings back to objects
@@ -300,17 +325,30 @@ async function startServer() {
       }
 
       if (method === 'INSERT') {
-        const pd = prepareData(data);
-        const columns = Object.keys(pd).map(c => `\`${c}\``).join(', ');
-        const placeholders = Object.keys(pd).map(() => '?').join(', ');
-        const values = Object.values(pd);
+        const items = Array.isArray(data) ? data : [data];
+        if (items.length === 0) return res.json({ data: [], error: null });
+
+        // Assume all items have the same keys (standard for bulk inserts)
+        const sample = items[0];
+        const columns = Object.keys(sample).map(c => `\`${c}\``).join(', ');
+        const placeholders = `(${Object.keys(sample).map(() => '?').join(', ')})`;
+        const allPlaceholders = items.map(() => placeholders).join(', ');
         
+        const allValues: any[] = [];
+        items.forEach(item => {
+          const prepared = prepareData(item);
+          Object.keys(sample).forEach(key => {
+            allValues.push(prepared[key]);
+          });
+        });
+
+        console.log(`>>> [SQL] INSERT into ${table} (${items.length} items)`);
         const [result]: any = await pool.query(
-          `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders})`,
-          values
+          `INSERT INTO \`${table}\` (${columns}) VALUES ${allPlaceholders}`,
+          allValues
         );
         
-        return res.json({ data: { id: result.insertId, ...data }, error: null });
+        return res.json({ data: items.length === 1 ? { id: result.insertId, ...items[0] } : items, error: null });
       }
 
       if (method === 'UPDATE') {
@@ -328,20 +366,33 @@ async function startServer() {
           }).join(" AND ");
         }
 
+        console.log(`>>> [SQL] UPDATE on ${table}`);
         await pool.query(sql, [...values, ...filterParams]);
         return res.json({ data: null, error: null });
       }
 
       if (method === 'UPSERT') {
-        const pd = prepareData(data);
-        const columns = Object.keys(pd).map(c => `\`${c}\``).join(', ');
-        const placeholders = Object.keys(pd).map(() => '?').join(', ');
-        const updates = Object.keys(pd).map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
-        const values = Object.values(pd);
+        const items = Array.isArray(data) ? data : [data];
+        if (items.length === 0) return res.json({ data: [], error: null });
+
+        const sample = items[0];
+        const columns = Object.keys(sample).map(c => `\`${c}\``).join(', ');
+        const placeholders = `(${Object.keys(sample).map(() => '?').join(', ')})`;
+        const allPlaceholders = items.map(() => placeholders).join(', ');
+        const updates = Object.keys(sample).map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
         
+        const allValues: any[] = [];
+        items.forEach(item => {
+          const prepared = prepareData(item);
+          Object.keys(sample).forEach(key => {
+            allValues.push(prepared[key]);
+          });
+        });
+
+        console.log(`>>> [SQL] UPSERT on ${table} (${items.length} items)`);
         await pool.query(
-          `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updates}`,
-          [...values]
+          `INSERT INTO \`${table}\` (${columns}) VALUES ${allPlaceholders} ON DUPLICATE KEY UPDATE ${updates}`,
+          allValues
         );
         
         return res.json({ data: data, error: null });
@@ -409,18 +460,22 @@ async function startServer() {
   }
   app.use("/uploads", express.static(uploadDir));
 
+  // ESM Interop for multer
+  const multerLib = (multer as any).default || multer;
+
   // Modified storage to handle relative paths if we want to support subbundles
-  const storage = (multer as any).diskStorage({
+  const storage = multerLib.diskStorage({
     destination: (req: any, file: any, cb: any) => {
-      // Check if the request has a 'path' field to determine subdirectory
-      const requestedPath = req.body.path || "";
+      let requestedPath = req.body.path || "";
       let targetDir = uploadDir;
       
       if (requestedPath) {
-        // Extract directory part of the path
+        // Strip potential 'uploads/' or '/uploads/' prefix
+        requestedPath = requestedPath.replace(/^(\/?uploads\/)/, '');
+        
         const subDir = path.dirname(requestedPath);
-        if (subDir !== ".") {
-          targetDir = path.join(uploadDir, subDir);
+        if (subDir !== "." && subDir !== "/" && subDir !== "\\") {
+          targetDir = path.resolve(uploadDir, subDir);
           if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
           }
@@ -429,9 +484,9 @@ async function startServer() {
       cb(null, targetDir);
     },
     filename: (req: any, file: any, cb: any) => {
-      const requestedPath = req.body.path || "";
+      let requestedPath = req.body.path || "";
       if (requestedPath) {
-        // Use the basename of the requested path
+        requestedPath = requestedPath.replace(/^(\/?uploads\/)/, '');
         cb(null, path.basename(requestedPath));
       } else {
         const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -439,15 +494,16 @@ async function startServer() {
       }
     }
   });
-  const upload = (multer as any)({ storage });
+  const uploadMiddleware = multerLib({ storage });
 
-  app.post("/api/storage/upload", upload.single("file"), (req: any, res: any) => {
+  app.post("/api/storage/upload", uploadMiddleware.single("file"), (req: any, res: any) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
     // Get the relative path from the uploads directory
     const relativePath = path.relative(uploadDir, req.file.path).replace(/\\/g, '/');
     const publicUrl = `/uploads/${relativePath}`;
     
+    console.log(`>>> [STORAGE] Uploaded: ${relativePath} -> ${publicUrl}`);
     res.json({ data: { path: relativePath, publicUrl }, error: null });
   });
 
