@@ -7478,7 +7478,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 
   useEffect(() => {
     if (selectedId) {
-      const url = `${window.location.origin}${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
+      const url = `${window.location.origin}/#${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
       QRCode.toDataURL(url, { 
         width: 600, 
         margin: 2,
@@ -7890,11 +7890,16 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   const fetchDashboardData = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      let bQuery = db.from('bookings').select('*, booking_payments(*)');
-      if (profile?.role !== 'admin') {
-        bQuery = bQuery.or(`user_id.eq.${user?.uid},owner_id.eq.${user?.uid}`);
+      let bData: any[] = [];
+      if (profile?.role === 'admin') {
+        const { data } = await db.from('bookings').select('*, booking_payments(*)');
+        bData = data || [];
+      } else {
+        const { data: cb } = await db.from('bookings').select('*, booking_payments(*)').eq('user_id', user?.uid);
+        const { data: pb } = await db.from('bookings').select('*, booking_payments(*)').eq('owner_id', user?.uid);
+        const combined = [...(cb || []), ...(pb || [])];
+        bData = combined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
       }
-      const { data: bData } = await bQuery;
       
       if (bData) {
         setBookings(bData.map(d => ({
@@ -9932,11 +9937,13 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
       const { error } = await db.from('service_providers').insert([{
         id: generateUUID(),
         name: formData.name,
+        type: formData.serviceType,
         service_type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
         images: formData.images.filter(i => i !== ''),
+        city: formData.city,
         video_url: formData.video_url,
         facilities: formData.facilities,
         facility_details: formData.facilityDetails,
@@ -10169,11 +10176,13 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
     try {
       const { error } = await db.from('service_providers').update({
         name: formData.name,
+        type: formData.serviceType,
         service_type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
         images: formData.images,
+        city: formData.city,
         video_url: formData.video_url,
         available_for: formData.availableFor,
         facilities: formData.facilities,
@@ -10397,6 +10406,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
     try {
       const { error } = await db.from('venues').update({
         name: formData.name,
+        type: formData.venueType,
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
@@ -10404,6 +10414,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
         capacity: formData.capacity,
         price_per_day: formData.pricePerDay,
         images: formData.images,
+        city: formData.city,
         video_url: formData.video_url,
         facilities: formData.facilities,
         facility_details: formData.facilityDetails,
@@ -10840,6 +10851,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
       const { error } = await db.from('venues').insert([{
         id: generateUUID(),
         name: formData.name,
+        type: formData.venueType,
         venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
@@ -13703,6 +13715,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       <p className="text-sm font-bold text-orange-600">Selected Category: <span className="uppercase">{newServicePhoto.serviceType}</span></p>
                       <ImageUpload 
                         label="Upload Photo or GIF" 
+                        multiple={true}
                         onUpload={(url) => handleAddServicePhotoUrl(url, 'image')} 
                       />
                     </div>

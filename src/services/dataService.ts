@@ -362,6 +362,10 @@ const mysqlDataService = {
         filters.push({ col, op: 'eq', val });
         return builder;
       },
+      or: (condition: string) => {
+        filters.push({ op: 'or', val: condition });
+        return builder;
+      },
       neq: (col: string, val: any) => {
         filters.push({ col, op: 'neq', val });
         return builder;
