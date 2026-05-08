@@ -3043,12 +3043,13 @@ const RegistrationView = () => {
       if (nextNum <= 0) nextNum = 1;
 
       let regId = '';
+      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       if (formData.role === 'owner') {
-        regId = 'BVOVO' + (900000 + nextNum).toString();
+        regId = 'BVOVO' + (900000 + nextNum).toString() + randomSuffix;
       } else if (formData.role === 'provider') {
-        regId = 'BVOSP' + (800000 + nextNum).toString();
+        regId = 'BVOSP' + (800000 + nextNum).toString() + randomSuffix;
       } else {
-        regId = 'UTSAV' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+        regId = 'UTSAV' + Date.now().toString().slice(-6) + randomSuffix;
       }
       
       // Use the helper to generate a UUID for better uniqueness
@@ -3947,7 +3948,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
         if (vData) setFeaturedVenues(vData.map(d => ({ 
           ...d, 
           ownerId: d.owner_id, 
-          venueType: d.type, 
+          venueType: d.venue_type || d.type, 
           pricePerDay: d.price_per_day, 
           rating: d.rating || 0,
           reviewCount: d.review_count || 0,
@@ -3957,8 +3958,8 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
         const { data: sData } = await db.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
         if (sData) setFeaturedServices(sData.map(d => ({ 
           ...d, 
-          providerId: d.owner_id, 
-          serviceType: d.type, 
+          ownerId: d.owner_id, 
+          serviceType: d.service_type || d.type, 
           priceRange: d.price_range, 
           rating: d.rating || 0,
           reviewCount: d.review_count || 0,
@@ -5310,8 +5311,8 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
     if (!error && data) {
       setService({
         ...data,
-        providerId: data.provider_id,
-        serviceType: data.service_type,
+        ownerId: data.owner_id || data.provider_id,
+        serviceType: data.service_type || data.type,
         priceRange: data.price_range,
         reviewCount: data.review_count,
         availableFor: data.available_for,
@@ -5324,22 +5325,23 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       } as ServiceProvider);
 
       // Fetch provider profile
+      const ownerId = data.owner_id || data.provider_id;
       const { data: userData } = await db
         .from('users')
         .select('*')
-        .eq('uid', data.provider_id)
+        .eq('uid', ownerId)
         .single();
       if (userData) setProviderProfile(userData);
 
       // Fetch stats
       const [vCount, sCount, bCount, pCount] = await Promise.all([
-        db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.provider_id),
-        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.provider_id),
+        db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId),
+        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId),
         db.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('owner_id', data.provider_id)
+          .eq('owner_id', ownerId)
           .in('status', ['completed', 'paid', 'confirmed', 'approved']),
         db.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('owner_id', data.provider_id)
+          .eq('owner_id', ownerId)
           .eq('status', 'pending')
       ]);
 
@@ -7938,7 +7940,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         setVenues(vData.map(d => ({
           ...d,
           ownerId: d.owner_id,
-          venueType: d.type,
+          venueType: d.venue_type || d.type,
           pricePerDay: d.price_per_day,
           availableFor: d.available_for || [],
           catalogue: d.catalogue || [],
@@ -7956,8 +7958,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       if (sData) {
         setServices(sData.map(d => ({
           ...d,
-          providerId: d.owner_id,
-          serviceType: d.type,
+          ownerId: d.owner_id,
+          serviceType: d.service_type || d.type,
           priceRange: d.price_range,
           priceLevel: d.price_level,
           availableFor: d.available_for || [],
@@ -10139,8 +10141,8 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
         }
         setFormData({
           ...data,
-          ownerId: data.owner_id,
-          serviceType: data.type,
+          ownerId: data.owner_id || data.provider_id,
+          serviceType: data.service_type || data.type,
           priceRange: data.price_range,
           priceLevel: data.price_level || 'per day',
           video_url: data.video_url || '',
@@ -10162,7 +10164,7 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
     try {
       const { error } = await db.from('service_providers').update({
         name: formData.name,
-        type: formData.serviceType,
+        service_type: formData.serviceType,
         description: formData.description,
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
@@ -10390,7 +10392,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
     try {
       const { error } = await db.from('venues').update({
         name: formData.name,
-        type: formData.venueType,
+        venue_type: formData.venueType,
         description: formData.description,
         address: formData.address,
         pincode: formData.pincode,
@@ -11188,9 +11190,10 @@ const SearchResultsView = () => {
       // Process Services including Synth
       let sData = servicesData.map(d => ({
         id: d.id,
-        providerId: d.owner_id,
+        ownerId: d.owner_id || d.provider_id,
+        providerId: d.owner_id || d.provider_id,
         name: d.name,
-        serviceType: d.type,
+        serviceType: d.service_type || d.type,
         state: d.state,
         district: d.district,
         block: d.block,
@@ -12960,23 +12963,13 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     if (!url) return;
     setLoading(true);
     try {
-      // Check if photo for this type already exists to offer "Update" logic
-      // But typically we can just add multiple. The user however said "update"
-      // So let's check for existing and update if found, or just insert
-      const { data: existing } = await db.from('service_type_photos').select('id').eq('service_type', newServicePhoto.serviceType).maybeSingle();
-      
-      if (existing) {
-        const { error } = await db.from('service_type_photos').update({ image_url: url }).eq('id', existing.id);
-        if (error) throw error;
-        toast.success(`Media updated for ${newServicePhoto.serviceType}`);
-      } else {
-        const { error } = await db.from('service_type_photos').insert([{ 
-          service_type: newServicePhoto.serviceType, 
-          image_url: url 
-        }]);
-        if (error) throw error;
-        toast.success(`Media added for ${newServicePhoto.serviceType}`);
-      }
+      // Allow multiple photos as requested
+      const { error } = await db.from('service_type_photos').insert([{ 
+        service_type: newServicePhoto.serviceType, 
+        image_url: url 
+      }]);
+      if (error) throw error;
+      toast.success(`Media added for ${newServicePhoto.serviceType}`);
       fetchData();
     } catch (err: any) {
       console.error('Service Photo Save Error:', err);
@@ -14000,24 +13993,51 @@ CREATE TABLE IF NOT EXISTS public.venues (
     owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
-    type TEXT,
+    venue_type TEXT,
     capacity INTEGER,
     price_per_day NUMERIC,
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    images TEXT[],
+    video_url TEXT,
+    address TEXT,
+    pincode TEXT,
+    state TEXT,
+    district TEXT,
+    block TEXT,
+    facilities TEXT[],
+    facility_details JSONB,
+    available_for TEXT[],
+    site_levels TEXT[],
+    latitude NUMERIC,
+    longitude NUMERIC,
+    catalogue TEXT[]
 );
 
 CREATE TABLE IF NOT EXISTS public.service_providers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    type TEXT,
+    service_type TEXT,
     description TEXT,
     price_range TEXT,
+    price_level TEXT,
     rating NUMERIC DEFAULT 0,
     review_count INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    images TEXT[],
+    video_url TEXT,
+    pincode TEXT,
+    state TEXT,
+    district TEXT,
+    block TEXT,
+    facilities TEXT[],
+    facility_details JSONB,
+    available_for TEXT[],
+    latitude NUMERIC,
+    longitude NUMERIC,
+    catalogue TEXT[]
 );
 
 CREATE TABLE IF NOT EXISTS public.bookings (
@@ -14388,9 +14408,10 @@ const ServiceListView = ({ user }: { user: any }) => {
 
       let data = servicesData.map(d => ({
         id: d.id,
-        providerId: d.owner_id,
+        ownerId: d.owner_id || d.provider_id,
+        providerId: d.owner_id || d.provider_id,
         name: d.name,
-        serviceType: d.type,
+        serviceType: d.service_type || d.type,
         state: d.state,
         district: d.district,
         block: d.block,

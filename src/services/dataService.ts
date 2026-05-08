@@ -80,7 +80,15 @@ const mockDataService = {
         eq: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] === val), options),
         neq: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] !== val), options),
         in: (col: string, vals: any[]) => createQueryBuilder(data.filter(item => vals.includes(item[col])), options),
-        or: (query: string) => builder, // Mock or
+        gte: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] >= val), options),
+        gt: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] > val), options),
+        lte: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] <= val), options),
+        lt: (col: string, val: any) => createQueryBuilder(data.filter(item => item[col] < val), options),
+        like: (col: string, val: string) => {
+          const pattern = new RegExp(val.replace(/%/g, '.*'), 'i');
+          return createQueryBuilder(data.filter(item => pattern.test(String(item[col]))), options);
+        },
+        or: (query: string) => builder, // Mock or remains simplified or improved if needed
         single: () => Promise.resolve({ data: data[0] || null, error: null }),
         maybeSingle: () => Promise.resolve({ data: data[0] || null, error: null }),
         then: (onfulfilled: any) => {
@@ -311,6 +319,14 @@ const mysqlDataService = {
           if (f.op === 'eq') builder.eq(f.col, f.val);
           else if (f.op === 'neq') builder.neq(f.col, f.val);
           else if (f.op === 'in') builder.in(f.col, f.val);
+          else if (f.op === 'gte') builder.data = builder.data.filter((item: any) => item[f.col] >= f.val);
+          else if (f.op === 'gt') builder.data = builder.data.filter((item: any) => item[f.col] > f.val);
+          else if (f.op === 'lte') builder.data = builder.data.filter((item: any) => item[f.col] <= f.val);
+          else if (f.op === 'lt') builder.data = builder.data.filter((item: any) => item[f.col] < f.val);
+          else if (f.op === 'like') builder.data = builder.data.filter((item: any) => {
+            const pattern = new RegExp(String(f.val).replace(/%/g, '.*'), 'i');
+            return pattern.test(String(item[f.col]));
+          });
         });
         return builder;
       }
@@ -352,6 +368,26 @@ const mysqlDataService = {
       },
       in: (col: string, vals: any[]) => {
         filters.push({ col, op: 'in', val: vals });
+        return builder;
+      },
+      gte: (col: string, val: any) => {
+        filters.push({ col, op: 'gte', val });
+        return builder;
+      },
+      gt: (col: string, val: any) => {
+        filters.push({ col, op: 'gt', val });
+        return builder;
+      },
+      lte: (col: string, val: any) => {
+        filters.push({ col, op: 'lte', val });
+        return builder;
+      },
+      lt: (col: string, val: any) => {
+        filters.push({ col, op: 'lt', val });
+        return builder;
+      },
+      like: (col: string, val: any) => {
+        filters.push({ col, op: 'like', val });
         return builder;
       },
       single: async () => {

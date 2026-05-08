@@ -279,7 +279,26 @@ async function startServer() {
         const params: any[] = [];
         
         if (filters && filters.length > 0) {
-          sql += " WHERE " + filters.map((f: any) => {
+          const whereClauses = filters.map((f: any) => {
+            if (f.op === 'or') {
+              const parts = f.val.split(',');
+              const orClauses = parts.map((part: string) => {
+                const pieces = part.split('.');
+                const col = pieces[0];
+                const op = pieces[1];
+                const val = pieces.slice(2).join('.');
+                params.push(val);
+                const mysqlOp = op === 'eq' ? '=' : 
+                               op === 'neq' ? '!=' :
+                               op === 'gt' ? '>' :
+                               op === 'gte' ? '>=' :
+                               op === 'lt' ? '<' :
+                               op === 'lte' ? '<=' :
+                               op === 'like' ? 'LIKE' : '=';
+                return `\`${col}\` ${mysqlOp} ?`;
+              });
+              return `(${orClauses.join(' OR ')})`;
+            }
             if (f.op === 'eq') {
               params.push(f.val);
               return `\`${f.col}\` = ?`;
@@ -288,12 +307,34 @@ async function startServer() {
               params.push(f.val);
               return `\`${f.col}\` != ?`;
             }
+            if (f.op === 'gt') {
+              params.push(f.val);
+              return `\`${f.col}\` > ?`;
+            }
+            if (f.op === 'gte') {
+              params.push(f.val);
+              return `\`${f.col}\` >= ?`;
+            }
+            if (f.op === 'lt') {
+              params.push(f.val);
+              return `\`${f.col}\` < ?`;
+            }
+            if (f.op === 'lte') {
+              params.push(f.val);
+              return `\`${f.col}\` <= ?`;
+            }
+            if (f.op === 'like') {
+              params.push(f.val);
+              return `\`${f.col}\` LIKE ?`;
+            }
             if (f.op === 'in') {
+              if (!Array.isArray(f.val) || f.val.length === 0) return "1=0";
               params.push(...f.val);
               return `\`${f.col}\` IN (${f.val.map(() => '?').join(',')})`;
             }
             return "1=1";
-          }).join(" AND ");
+          });
+          sql += " WHERE " + whereClauses.join(" AND ");
         }
 
         if (order && order.col) {
