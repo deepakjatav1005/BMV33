@@ -12,84 +12,49 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const rawUrl = supabaseUrl && supabaseUrl !== 'undefined' ? supabaseUrl : undefined;
 const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnonKey : undefined;
 
-// Initialize real Supabase if keys are present
-let supabaseInstance: any = null;
+// Initialize real Database if keys or health check passed
 let forceOffline = false;
-
-const initSupabase = () => {
-  if (rawUrl && rawKey && rawUrl.startsWith('http')) {
-    try {
-      // Validate URL format
-      new URL(rawUrl);
-      
-      return createClient(rawUrl, rawKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      });
-    } catch (err) {
-      console.error('❌ Invalid Supabase URL configuration:', err);
-      return null;
-    }
-  }
-  return null;
-};
-
-supabaseInstance = initSupabase();
 
 export const setOfflineMode = (offline: boolean) => {
   forceOffline = offline;
+  if (typeof window !== 'undefined') (window as any).forceOffline = offline;
   if (offline) {
     console.warn('📡 App is now running in OFFLINE MODE (Mock Data)');
   } else {
-    console.log('📡 App is attempting to run in ONLINE MODE (Supabase)');
+    console.log('📡 App is attempting to run in ONLINE MODE (MySQL)');
   }
 };
 
-export const getIsOffline = () => forceOffline || !supabaseInstance;
+export const getIsOffline = () => forceOffline;
 
 export const checkConnection = async () => {
-  if (!supabaseInstance || forceOffline) return false;
   try {
-    const { error } = await supabaseInstance.from('users').select('count', { count: 'exact', head: true });
-    if (error) {
-      // Treat network errors as disconnection
-      if (error.message?.includes('fetch') || error.message?.includes('Network')) {
-        return false;
-      }
+    const response = await fetch('/api/health');
+    const contentType = response.headers.get('content-type');
+    
+    if (!response.ok || !contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.warn('[DATABASE] Health check failed or returned non-JSON:', text.slice(0, 50));
       return false;
     }
-    return true;
+    const result = await response.json();
+    const healthy = result.status === 'ok';
+    if (healthy) setOfflineMode(false);
+    return healthy;
   } catch (err) {
     console.error('[DATABASE] Connection check error:', err);
     return false;
   }
 };
 
-if (supabaseInstance) {
-  console.log('✅ Supabase initialized successfully.');
-  checkConnection().then(connected => {
-    if (connected) console.log('📡 Live connection to Supabase active.');
-    else console.error('❌ Supabase Connection Failed (Network or Keys)');
-  });
-} else {
-  console.warn('⚠️ Supabase URL or Anon Key is missing or invalid!');
-  console.warn('VITE_SUPABASE_URL:', supabaseUrl ? 'Defined' : 'MISSING');
-  console.warn('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Defined' : 'MISSING');
-  console.info('Falling back to LocalStorage Mock Data Service.');
-  
-  if (typeof window !== 'undefined') {
-    // Expose keys status for debugging
-    (window as any).__SUPABASE_DEBUG__ = {
-      urlPresent: !!supabaseUrl,
-      keyPresent: !!supabaseAnonKey,
-      hostname: window.location.hostname,
-      protocol: window.location.protocol
-    };
+// Start connection check
+checkConnection().then(connected => {
+  if (connected) {
+    console.log('✅ Database connection verified.');
+  } else {
+    console.warn('⚠️ Database connection could not be verified. Some features may use mock data.');
   }
-}
+});
 
 const getLocalData = () => {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -265,7 +230,7 @@ const mysqlDataService = {
     let limitVal: number | null = null;
     let orderVal: any = null;
 
-    const execute = async (method: string, data?: any) => {
+    const execute = async (method: string, data?: any, retryCount = 0) => {
       try {
         const response = await fetch(`/api/db/${table}/query`, {
           method: 'POST',
@@ -280,17 +245,37 @@ const mysqlDataService = {
           })
         });
 
+        const contentType = response.headers.get('content-type');
+        const isJson = contentType && contentType.includes('application/json');
+
         // Handle non-OK responses from the server
-        if (!response.ok) {
-          const errorResult = await response.json().catch(() => ({ error: 'Unknown server error' }));
+        if (!response.ok || !isJson) {
+          const text = await response.text();
+          let errorResult: any = { error: 'Unknown server error' };
+          
+          if (isJson) {
+            try {
+              errorResult = JSON.parse(text);
+            } catch (e) {
+              errorResult = { error: text.slice(0, 100) };
+            }
+          } else {
+            errorResult = { error: `Server returned non-JSON (${response.status}): ${text.slice(0, 50)}` };
+          }
           
           // Detect database connection errors (like ETIMEDOUT, ECONNREFUSED)
-          const dbErrorKeywords = ['connect', 'ETIMEDOUT', 'ECONNREFUSED', 'ER_ACCESS_DENIED_ERROR', 'database', 'MySQL Disconnected'];
+          const dbErrorKeywords = ['connect', 'ETIMEDOUT', 'ECONNREFUSED', 'ER_ACCESS_DENIED_ERROR', 'database', 'MySQL Disconnected', '503'];
           const isDbError = typeof errorResult.error === 'string' && 
                           dbErrorKeywords.some(k => errorResult.error.toLowerCase().includes(k.toLowerCase()));
 
-          if (isDbError || response.status === 503) {
-            console.warn(`📡 Detected MySQL Connection Failure (${errorResult.error}). Switching to OFFLINE MOCK DATA.`);
+          if (isDbError || response.status === 503 || !isJson) {
+            if (retryCount < 2) {
+              console.log(`📡 DB Busy/Fallback. Retrying... (${retryCount + 1}/2)`);
+              await new Promise(r => setTimeout(r, 1000));
+              return execute(method, data, retryCount + 1);
+            }
+            
+            console.warn(`📡 Backend/DB Failure persisted. Falling back to Local Mock Data.`);
             setOfflineMode(true);
             return handleOfflineFallback(method, data);
           }
@@ -299,6 +284,7 @@ const mysqlDataService = {
         }
 
         const result = await response.json();
+
         if (result.error && typeof result.error === 'string') {
           result.error = { message: result.error };
         }
@@ -546,8 +532,8 @@ const mysqlDataService = {
   }
 };
 
-export const supabase = null; // No longer using direct Supabase
-export const isSupabaseConnected = true; // Pretend we are connected to our new MySQL backend
+export const supabase = null;
+export const isSupabaseConnected = true; 
 
 // Proxy the dataService to allow runtime switching between MySQL/Mock modes
 export const dataService = new Proxy({} as any, {

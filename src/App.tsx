@@ -5,343 +5,200 @@
 
 /*
   =============================================================================
-  MASTER SQL SCRIPT FOR SUPABASE (Execute in Supabase SQL Editor):
+  MASTER SQL SCRIPT FOR MYSQL (Execute in PHPMyAdmin or MySQL Query Editor):
   =============================================================================
-  -- ENABLE UUID EXTENSION
-  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
+  
   -- 1. Users Table
-  CREATE TABLE IF NOT EXISTS public.users (
-      uid TEXT PRIMARY KEY,
-      registration_id TEXT UNIQUE,
-      display_name TEXT,
-      father_name TEXT,
-      mobile_number TEXT UNIQUE,
-      email TEXT,
+  CREATE TABLE IF NOT EXISTS users (
+      uid VARCHAR(255) PRIMARY KEY,
+      registration_id VARCHAR(255) UNIQUE,
+      display_name VARCHAR(255),
+      father_name VARCHAR(255),
+      mobile_number VARCHAR(20) UNIQUE,
+      email VARCHAR(255),
       photo_url TEXT,
-      role TEXT,
-      state TEXT,
-      district TEXT,
-      block TEXT,
-      pincode TEXT,
-      venue_type TEXT, -- Added for owners
-      status TEXT DEFAULT 'active',
-      password TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      role VARCHAR(50),
+      state VARCHAR(100),
+      district VARCHAR(100),
+      block VARCHAR(100),
+      pincode VARCHAR(10),
+      venue_type VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'active',
+      password VARCHAR(255),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 2. Venues Table
-  CREATE TABLE IF NOT EXISTS public.venues (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      owner_id TEXT,
-      name TEXT,
-      venue_type TEXT,
+  CREATE TABLE IF NOT EXISTS venues (
+      id CHAR(36) PRIMARY KEY,
+      owner_id VARCHAR(255),
+      name VARCHAR(255),
+      venue_type VARCHAR(100),
       description TEXT,
       address TEXT,
-      state TEXT,
-      district TEXT,
-      block TEXT,
-      pincode TEXT,
-      capacity INTEGER,
-      price_per_day NUMERIC,
-      images TEXT[],
-      video_url TEXT, -- Added video support
-      facilities TEXT[],
-      available_for TEXT[],
-      rating NUMERIC(3,1) DEFAULT 0,
-      review_count INTEGER DEFAULT 0,
-      catalogue JSONB DEFAULT '[]',
-      facility_details JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      state VARCHAR(100),
+      district VARCHAR(100),
+      block VARCHAR(100),
+      pincode VARCHAR(10),
+      capacity INT,
+      price_per_day DECIMAL(10,2),
+      images JSON,
+      video_url TEXT,
+      facilities JSON,
+      available_for JSON,
+      rating DECIMAL(3,1) DEFAULT 0,
+      review_count INT DEFAULT 0,
+      catalogue JSON,
+      facility_details JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 3. Service Providers Table
-  CREATE TABLE IF NOT EXISTS public.service_providers (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      provider_id TEXT,
-      name TEXT,
-      service_type TEXT,
+  CREATE TABLE IF NOT EXISTS service_providers (
+      id CHAR(36) PRIMARY KEY,
+      provider_id VARCHAR(255),
+      name VARCHAR(255),
+      service_type VARCHAR(100),
       description TEXT,
-      price_range TEXT,
-      price_level TEXT,
-      images TEXT[],
-      video_url TEXT, -- Added video support
-      facilities TEXT[],
-      available_for TEXT[],
-      state TEXT,
-      district TEXT,
-      block TEXT,
-      pincode TEXT,
-      rating NUMERIC(3,1) DEFAULT 0,
-      review_count INTEGER DEFAULT 0,
-      catalogue JSONB DEFAULT '[]',
-      facility_details JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      price_range VARCHAR(100),
+      price_level VARCHAR(50),
+      images JSON,
+      video_url TEXT,
+      facilities JSON,
+      available_for JSON,
+      state VARCHAR(100),
+      district VARCHAR(100),
+      block VARCHAR(100),
+      pincode VARCHAR(10),
+      rating DECIMAL(3,1) DEFAULT 0,
+      review_count INT DEFAULT 0,
+      catalogue JSON,
+      facility_details JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 4. Bookings Table
-  CREATE TABLE IF NOT EXISTS public.bookings (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id TEXT,
-      owner_id TEXT,
-      target_id UUID,
-      target_type TEXT,
-      target_name TEXT,
-      visitor_name TEXT,
-      visitor_mobile TEXT,
+  CREATE TABLE IF NOT EXISTS bookings (
+      id CHAR(36) PRIMARY KEY,
+      user_id VARCHAR(255),
+      owner_id VARCHAR(255),
+      target_id CHAR(36),
+      target_type VARCHAR(50),
+      target_name VARCHAR(255),
+      visitor_name VARCHAR(255),
+      visitor_mobile VARCHAR(20),
       event_date DATE,
       end_date DATE,
       start_time TIME,
       end_time TIME,
-      event_type TEXT,
-      party_name TEXT,
+      event_type VARCHAR(100),
+      party_name VARCHAR(255),
       party_address TEXT,
       message TEXT,
-      status TEXT DEFAULT 'pending',
-      total_amount NUMERIC DEFAULT 0,
-      updated_amount NUMERIC,
-      payment_mode TEXT DEFAULT 'Cash',
-      payment_status TEXT DEFAULT 'Unpaid',
-      transaction_id TEXT,
+      status VARCHAR(50) DEFAULT 'pending',
+      total_amount DECIMAL(10,2) DEFAULT 0,
+      updated_amount DECIMAL(10,2),
+      payment_mode VARCHAR(50) DEFAULT 'Cash',
+      payment_status VARCHAR(50) DEFAULT 'Unpaid',
+      transaction_id VARCHAR(255),
       is_invoice_generated BOOLEAN DEFAULT FALSE,
       invoice_url TEXT,
       is_manual BOOLEAN DEFAULT FALSE,
-      extra_services JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      extra_services JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 5. App Feedback Table
-  CREATE TABLE IF NOT EXISTS public.app_feedback (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id TEXT,
-      user_name TEXT,
-      visitor_mobile TEXT,
-      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  CREATE TABLE IF NOT EXISTS app_feedback (
+      id CHAR(36) PRIMARY KEY,
+      user_id VARCHAR(255),
+      user_name VARCHAR(255),
+      visitor_mobile VARCHAR(20),
+      rating INT,
       comment TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 6. Reviews Table
-  CREATE TABLE IF NOT EXISTS public.reviews (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      target_id UUID NOT NULL,
-      user_id TEXT,
-      visitor_name TEXT,
-      visitor_mobile TEXT,
-      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  CREATE TABLE IF NOT EXISTS reviews (
+      id CHAR(36) PRIMARY KEY,
+      target_id CHAR(36) NOT NULL,
+      user_id VARCHAR(255),
+      visitor_name VARCHAR(255),
+      visitor_mobile VARCHAR(20),
+      rating INT,
       comment TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 7. Subscription Plans
-  CREATE TABLE IF NOT EXISTS public.subscription_plans (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      role TEXT,
-      name TEXT,
-      price NUMERIC,
-      duration TEXT,
+  CREATE TABLE IF NOT EXISTS subscription_plans (
+      id CHAR(36) PRIMARY KEY,
+      role VARCHAR(50),
+      name VARCHAR(255),
+      price DECIMAL(10,2),
+      duration VARCHAR(50),
       is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      benefits JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-  -- Ensure no restrictive constraints exist on duration
-  ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS subscription_plans_duration_check;
-  ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS plans_duration_check;
-  ALTER TABLE public.subscription_plans DROP CONSTRAINT IF EXISTS duration_check;
-  
-  -- Add benefits column if not exists
-  ALTER TABLE public.subscription_plans ADD COLUMN IF NOT EXISTS benefits JSONB DEFAULT '[]';
 
   -- 8. User Subscriptions
-  CREATE TABLE IF NOT EXISTS public.user_subscriptions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id TEXT,
-      plan_id UUID,
+  CREATE TABLE IF NOT EXISTS user_subscriptions (
+      id CHAR(36) PRIMARY KEY,
+      user_id VARCHAR(255),
+      plan_id CHAR(36),
       start_date DATE,
       end_date DATE,
-      status TEXT DEFAULT 'active',
-      amount NUMERIC,
-      payment_id TEXT,
-      order_id TEXT,
+      status VARCHAR(50) DEFAULT 'active',
+      amount DECIMAL(10,2),
+      payment_id VARCHAR(255),
+      order_id VARCHAR(255),
       signature TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- 9. App Meta Tables
-  CREATE TABLE IF NOT EXISTS public.notifications (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      title TEXT,
+  CREATE TABLE IF NOT EXISTS notifications (
+      id CHAR(36) PRIMARY KEY,
+      title VARCHAR(255),
       message TEXT,
-      target_role TEXT DEFAULT 'all',
+      target_role VARCHAR(50) DEFAULT 'all',
       is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  -- MIGRATION: Ensure target_role exists if table was created earlier
-  DO $$ 
-  BEGIN 
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notifications' AND column_name='target_role') THEN
-          ALTER TABLE public.notifications ADD COLUMN target_role TEXT DEFAULT 'all';
-      END IF;
-  END $$;
-
-  CREATE TABLE IF NOT EXISTS public.banners (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      title TEXT,
+  CREATE TABLE IF NOT EXISTS banners (
+      id CHAR(36) PRIMARY KEY,
+      title VARCHAR(255),
       image_url TEXT,
       link TEXT,
       is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS public.service_type_photos (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      service_type TEXT,
+  CREATE TABLE IF NOT EXISTS service_type_photos (
+      id CHAR(36) PRIMARY KEY,
+      service_type VARCHAR(100),
       image_url TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS public.moments (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  CREATE TABLE IF NOT EXISTS moments (
+      id CHAR(36) PRIMARY KEY,
       media_url TEXT,
-      type TEXT DEFAULT 'image',
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      type VARCHAR(50) DEFAULT 'image',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS public.admin_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT,
-      updated_at TIMESTAMPTZ DEFAULT NOW()
+  CREATE TABLE IF NOT EXISTS admin_settings (
+      `key` VARCHAR(255) PRIMARY KEY,
+      `value` TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   );
 
-  -- ENABLE RLS & ADD POLICIES (Simplification: Permit Public Access for Demo)
-  -- FOR PRODUCTION, SPECIFY AUTH.UID() CHECKS
-  ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access users" ON public.users FOR ALL USING (true) WITH CHECK (true);
-  
-  ALTER TABLE public.venues ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access venues" ON public.venues FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.service_providers ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access providers" ON public.service_providers FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access bookings" ON public.bookings FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access reviews" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.app_feedback ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access app_feedback" ON public.app_feedback FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public full access banners" ON public.banners FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.service_type_photos ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access service_photos" ON public.service_type_photos;
-  CREATE POLICY "Public full access service_photos" ON public.service_type_photos FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.moments ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access moments" ON public.moments;
-  CREATE POLICY "Public full access moments" ON public.moments FOR ALL USING (true) WITH CHECK (true);
-
-  -- 10. STORAGE POLICIES (Run these in SQL Editor)
-  -- Note: You MUST create a bucket named 'images' in the Supabase Storage UI first
-  -- and set it to 'Public'. If policies are needed, use these:
-  -- DROP POLICY IF EXISTS "Public Access" ON storage.objects;
-  -- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'images');
-  -- DROP POLICY IF EXISTS "Public Upload" ON storage.objects;
-  -- CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'images');
-  -- DROP POLICY IF EXISTS "Public Update" ON storage.objects;
-  -- CREATE POLICY "Public Update" ON storage.objects FOR UPDATE USING (bucket_id = 'images');
-  -- DROP POLICY IF EXISTS "Public Delete" ON storage.objects;
-  -- CREATE POLICY "Public Delete" ON storage.objects FOR DELETE USING (bucket_id = 'images');
-
-  ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access settings" ON public.admin_settings;
-  CREATE POLICY "Public full access settings" ON public.admin_settings FOR ALL USING (true) WITH CHECK (true);
-  
-  ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access plans" ON public.subscription_plans;
-  CREATE POLICY "Public full access plans" ON public.subscription_plans FOR ALL USING (true) WITH CHECK (true);
-
-  ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access subscriptions" ON public.user_subscriptions;
-  CREATE POLICY "Public full access subscriptions" ON public.user_subscriptions FOR ALL USING (true) WITH CHECK (true);
-
-  -- ENABLE REALTIME FOR ALL TABLES
-  BEGIN;
-    DROP PUBLICATION IF EXISTS supabase_realtime;
-    CREATE PUBLICATION supabase_realtime FOR ALL TABLES;
-  COMMIT;
-
-  -- Ensure replica identity is set to FULL for all tables to ensure clean updates
-  ALTER TABLE public.users REPLICA IDENTITY FULL;
-  ALTER TABLE public.venues REPLICA IDENTITY FULL;
-  ALTER TABLE public.service_providers REPLICA IDENTITY FULL;
-  ALTER TABLE public.bookings REPLICA IDENTITY FULL;
-  ALTER TABLE public.notifications REPLICA IDENTITY FULL;
-  ALTER TABLE public.banners REPLICA IDENTITY FULL;
-  ALTER TABLE public.subscription_plans REPLICA IDENTITY FULL;
-  ALTER TABLE public.user_subscriptions REPLICA IDENTITY FULL;
-  ALTER TABLE public.app_feedback REPLICA IDENTITY FULL;
-  ALTER TABLE public.reviews REPLICA IDENTITY FULL;
-
-  -- =============================================================================
-  -- MIGRATIONS / PATCHES (Run these if your tables already exist but are missing columns)
-  -- =============================================================================
-  -- Patch for Users table (Missing venue_type or service_type)
-  DO $$ 
-  BEGIN 
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='venue_type') THEN
-          ALTER TABLE public.users ADD COLUMN venue_type TEXT;
-      END IF;
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='service_type') THEN
-          ALTER TABLE public.users ADD COLUMN service_type TEXT;
-      END IF;
-  END $$;
-
-  -- Patch for Service Providers table (Missing facilities)
-  DO $$ 
-  BEGIN 
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_providers' AND column_name='facilities') THEN
-          ALTER TABLE public.service_providers ADD COLUMN facilities TEXT[];
-      END IF;
-  END $$;
-
-  -- Patch for Service Providers table (Missing video_url)
-  DO $$ 
-  BEGIN 
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_providers' AND column_name='video_url') THEN
-          ALTER TABLE public.service_providers ADD COLUMN video_url TEXT;
-      END IF;
-  END $$;
-
-  -- Patch for Venues table (Missing video_url)
-  DO $$ 
-  BEGIN 
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='venues' AND column_name='video_url') THEN
-          ALTER TABLE public.venues ADD COLUMN video_url TEXT;
-      END IF;
-  END $$;
-
-  -- Ensure App Feedback table exists and has RLS
-  CREATE TABLE IF NOT EXISTS public.app_feedback (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id TEXT,
-      user_name TEXT,
-      visitor_mobile TEXT,
-      rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-      comment TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-  );
-  ALTER TABLE public.app_feedback ENABLE ROW LEVEL SECURITY;
-  DROP POLICY IF EXISTS "Public full access app_feedback" ON public.app_feedback;
-  CREATE POLICY "Public full access app_feedback" ON public.app_feedback FOR ALL USING (true) WITH CHECK (true);
-
-  =============================================================================
+  -- NOTE: MySQL does not have RLS. Use application-level security via the provided server.ts.
+  -- To secure data, ensure you are using the provided Generic MySQL Query Proxy in server.ts.
 */
 
 import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -388,6 +245,8 @@ import {
   FileText,
   BarChart2,
   AlertCircle,
+  CloudOff,
+  AlertTriangle,
   IndianRupee,
   ChevronRight,
   ChevronDown,
@@ -854,6 +713,7 @@ const LOCATION_DATA = locations;
 
 // Mock database to remove backend connection as requested
 import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
+import { Database as DbIcon } from 'lucide-react';
 
 import { cn } from './lib/utils';
 
@@ -2124,6 +1984,70 @@ const ImageUpload = ({
   );
 };
 
+const DatabaseStatusIndicator = () => {
+  const [isOffline, setIsOffline] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+
+  useEffect(() => {
+    // Import checking functions dynamically or use shared state
+    const check = async () => {
+      const offline = (window as any).forceOffline || false;
+      setIsOffline(offline);
+    };
+    
+    check();
+    const interval = setInterval(check, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleReconnect = async () => {
+    setIsChecking(true);
+    try {
+      const response = await fetch('/api/health?force=true');
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'ok') {
+        // Force back to online
+        (window as any).forceOffline = false;
+        setIsOffline(false);
+        toast.success('Database reconnected successfully!');
+        window.location.reload(); // Refresh to resync
+      } else {
+        const errorMsg = result.error || result.database || 'Database is still unreachable.';
+        toast.error(errorMsg);
+        console.warn('Reconnect failed:', result);
+      }
+    } catch (err) {
+      toast.error('Connection failed (Network error).');
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  if (!isOffline) return null;
+
+  return (
+    <div className="flex items-center space-x-2 bg-red-50 border border-red-100 px-3 py-1.5 rounded-xl cursor-default group relative">
+      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+      <span className="text-[10px] font-black text-red-600 uppercase tracking-tight">Offline Mode</span>
+      <button 
+        onClick={handleReconnect}
+        disabled={isChecking}
+        className="ml-2 text-[9px] font-black bg-red-600 text-white px-2 py-0.5 rounded-lg hover:bg-red-700 transition-colors uppercase"
+      >
+        {isChecking ? '...' : 'Retry'}
+      </button>
+      
+      {/* Tooltip */}
+      <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100]">
+        <p className="text-[9px] text-gray-500 font-medium leading-tight">
+          Backend connection timed out. Data is currently being saved locally. Click retry to reconnect to MySQL.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: UserProfile | null, onLogout: () => void, onRateApp: () => void }) => {
   const { lang, setLang, t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -2185,6 +2109,8 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               <Link to="/gallery" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('gallery')}</Link>
               <Link to="/search" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('search')}</Link>
               <Link to="/about" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('about')}</Link>
+              
+              <DatabaseStatusIndicator />
               
               <button 
                 onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
@@ -4518,6 +4444,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
     const [isCallSatisfied, setIsCallSatisfied] = useState(false);
     const [ownerProfile, setOwnerProfile] = useState<any>(null);
+    const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0 });
 
     // Update form when profile loads
     useEffect(() => {
@@ -4557,6 +4484,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         reviewCount: data.review_count,
         availableFor: data.available_for,
         site_levels: data.site_levels || [],
+        facilities: data.facilities || [],
         catalogue: data.catalogue || [],
         facilityDetails: data.facility_details || [],
         createdAt: data.created_at
@@ -4569,6 +4497,24 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         .eq('uid', data.owner_id)
         .single();
       if (userData) setOwnerProfile(userData);
+
+      // Fetch owner stats
+      const [vCount, sCount, bCount, pCount] = await Promise.all([
+        db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
+        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.owner_id),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', data.owner_id)
+          .in('status', ['completed', 'paid', 'confirmed', 'approved']),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', data.owner_id)
+          .eq('status', 'pending')
+      ]);
+
+      setStats({
+        totalItems: (vCount.count || 0) + (sCount.count || 0),
+        completed: bCount.count || 0,
+        pending: pCount.count || 0
+      });
     }
     setLoading(false);
   };
@@ -4777,7 +4723,21 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
             </div>
             <div className="text-left">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Managed By</p>
-              <p className="font-bold text-gray-900">{ownerProfile?.display_name || 'Venue Manager'}</p>
+              <p className="font-bold text-gray-900 leading-tight">{ownerProfile?.display_name || 'Venue Manager'}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <div className="flex items-center text-[9px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-tighter" title="Successfully Completed Bookings">
+                  <CheckCircle size={10} className="mr-1" />
+                  {stats.completed} Completed
+                </div>
+                <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Pending Booking Requests">
+                  <Clock size={10} className="mr-1" />
+                  {stats.pending} Requests
+                </div>
+                <div className="flex items-center text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter" title="Total Managed Venues & Services">
+                  <DbIcon size={10} className="mr-1" />
+                  {stats.totalItems} Items
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4840,33 +4800,38 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
               <p>{venue.description}</p>
             </div>
 
-            <div className="mt-10">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Available For & Levels</h3>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  ...(venue.availableFor || []), 
-                  ...(venue.site_levels || []),
-                  ...(venue.catalogue?.map(c => c.level) || [])
-                ].filter((v, i, a) => v && a.indexOf(v) === i).map((item, idx) => (
-                  <span key={idx} className="bg-orange-50 text-orange-700 px-4 py-2 rounded-xl text-sm font-bold border border-orange-100">
-                    {item}
-                  </span>
-                ))}
-                {(!venue.availableFor || venue.availableFor.length === 0) && (!venue.site_levels || venue.site_levels.length === 0) && (!venue.catalogue || venue.catalogue.length === 0) && (
-                  <span className="text-gray-400 italic text-sm">No specific event types or levels listed</span>
-                )}
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-black text-orange-600 uppercase tracking-widest mb-3">Event Categories</h3>
+                <div className="flex flex-wrap gap-2">
+                  {venue.availableFor?.length ? venue.availableFor.map((item, idx) => (
+                    <span key={idx} className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-xl text-[10px] font-black border border-orange-100 uppercase tracking-tight">
+                      {item}
+                    </span>
+                  )) : <span className="text-gray-400 italic text-xs">No specific events listed</span>}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-purple-600 uppercase tracking-widest mb-3">Available Levels</h3>
+                <div className="flex flex-wrap gap-2">
+                  {venue.site_levels?.length ? venue.site_levels.map((item, idx) => (
+                    <span key={idx} className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-xl text-[10px] font-black border border-purple-100 uppercase tracking-tight">
+                      {item}
+                    </span>
+                  )) : <span className="text-gray-400 italic text-xs">No specific levels listed</span>}
+                </div>
               </div>
             </div>
 
             <div className="mt-10">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Amenities</h3>
+              <h3 className="text-sm font-black text-blue-600 uppercase tracking-widest mb-4">Facilities Offered Level</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {venue.facilities?.map((item, idx) => (
-                  <div key={idx} className="flex items-center space-x-3 text-gray-700">
-                    <CheckCircle size={18} className="text-green-500" />
-                    <span>{item}</span>
+                {venue.facilities?.length ? venue.facilities.map((item, idx) => (
+                  <div key={idx} className="flex items-center space-x-3 text-gray-700 bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                    <CheckCircle size={14} className="text-green-500 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-tight">{item}</span>
                   </div>
-                ))}
+                )) : <p className="text-gray-400 italic text-xs col-span-full">No facilities listed</p>}
               </div>
             </div>
 
@@ -5262,6 +5227,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [providerProfile, setProviderProfile] = useState<any>(null);
+  const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0 });
 
   // Update form when profile loads
   useEffect(() => {
@@ -5300,6 +5266,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         priceRange: data.price_range,
         reviewCount: data.review_count,
         availableFor: data.available_for,
+        facilities: data.facilities || [],
         catalogue: data.catalogue || [],
         facilityDetails: data.facility_details || [],
         latitude: data.latitude,
@@ -5314,6 +5281,24 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         .eq('uid', data.provider_id)
         .single();
       if (userData) setProviderProfile(userData);
+
+      // Fetch stats
+      const [vCount, sCount, bCount, pCount] = await Promise.all([
+        db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.provider_id),
+        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.provider_id),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', data.provider_id)
+          .in('status', ['completed', 'paid', 'confirmed', 'approved']),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', data.provider_id)
+          .eq('status', 'pending')
+      ]);
+
+      setStats({
+        totalItems: (vCount.count || 0) + (sCount.count || 0),
+        completed: bCount.count || 0,
+        pending: pCount.count || 0
+      });
     }
     setLoading(false);
   };
@@ -5536,7 +5521,21 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                </div>
                <div className="text-left">
                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Provider</p>
-                 <p className="font-bold text-gray-900">{providerProfile?.display_name || 'Service Partner'}</p>
+                 <p className="font-bold text-gray-900 leading-tight">{providerProfile?.display_name || 'Service Partner'}</p>
+                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                   <div className="flex items-center text-[9px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-tighter" title="Successfully Completed Bookings">
+                     <CheckCircle size={10} className="mr-1" />
+                     {stats.completed} Completed
+                   </div>
+                   <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Pending Booking Requests">
+                     <Clock size={10} className="mr-1" />
+                     {stats.pending} Requests
+                   </div>
+                   <div className="flex items-center text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter" title="Total Managed Venues & Services">
+                     <DbIcon size={10} className="mr-1" />
+                     {stats.totalItems} Items
+                   </div>
+                 </div>
                </div>
              </div>
           </div>
@@ -10520,14 +10519,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
-            <FacilityDetailsEditor 
-              facilities={formData.facilityDetails}
-              onChange={(details) => setFormData({...formData, facilityDetails: details})}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Venue Site Level (Select Available Areas)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Venue Site Level (Select Available Areas)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
               {VENUE_SITE_LEVELS.map(option => (
                 <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
@@ -10545,6 +10537,33 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
                 </label>
               ))}
             </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Facilities Offered Level (Select All Applicable)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {VENUE_FACILITIES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.facilities?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.facilities || [];
+                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
+                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">4. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
+            />
           </div>
         </div>
         <button 
@@ -10953,14 +10972,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Detailed Facility Listing (Rates & Units)</label>
-            <FacilityDetailsEditor 
-              facilities={formData.facilityDetails}
-              onChange={(details) => setFormData({...formData, facilityDetails: details})}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Venue Site Level (Select Available Areas)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">2. Venue Site Level (Select Available Areas)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
               {VENUE_SITE_LEVELS.map(option => (
                 <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
@@ -10978,6 +10990,33 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
                 </label>
               ))}
             </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Facilities Offered Level (Select All Applicable)</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {VENUE_FACILITIES.map(option => (
+                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    checked={formData.facilities?.includes(option)}
+                    onChange={(e) => {
+                      const current = formData.facilities || [];
+                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
+                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">4. Detailed Facility Listing (Rates & Units)</label>
+            <FacilityDetailsEditor 
+              facilities={formData.facilityDetails}
+              onChange={(details) => setFormData({...formData, facilityDetails: details})}
+            />
           </div>
         </div>
         <button 
@@ -11308,112 +11347,109 @@ const SearchResultsView = () => {
 
 const DatabaseMonitor = () => {
   const [status, setStatus] = useState<'checking' | 'connected' | 'disconnected' | 'mock'>('checking');
-  const [errorCount, setErrorCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  useEffect(() => {
+  const check = useCallback(async () => {
     if (!isSupabaseConnected || getIsOffline()) {
       setStatus('mock');
       return;
     }
 
-    const checkConnection = async () => {
-      try {
-        const { error } = await db.from('users').select('id').limit(1);
-        
-        if (error) {
-          const msg = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
-          console.error('[DB MONITOR] Error details:', msg);
-
-          const isNetworkError = msg.toLowerCase().includes('fetch') || 
-                                msg.toLowerCase().includes('network') || 
-                                msg.toLowerCase().includes('failed to connect') ||
-                                msg.toLowerCase().includes('timeout');
-          
-          if (isNetworkError) {
-            setErrorMessage(`Bridge Error: ${msg}`);
-            setStatus('disconnected');
-            setErrorCount(prev => prev + 1);
-          } else {
-            // DB-level errors (like table missing) mean we ARE connected to the backend
-            // but the schema might be wrong. We shouldn't block the whole app with a banner.
-            console.warn('[DB MONITOR] Schema warning:', msg);
-            setStatus('connected');
-            setErrorMessage('');
-          }
-        } else {
-          setStatus('connected');
-          setErrorCount(0);
-          setErrorMessage('');
-        }
-      } catch (err: any) {
-        const msg = err.message || JSON.stringify(err);
-        console.error('[DB MONITOR] Critical catch:', msg);
-        if (errorCount > 1) {
-          setErrorMessage(`System Error: ${msg}`);
-          setStatus('disconnected');
-        }
-        setErrorCount(prev => prev + 1);
+    setIsRetrying(true);
+    try {
+      const response = await fetch('/api/health');
+      const data = await response.json();
+      
+      if (response.ok && data.status === 'ok') {
+        setStatus('connected');
+        setOfflineMode(false);
+      } else {
+        setStatus('disconnected');
+        setErrorMessage(data.error || data.database || 'Database unreachable');
+        setOfflineMode(true);
       }
-    };
-
-    checkConnection();
-    const interval = setInterval(checkConnection, 30000); // Check every 30s
-    return () => clearInterval(interval);
+    } catch (err: any) {
+      setStatus('disconnected');
+      setErrorMessage(err.message || 'Network connection lost');
+      setOfflineMode(true);
+    } finally {
+      setIsRetrying(false);
+    }
   }, []);
+
+  useEffect(() => {
+    check();
+    const interval = setInterval(check, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, [check]);
 
   if (status === 'checking') return null;
 
-  if (status === 'connected' || status === 'mock') {
-    return (
-      <div className="fixed bottom-4 right-4 z-[9999] flex items-center gap-2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-[9px] uppercase font-bold tracking-widest border border-emerald-500/30 backdrop-blur-sm">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-        <span>MySQL Connected</span>
-      </div>
-    );
-  }
-
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="fixed bottom-6 left-6 z-[9999] max-w-sm"
-    >
-      <div className="bg-red-600 text-white p-4 rounded-2xl shadow-2xl space-y-3 border border-red-500/20 backdrop-blur-md bg-opacity-90">
-        <div className="flex items-center space-x-4">
-          <div className="bg-red-700 p-2 rounded-xl animate-pulse">
-            <AlertCircle size={20} />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-sm">Database Connection Error</h3>
-            <p className="text-[10px] opacity-90 leading-tight">
-              {errorMessage || 'Disconnected from real-time database.'}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex gap-2">
-          <button 
-            onClick={() => window.location.reload()}
-            className="flex-1 bg-white text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-50"
+    <div className="fixed bottom-6 left-6 z-[200]">
+      <AnimatePresence>
+        {status === 'disconnected' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="flex items-center space-x-3 bg-red-600 text-white px-4 py-3 rounded-2xl shadow-2xl border border-red-500 max-w-sm"
           >
-            Retry Sync
-          </button>
-          {errorCount >= 1 && (
+            <div className="bg-red-500/30 p-2 rounded-xl">
+              <CloudOff size={20} className="animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Connection Failed</p>
+              <p className="text-xs text-red-100 truncate opacity-90">{errorMessage}</p>
+            </div>
+            <button 
+              onClick={check} 
+              disabled={isRetrying}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={isRetrying ? "animate-spin" : ""} />
+            </button>
+          </motion.div>
+        )}
+
+        {status === 'mock' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center space-x-3 bg-orange-600 text-white px-4 py-3 rounded-2xl shadow-2xl border border-orange-500"
+          >
+            <div className="bg-orange-500/30 p-2 rounded-xl">
+              <DbIcon size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Working Offline</p>
+              <p className="text-xs text-orange-100 opacity-90">Local Storage Active</p>
+            </div>
             <button 
               onClick={() => {
-                setOfflineMode(true);
-                setStatus('mock');
-                toast.success('Switched to Offline Mode');
+                setOfflineMode(false);
+                check();
               }}
-              className="flex-1 bg-red-800 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-900 border border-red-700 shadow-inner"
+              className="ml-2 bg-white/20 hover:bg-white/30 p-2 rounded-lg"
             >
-              Use Offline Mode
+              <RefreshCw size={14} className={isRetrying ? "animate-spin" : ""} />
             </button>
-          )}
-        </div>
-      </div>
-    </motion.div>
+          </motion.div>
+        )}
+
+        {status === 'connected' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-[9px] uppercase font-bold tracking-widest border border-emerald-500/30 backdrop-blur-sm flex items-center gap-2"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            <span>MySQL Connected</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

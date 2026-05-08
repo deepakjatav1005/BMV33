@@ -20,19 +20,24 @@ const __dirname = path.dirname(__filename);
 let pool: mysql.Pool;
 let isDbHealthy = true;
 let lastDbCheck = 0;
-const DB_CHECK_INTERVAL = 30000; // 30 seconds
+const DB_CHECK_INTERVAL = 5000; // Check every 5s if requested
 
-async function checkDbHealth() {
+async function checkDbHealth(force = false) {
   const now = Date.now();
-  if (now - lastDbCheck < DB_CHECK_INTERVAL) return isDbHealthy;
+  if (!force && now - lastDbCheck < DB_CHECK_INTERVAL) return isDbHealthy;
   
   lastDbCheck = now;
   try {
+    console.log(">>> [HEALTH CHECK] Testing MySQL connection...");
     const connection = await pool.getConnection();
     connection.release();
+    console.log(">>> [HEALTH CHECK] Connection successful.");
     isDbHealthy = true;
     return true;
-  } catch (err) {
+  } catch (err: any) {
+    console.error(">>> [HEALTH CHECK] MySQL Connection ERROR:", err.message);
+    if (err.code) console.error(">>> [HEALTH CHECK] ERROR CODE:", err.code);
+    
     console.warn(">>> [HEALTH CHECK] MySQL Database is unreachable. Enabling fail-fast mode.");
     isDbHealthy = false;
     return false;
@@ -43,6 +48,7 @@ async function startServer() {
   console.log(">>> [BOOT] Starting server initialization...");
   
   // Validate configuration before initializing
+  const mysqlHost = process.env.MYSQL_HOST || 'localhost';
   if (!process.env.MYSQL_HOST || !process.env.MYSQL_USER || !process.env.MYSQL_DATABASE) {
     console.error(">>> [CRITICAL] Missing MySQL configuration! Please check your environment variables.");
     console.error(`>>> [CONFIG] HOST: ${process.env.MYSQL_HOST ? 'SET' : 'MISSING'}`);
@@ -53,6 +59,7 @@ async function startServer() {
   }
 
   // Initialize pool inside startServer to ensure dotenv.config() has run
+  console.log(">>> [BOOT] Initializing MySQL connection pool...");
   pool = mysql.createPool({
     host: process.env.MYSQL_HOST || 'localhost',
     user: process.env.MYSQL_USER,
@@ -62,15 +69,34 @@ async function startServer() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    connectTimeout: 5000,   // Fail fast (5s instead of 30s)
-    acquireTimeout: 5000,   // Fail fast
-    ssl: {
-      rejectUnauthorized: false
-    }
+    connectTimeout: 10000,   // Wait up to 10s for connection
+    enableKeepAlive: true,    // Prevent idle disconnects
+    keepAliveInitialDelay: 10000,
+    ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined
   });
 
-  // Init health check
-  checkDbHealth();
+  // Init health check with retry
+  let retries = 3;
+  const initDb = async () => {
+    while (retries > 0) {
+      const healthy = await checkDbHealth();
+      if (healthy) {
+        console.log(">>> [SUCCESS] MySQL Database connected and verified healthy.");
+        break;
+      }
+      retries--;
+      if (retries > 0) {
+        console.log(`>>> [RETRY] DB connection failed. Retrying in 2s... (${retries} retries left)`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+    if (!isDbHealthy) {
+      console.error(">>> [FAILURE] MySQL Database could not be reached after multiple attempts.");
+      console.error(">>> [ADVICE] Check if your remote MySQL host (Hostinger/CPanel) has whitelisted '%' for Remote MySQL access.");
+    }
+  };
+  
+  initDb();
   
   const app = express();
   const PORT = 3000;
@@ -82,6 +108,15 @@ async function startServer() {
   });
 
   app.use(express.json());
+
+  // Strict API logging and error barrier
+  app.use("/api", (req, res, next) => {
+    console.log(`>>> [API CALL] ${req.method} ${req.url}`);
+    
+    // Set standard JSON headers for all /api responses
+    res.setHeader('Content-Type', 'application/json');
+    next();
+  });
 
   // Check for critical environment variables
   const requiredEnv = [
@@ -134,24 +169,31 @@ async function startServer() {
 
   // API routes
   app.get("/api/health", async (req, res) => {
+    const force = req.query.force === 'true';
     try {
-      const healthy = await checkDbHealth();
+      const healthy = await checkDbHealth(force);
+      const host = process.env.MYSQL_HOST || 'localhost';
+      const maskedHost = host.length > 5 ? host.substring(0, 3) + '...' + host.substring(host.length - 2) : '***';
+      
       if (!healthy) {
         return res.status(503).json({
           status: "error",
-          database: "MySQL Unreachable (Fail-Fast)",
+          database: "MySQL Unreachable",
+          host: maskedHost,
+          advice: "Whitelisting '%' for Remote MySQL in Hostinger/CPanel is usually required.",
           timestamp: new Date().toISOString()
         });
       }
       res.json({ 
         status: "ok", 
         database: "MySQL Connected",
+        host: maskedHost,
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
       res.status(503).json({ 
         status: "error", 
-        database: "MySQL Disconnected",
+        database: "MySQL Error",
         error: err.message,
         timestamp: new Date().toISOString()
       });
@@ -306,9 +348,10 @@ async function startServer() {
       if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED' || err.message.includes('connect')) {
         isDbHealthy = false;
         lastDbCheck = Date.now(); // Reset check timer
+        console.error(">>> [CONNECTION ADVICE] If you are using Hostinger or CPanel, please ensure you have whitelisted '%' in the 'Remote MySQL' settings.");
       }
 
-      // Attempt to fix common column missing errors
+      // Attempt to fix common column/table errors
       if (err.code === 'ER_BAD_FIELD_ERROR' || err.message.includes('Unknown column')) {
          console.warn(`>> DETECTED MISSING COLUMN in ${table}. Try adding it...`);
          const match = err.message.match(/Unknown column '(.+?)' in/);
@@ -323,6 +366,15 @@ async function startServer() {
            }
          }
       }
+
+      if (err.code === 'ER_NO_SUCH_TABLE' || err.message.includes("doesn't exist")) {
+        console.error(`>>> [CRITICAL] Table '${table}' is missing in your MySQL database.`);
+        return res.status(404).json({ 
+          error: `Table '${table}' does not exist. Please execute the SQL script provided in App.tsx (top comments) in your PHPMyAdmin/MySQL editor.`,
+          code: "TABLE_MISSING"
+        });
+      }
+
       res.status(500).json({ error: err.message });
     }
   });
@@ -390,13 +442,19 @@ async function startServer() {
         receipt,
         notes,
       };
-
+ 
       const order = await razorpay.orders.create(options);
       res.json(order);
     } catch (error) {
       console.error("> [ERROR] Razorpay order error:", error);
       res.status(500).json({ error: "Failed to create Razorpay order" });
     }
+  });
+  
+  // API 404 Handler (Should be after all API routes but BEFORE Vite/Static fallback)
+  app.all("/api/*", (req, res) => {
+    console.warn(`>>> [API 404] Route not found: ${req.method} ${req.url}`);
+    res.status(404).json({ error: "API route not found", path: req.url });
   });
 
   const isProduction = process.env.NODE_ENV === "production";
