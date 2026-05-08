@@ -7891,53 +7891,68 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
     if (!user?.uid) return;
     try {
       let bData: any[] = [];
+      let pData: any[] = [];
+
+      // Fetch bookings and payments separately because the MySQL proxy doesn't support nested joins
       if (profile?.role === 'admin') {
-        const { data } = await db.from('bookings').select('*, booking_payments(*)');
-        bData = data || [];
+        const { data: bookings } = await db.from('bookings').select('*').order('created_at', { ascending: false });
+        const { data: payments } = await db.from('booking_payments').select('*');
+        bData = bookings || [];
+        pData = payments || [];
       } else {
-        const { data: cb } = await db.from('bookings').select('*, booking_payments(*)').eq('user_id', user?.uid);
-        const { data: pb } = await db.from('bookings').select('*, booking_payments(*)').eq('owner_id', user?.uid);
+        const { data: cb } = await db.from('bookings').select('*').eq('user_id', user?.uid);
+        const { data: pb } = await db.from('bookings').select('*').eq('owner_id', user?.uid);
         const combined = [...(cb || []), ...(pb || [])];
         bData = combined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+        
+        if (bData.length > 0) {
+          const bookingIds = bData.map(b => b.id);
+          // Fetch payments for these bookings
+          const { data: payments } = await db.from('booking_payments').select('*').in('booking_id', bookingIds);
+          pData = payments || [];
+        }
       }
       
       if (bData) {
-        setBookings(bData.map(d => ({
-          ...d,
-          userId: d.user_id,
-          ownerId: d.owner_id,
-          targetId: d.target_id,
-          targetType: d.target_type,
-          targetName: d.target_name,
-          eventDate: d.event_date,
-          endDate: d.end_date,
-          startTime: d.start_time,
-          endTime: d.end_time,
-          status: d.status,
-          totalAmount: d.total_amount || 0,
-          updatedAmount: d.updated_amount,
-          advance_amount: d.advance_amount || 0,
-          eventType: d.event_type,
-          partyName: d.party_name,
-          partyAddress: d.party_address,
-          visitorName: d.visitor_name,
-          visitorMobile: d.visitor_mobile,
-          paymentStatus: d.payment_status ? (d.payment_status.charAt(0).toUpperCase() + d.payment_status.slice(1)) : 'Pending',
-          paymentMode: d.payment_mode,
-          isManual: d.is_manual,
-          is_invoice_generated: d.is_invoice_generated,
-          invoice_url: d.invoice_url,
-          payments: (d.booking_payments || []).map((p: any) => ({
-            id: p.id,
-            bookingId: p.booking_id,
-            amount: p.amount,
-            paymentMode: p.payment_mode,
-            paymentDate: p.payment_date,
-            paymentType: p.payment_type,
-            createdAt: p.created_at
-          })),
-          createdAt: d.created_at
-        }) as Booking));
+        setBookings(bData.map(d => {
+          const relatedPayments = pData.filter(p => p.booking_id === d.id);
+          return {
+            ...d,
+            userId: d.user_id,
+            ownerId: d.owner_id,
+            targetId: d.target_id,
+            targetType: d.target_type,
+            targetName: d.target_name,
+            eventDate: d.event_date,
+            endDate: d.end_date,
+            startTime: d.start_time,
+            endTime: d.end_time,
+            status: d.status,
+            totalAmount: d.total_amount || 0,
+            updatedAmount: d.updated_amount,
+            advance_amount: d.advance_amount || 0,
+            eventType: d.event_type,
+            partyName: d.party_name,
+            partyAddress: d.party_address,
+            visitorName: d.visitor_name,
+            visitorMobile: d.visitor_mobile,
+            paymentStatus: d.payment_status ? (d.payment_status.charAt(0).toUpperCase() + d.payment_status.slice(1)) : 'Pending',
+            paymentMode: d.payment_mode,
+            isManual: d.is_manual,
+            is_invoice_generated: d.is_invoice_generated,
+            invoice_url: d.invoice_url,
+            payments: relatedPayments.map((p: any) => ({
+              id: p.id,
+              bookingId: p.booking_id,
+              amount: p.amount,
+              paymentMode: p.payment_mode,
+              paymentDate: p.payment_date,
+              paymentType: p.payment_type || 'Regular',
+              createdAt: p.created_at
+            })),
+            createdAt: d.created_at
+          } as Booking;
+        }));
       }
 
       const vQuery = db.from('venues').select('*');
@@ -9900,17 +9915,6 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
           </div>
         )}
         
-        {activeType === 'service' && services.length === 0 && (
-          <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-            <Music2 size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500 font-medium">Add a service first to manage its catalogue.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | null }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -9925,6 +9929,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
     facilities: [] as string[],
     facilityDetails: [] as FacilityItem[],
     availableFor: [] as string[],
+    city: profile?.district || '',
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     catalogue: [] as string[]
@@ -9943,18 +9948,19 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
         price_range: formData.priceRange,
         price_level: formData.priceLevel,
         images: formData.images.filter(i => i !== ''),
-        city: formData.city,
+        city: formData.city || profile?.district || '',
         video_url: formData.video_url,
         facilities: formData.facilities,
         facility_details: formData.facilityDetails,
         available_for: formData.availableFor,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        provider_id: user?.uid,
+        owner_id: user?.uid,
         state: profile?.state || '',
         district: profile?.district || '',
         block: profile?.block || '',
         pincode: profile?.pincode || '',
-        owner_id: user?.uid,
         rating: 0,
         review_count: 0,
         catalogue: formData.catalogue
