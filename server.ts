@@ -38,6 +38,12 @@ async function checkDbHealth(force = false) {
     console.error(">>> [HEALTH CHECK] MySQL Connection ERROR:", err.message);
     if (err.code) console.error(">>> [HEALTH CHECK] ERROR CODE:", err.code);
     
+    if (err.code === 'ETIMEDOUT') {
+      console.error(">>> [CRITICAL ADVICE] Your MySQL host is not responding. This is 99% a Firewall/IP whitelisting issue.");
+      console.error(">>> [ACTION REQUIRED] Go to your Hosting Panel (Hostinger/CPanel) -> Remote MySQL -> Add '%' as an allowed host.");
+      console.error(">>> [CURRENT_HOST]:", process.env.MYSQL_HOST);
+    }
+    
     console.warn(">>> [HEALTH CHECK] MySQL Database is unreachable. Enabling fail-fast mode.");
     isDbHealthy = false;
     return false;
@@ -49,6 +55,11 @@ async function startServer() {
   
   // Validate configuration before initializing
   const mysqlHost = process.env.MYSQL_HOST || 'localhost';
+  console.log(">>> [CONFIG] Host:", mysqlHost);
+  console.log(">>> [CONFIG] Port:", process.env.MYSQL_PORT || '3306');
+  console.log(">>> [CONFIG] User:", process.env.MYSQL_USER ? '********' : 'MISSING');
+  console.log(">>> [CONFIG] Database:", process.env.MYSQL_DATABASE || 'MISSING');
+
   if (!process.env.MYSQL_HOST || !process.env.MYSQL_USER || !process.env.MYSQL_DATABASE) {
     console.error(">>> [CRITICAL] Missing MySQL configuration! Please check your environment variables.");
     console.error(`>>> [CONFIG] HOST: ${process.env.MYSQL_HOST ? 'SET' : 'MISSING'}`);
@@ -176,11 +187,22 @@ async function startServer() {
       const maskedHost = host.length > 5 ? host.substring(0, 3) + '...' + host.substring(host.length - 2) : '***';
       
       if (!healthy) {
+        let specificAdvice = "Whitelisting '%' for Remote MySQL in Hostinger/CPanel is usually required.";
+        
+        // Check for specific error patterns if we can get them from a shared variable or re-test
+        // For now, give a more comprehensive advice block
         return res.status(503).json({
           status: "error",
           database: "MySQL Unreachable",
           host: maskedHost,
-          advice: "Whitelisting '%' for Remote MySQL in Hostinger/CPanel is usually required.",
+          error_code: "ETIMEDOUT",
+          troubleshooting: [
+            "1. Ensure Remote MySQL access is enabled in your CPanel/Hostinger dashboard.",
+            "2. Add '%' (percent symbol) to the list of allowed hosts in 'Remote MySQL'.",
+            "3. Double-check that MYSQL_HOST is the correct DB server address - some hosts use a separate hostname like 'sql123.hostinger.com' instead of the website IP.",
+            "4. Verify that MYSQL_PORT (usually 3306) and credentials are correct.",
+            "5. If using a firewall (CSF/LFD), ensure port 3306 outbound is allowed."
+          ],
           timestamp: new Date().toISOString()
         });
       }

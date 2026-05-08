@@ -2039,10 +2039,21 @@ const DatabaseStatusIndicator = () => {
       </button>
       
       {/* Tooltip */}
-      <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100]">
-        <p className="text-[9px] text-gray-500 font-medium leading-tight">
-          Backend connection timed out. Data is currently being saved locally. Click retry to reconnect to MySQL.
+      <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl shadow-xl border border-red-100 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-[100]">
+        <p className="text-[10px] text-gray-700 font-bold mb-1">
+          Database Connection Failed
         </p>
+        <p className="text-[9px] text-gray-500 font-medium leading-tight mb-2">
+          Backend connection timed out (ETIMEDOUT). This usually means your MySQL host is blocking our connection.
+        </p>
+        <div className="space-y-1">
+          <p className="text-[8px] text-red-600 font-black uppercase tracking-widest">How to Fix:</p>
+          <ul className="text-[8px] text-gray-600 list-disc pl-3 space-y-0.5">
+            <li>Go to CPanel/Hostinger -&gt; Remote MySQL</li>
+            <li>Add <code className="bg-gray-100 px-0.5 rounded">%</code> to whitelist all IPs</li>
+            <li>Verify Host, Port, and Credentials</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
