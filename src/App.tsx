@@ -430,10 +430,11 @@ const ManagePaymentModal = ({
     }
 
     // Verify overpayment
-    const targetAmount = booking.updatedAmount || booking.totalAmount || 0;
-    const currentTotal = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    // Use a small epsilon to avoid floating point issues
-    if (currentTotal + parseFloat(newPayment.amount.toString()) > targetAmount + 0.01) {
+    const targetAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
+    const currentTotal = Math.round(payments.reduce((sum, p) => sum + (p.amount || 0), 0));
+    const inputAmount = Math.round(parseFloat(newPayment.amount.toString()) || 0);
+
+    if (currentTotal + inputAmount > targetAmount + 0.5) {
       toast.error(`Overpayment not allowed. Due amount is ₹${Math.max(0, targetAmount - currentTotal).toLocaleString()}`);
       return;
     }
@@ -442,7 +443,7 @@ const ManagePaymentModal = ({
     try {
       const { error: payError } = await db.from('booking_payments').insert([{
         booking_id: booking.id,
-        amount: Number(newPayment.amount),
+        amount: inputAmount,
         payment_mode: newPayment.paymentMode,
         payment_date: newPayment.paymentDate,
         payment_type: newPayment.paymentType
@@ -457,10 +458,10 @@ const ManagePaymentModal = ({
       
       if (fetchErr) throw fetchErr;
 
-      const totalCredited = (latestPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-      const targetAmount = booking.updatedAmount || booking.totalAmount || 0;
+      const totalCredited = Math.round((latestPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
+      const finalTargetAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
       
-      const isNowPaid = totalCredited >= targetAmount && targetAmount > 0;
+      const isNowPaid = totalCredited >= finalTargetAmount && finalTargetAmount > 0;
       const updateData: any = {
         advance_amount: totalCredited,
         payment_status: isNowPaid ? 'Paid' : 'Pending'
@@ -494,14 +495,14 @@ const ManagePaymentModal = ({
 
   if (!isOpen || !booking) return null;
 
-  const totalAmount = (booking.updatedAmount || booking.totalAmount || 0);
-  const totalRegular = payments.filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + p.amount, 0);
-  const totalAdvance = payments.filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + p.amount, 0);
-  const totalDiscount = payments.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0);
+  const totalAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
+  const totalRegular = Math.round(payments.filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + p.amount, 0));
+  const totalAdvance = Math.round(payments.filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + p.amount, 0));
+  const totalDiscount = Math.round(payments.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0));
   
-  // User requested logic: booking amount = regular + advance + discount
-  const bookingAmount = totalRegular + totalAdvance + totalDiscount;
-  const pendingAmount = Math.max(0, totalAmount - bookingAmount);
+  const totalPaid = totalRegular + totalAdvance;
+  const bookingReceived = totalPaid + totalDiscount;
+  const pendingAmount = Math.max(0, totalAmount - bookingReceived);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -521,24 +522,24 @@ const ManagePaymentModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100">
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Booking Amount</span>
-              <span className="text-xl font-black text-blue-900">₹{bookingAmount.toLocaleString()}</span>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100 shadow-sm">
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Venue Amt.</span>
+              <span className="text-xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
             </div>
-            <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100">
-              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid Reg.</span>
+            <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100 shadow-sm">
+              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Regular Paid</span>
               <span className="text-xl font-black text-green-900">₹{totalRegular.toLocaleString()}</span>
             </div>
-            <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
-              <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest block mb-1">Advance</span>
+            <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100 shadow-sm">
+              <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest block mb-1">Advance Paid</span>
               <span className="text-xl font-black text-orange-900">₹{totalAdvance.toLocaleString()}</span>
             </div>
-            <div className="bg-purple-50/50 p-4 rounded-3xl border border-purple-100">
-              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest block mb-1">Discount</span>
+            <div className="bg-purple-50/50 p-4 rounded-3xl border border-purple-100 shadow-sm">
+              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest block mb-1">Discount Amount</span>
               <span className="text-xl font-black text-purple-900">₹{totalDiscount.toLocaleString()}</span>
             </div>
-            <div className="bg-red-50/50 p-4 rounded-3xl border border-red-100">
+            <div className="bg-red-50/50 p-4 rounded-3xl border border-red-100 shadow-sm transition-all hover:bg-red-50">
               <span className="text-[9px] font-black text-red-600 uppercase tracking-widest block mb-1">Rem. Balance</span>
               <span className="text-xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
             </div>
@@ -4694,7 +4695,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       const selectedAmenities = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
       const extraServices = selectedAmenities.map(item => ({ 
         name: item.level, 
-        amount: (item.priceRate || 0) * diffDays 
+        amount: Math.round((item.priceRate || 0) * diffDays)
       }));
 
       const bookingData = {
@@ -4711,7 +4712,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: totalAmount,
+        total_amount: Math.round(totalAmount),
         message: message || '',
         party_address: visitorAddress,
         transaction_id: tid,
@@ -6507,7 +6508,7 @@ const BookingManagerView = ({
         const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
         extraServices = selectedAmenities.map(item => ({
           name: item.level,
-          amount: (item.priceRate || 0) * diffDays
+          amount: Math.round((item.priceRate || 0) * diffDays)
         }));
         finalTargetName = manualBooking.targetName + ' (Amenities)';
         
@@ -6536,12 +6537,12 @@ const BookingManagerView = ({
         party_name: manualBooking.partyName,
         party_address: manualBooking.partyAddress,
         visitor_mobile: manualBooking.mobileNumber,
-        status: (finalTotalAmount > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
+        status: (Math.round(finalTotalAmount) > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
         is_manual: true,
         payment_mode: 'Cash',
         payment_status: paymentStatus || 'Pending',
-        total_amount: finalTotalAmount || 0,
-        updated_amount: finalTotalAmount || 0,
+        total_amount: Math.round(finalTotalAmount) || 0,
+        updated_amount: Math.round(finalTotalAmount) || 0,
         transaction_id: tid,
         extra_services: extraServices
       }]);
@@ -7230,20 +7231,18 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
 
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const fullTotalRecord = booking.updatedAmount || booking.totalAmount || 0;
-  const extraServicesTotal = (booking.extra_services || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+  const fullTotalRecord = Math.round(booking.updatedAmount || booking.totalAmount || 0);
+  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (s.amount || 0), 0));
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
-  const subTotal = fullTotalRecord + (expenditure || 0);
-  const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
-  const totalAdvanceLegacy = (booking.advance_amount || 0);
-  // Fix double counting: If we have individual payments, advance_amount is likely synced to the sum.
-  // We should take the total as the maximum of payments sum and legacy advance amount, or better:
-  // if payments exist, trust them.
-  const totalReceived = totalPayments > 0 ? totalPayments : totalAdvanceLegacy;
-  const balanceDue = Math.max(0, subTotal - totalReceived);
-  const isPaid = (balanceDue <= 0.01 && subTotal > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid';
+  const subTotalActual = Math.round(fullTotalRecord + (expenditure || 0));
+  
+  // Accurately sum all payments
+  const totalReceived = Math.round((booking.payments || []).reduce((sum, p) => sum + p.amount, 0));
+  const balanceDue = Math.max(0, subTotalActual - totalReceived);
+  
+  const isPaid = (balanceDue <= 0.5 && subTotalActual > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid';
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
-  const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
+  const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
@@ -7259,7 +7258,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(22);
   doc.setTextColor(234, 88, 12); // orange-600
   doc.setFont("helvetica", "bold");
-  doc.text((booking.targetName || "BUSINESS").toUpperCase(), 105, 35, { align: 'center' });
+  doc.text((booking.targetName || "BUSINESS").toUpperCase(), 105, 35, { align: 'center', maxWidth: 170 });
   
   // Left side: Owner/Provider Name & Mobile
   doc.setFontSize(10);
@@ -7286,9 +7285,9 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + (booking.id || '').substring(0, 8).toUpperCase())}`, 140, 65);
-  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 140, 70);
-  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 140, 75);
+  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + (booking.id || '').substring(0, 8).toUpperCase())}`, 190, 65, { align: 'right' });
+  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 70, { align: 'right' });
+  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 75, { align: 'right' });
   
   // Customer Details (Bill To)
   doc.setFontSize(11);
@@ -7298,50 +7297,55 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(`Name: ${partyName || 'N/A'}`, 20, 93);
-  doc.text(`Mobile: ${partyMobile || 'N/A'}`, 20, 98);
+  doc.text(`Mobile: ${partyMobile}`, 20, 98);
   if (booking.partyAddress) {
-    doc.text(`Address: ${booking.partyAddress}`, 20, 103);
+    doc.text(`Address: ${booking.partyAddress}`, 20, 103, { maxWidth: 100 });
   }
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 108);
-  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 113);
+  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 115);
+  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 120);
   if (booking.startTime) {
-    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 118);
+    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 125);
   }
 
-  // Booking Status
+  // Booking Status (Adjusted Y to prevent overlap if address is long)
   doc.setFont("helvetica", "bold");
-  doc.text(`Booking Status: ${getDisplayStatus()}`, 140, 85);
-  doc.text(`Payment Status: ${(isPaid ? 'paid' : 'pending').toUpperCase()}`, 140, 91);
+  doc.text(`Booking Status:`, 140, 85);
   doc.setFont("helvetica", "normal");
+  doc.text(`${getDisplayStatus()}`, 190, 85, { align: 'right' });
+  
+  doc.setFont("helvetica", "bold");
+  doc.text(`Payment Status:`, 140, 91);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, 91, { align: 'right' });
 
   // Table Header
   doc.setFillColor(245, 245, 245);
-  doc.rect(20, 130, 170, 10, 'F');
+  doc.rect(20, 135, 170, 10, 'F');
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("Description", 25, 137);
-  doc.text("Amount (INR)", 160, 137, { align: 'right' });
+  doc.text("Description", 25, 142);
+  doc.text("Amount (INR)", 185, 142, { align: 'right' });
 
   // Table Rows
-  let currentY = 150;
+  let currentY = 155;
   if (baseAmount > 0) {
     doc.setFont("helvetica", "normal");
-    doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY);
-    doc.text(baseAmount.toLocaleString(), 160, currentY, { align: 'right' });
+    doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY, { maxWidth: 130 });
+    doc.text(baseAmount.toLocaleString(), 185, currentY, { align: 'right' });
     currentY += 10;
   }
 
   if (expenditure > 0) {
     doc.text("Additional Expenditure", 25, currentY);
-    doc.text(expenditure.toLocaleString(), 160, currentY, { align: 'right' });
+    doc.text(Math.round(expenditure).toLocaleString(), 185, currentY, { align: 'right' });
     currentY += 10;
   }
 
   if (booking.extra_services && booking.extra_services.length > 0) {
     booking.extra_services.forEach(service => {
-      doc.text(service.name, 25, currentY);
-      doc.text(service.amount.toLocaleString(), 160, currentY, { align: 'right' });
+      doc.text(service.name, 25, currentY, { maxWidth: 130 });
+      doc.text(Math.round(service.amount || 0).toLocaleString(), 185, currentY, { align: 'right' });
       currentY += 10;
     });
   }
@@ -7351,59 +7355,55 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.line(20, currentY + 5, 190, currentY + 5);
   currentY += 15;
   
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("Total Booking Amount:", 110, currentY);
-  doc.text(`INR ${subTotal.toLocaleString()}`, 185, currentY, { align: 'right' });
+  doc.text("Final Booking Total:", 110, currentY);
+  doc.text(`INR ${subTotalActual.toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 10;
   
   if (totalReceived > 0) {
     doc.setFontSize(10);
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.text("Payments Breakdown:", 25, currentY);
-    currentY += 7;
+    doc.text("Received Payments:", 25, currentY);
+    currentY += 8;
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100);
     
-    if (totalAdvanceLegacy > 0) {
-      doc.text("Advance (Initial Entry):", 25, currentY);
-      doc.text(`(-) INR ${totalAdvanceLegacy.toLocaleString()}`, 160, currentY, { align: 'right' });
-      currentY += 6;
-    }
-    
     (booking.payments || []).forEach(p => {
-       const label = p.paymentType === 'Round off' ? 'Concession' : `${p.paymentType}`;
-       doc.text(`${label} - ${formatDateDDMMYYYY(p.paymentDate)}:`, 25, currentY);
-       doc.text(`(-) INR ${p.amount.toLocaleString()}`, 160, currentY, { align: 'right' });
+       const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
+       doc.text(`${label} (${formatDateDDMMYYYY(p.paymentDate)}):`, 25, currentY);
+       doc.text(`INR ${Math.round(p.amount).toLocaleString()}`, 185, currentY, { align: 'right' });
        currentY += 6;
     });
 
     currentY += 4;
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("Total Received:", 110, currentY);
+    doc.setFontSize(11);
+    doc.text("Total Paid:", 110, currentY);
     doc.setTextColor(22, 101, 52); // Dark Green
-    doc.text(`INR ${totalReceived.toLocaleString()}`, 185, currentY, { align: 'right' });
-    currentY += 10;
+    doc.text(`INR ${totalReceived.toLocaleString()}`, 190, currentY, { align: 'right' });
+    currentY += 12;
   }
   
   doc.setFontSize(14);
   doc.setTextColor(234, 88, 12);
   doc.setFont("helvetica", "bold");
-  doc.text("Balance Due (Total Due):", 110, currentY);
+  doc.text("BALANCE DUE:", 110, currentY);
   doc.text(`INR ${balanceDue.toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 12;
+  currentY += 15;
 
   // Amount in words
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "italic");
-  doc.text(`Amount in words (Balance): ${numberToWords(balanceDue)}`, 20, currentY);
+  const words = `Amount in words (Balance): ${numberToWords(balanceDue)}`;
+  const splitWords = doc.splitTextToSize(words, 170);
+  doc.text(splitWords, 20, currentY);
 
   // --- Footer ---
   doc.setDrawColor(234, 88, 12);
@@ -8424,16 +8424,17 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       const years = Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a));
                       
                       const aggregates = filteredForReport.reduce((acc, b) => {
-                        const total = b.updatedAmount || b.totalAmount || 0;
-                        const paidTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
-                        const discTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
-                        const totalCredited = paidTotal + discTotal;
-                        const pending = Math.max(0, total - totalCredited);
+                        const total = Math.round(b.updatedAmount || b.totalAmount || 0);
+                        const paidTotal = Math.round((b.payments || []).reduce((sum, p) => sum + p.amount, 0));
+                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0));
+                        const actualCashPaid = paidTotal - discountOnly;
+                        
+                        const pending = Math.max(0, total - paidTotal);
                         
                         return {
                           total: acc.total + total,
-                          paid: acc.paid + paidTotal,
-                          discount: acc.discount + discTotal,
+                          paid: acc.paid + actualCashPaid,
+                          discount: acc.discount + discountOnly,
                           pending: acc.pending + pending
                         };
                       }, { total: 0, paid: 0, discount: 0, pending: 0 });
@@ -8560,8 +8561,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                           </thead>
                           <tbody className="divide-y divide-gray-50">
                             {bookings.filter(b => {
-                              const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
-                              const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+                              const matchesName = (b.visitorName?.toLowerCase() || '').includes(reportFilters.name.toLowerCase()) || (b.partyName?.toLowerCase() || '').includes(reportFilters.name.toLowerCase());
+                              const matchesMobile = (b.visitorMobile || '').includes(reportFilters.mobile);
                               const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
                               const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
                               const bDate = new Date(b.eventDate);
@@ -8570,13 +8571,12 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               const matchesYear = !reportFilters.year || b.eventDate.startsWith(reportFilters.year);
                               return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
                             }).map((b, index) => {
-                              const subTotal = (b.updatedAmount || b.totalAmount || 0);
-                              const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-                              const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-                              const totalCredited = paymentsTotal + discountTotal;
-                              const totalRec = totalCredited > 0 ? totalCredited : (b.advance_amount || 0);
-                              const pending = Math.max(0, subTotal - totalRec);
-                              const isPaid = (pending <= 0.01 && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+                              const subTotal = Math.round(b.updatedAmount || b.totalAmount || 0);
+                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + p.amount, 0));
+                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0));
+                              const cashPaidTotal = totalReceived - discountTotal;
+                              const pending = Math.max(0, subTotal - totalReceived);
+                              const isPaid = (pending <= 0.5 && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
                               
                               return (
                                 <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
@@ -8599,7 +8599,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                     {b.transaction_id || ('INV-' + b.id.substring(0, 8).toUpperCase())}
                                   </td>
                                   <td className="py-4 font-bold text-gray-900">₹{subTotal.toLocaleString()}</td>
-                                  <td className="py-4 font-bold text-orange-600">₹{paymentsTotal.toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-orange-600">₹{cashPaidTotal.toLocaleString()}</td>
                                   <td className="py-4 font-bold text-green-600">₹{discountTotal.toLocaleString()}</td>
                                   <td className="py-4 font-black text-blue-600">₹{pending.toLocaleString()}</td>
                                   <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
