@@ -503,6 +503,7 @@ const ManagePaymentModal = ({
   const totalPaid = totalRegular + totalAdvance;
   const bookingReceived = totalPaid + totalDiscount;
   const pendingAmount = Math.max(0, totalAmount - bookingReceived);
+  const isFullyPaid = pendingAmount < 1 && totalAmount > 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -551,7 +552,7 @@ const ManagePaymentModal = ({
                 <Clock className="mr-2 text-orange-600" size={20} />
                 Transaction History
               </h4>
-              {pendingAmount > 1 && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
+              {!isFullyPaid && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
                 <button 
                   onClick={() => setIsRegistering(true)}
                   className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
@@ -7237,10 +7238,10 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const subTotalActual = Math.round(fullTotalRecord + (expenditure || 0));
   
   // Accurately sum all payments
-  const totalReceived = Math.round((booking.payments || []).reduce((sum, p) => sum + p.amount, 0));
+  const totalReceived = Math.round((booking.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
-  const isPaid = (balanceDue <= 0.5 && subTotalActual > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid';
+  const isPaid = (balanceDue <= 1 && subTotalActual > 0) || (booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid';
   const partyName = booking.isManual ? booking.partyName : booking.visitorName;
   const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
   
@@ -7386,7 +7387,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     (booking.payments || []).forEach(p => {
        const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
        doc.text(`${label} (${formatDateDDMMYYYY(p.paymentDate)}):`, 25, currentY);
-       doc.text(`INR ${Math.round(p.amount).toLocaleString()}`, 185, currentY, { align: 'right' });
+       doc.text(`INR ${Math.round(p.amount || 0).toLocaleString()}`, 185, currentY, { align: 'right' });
        currentY += 6;
     });
 
@@ -9103,9 +9104,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     <span>Amount</span>
                   </button>
                   <button 
-                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)}
+                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)}
                     onClick={() => {
-                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) {
+                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) {
                         toast.error('Payment is already completed');
                         return;
                       }
@@ -9114,7 +9115,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     }}
                     className={cn(
                       "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
-                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                     )}
                   >
                     <IndianRupee size={12} className="md:size-4" />
@@ -10743,20 +10744,25 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
         return;
       }
 
+      const updatePayload: any = {
+        display_name: formData.displayName,
+        father_name: formData.fatherName,
+        mobile_number: formData.mobileNumber,
+        photo_url: formData.photoURL,
+        state: formData.state,
+        district: formData.district,
+        block: formData.block,
+        pincode: formData.pincode,
+        venue_type: formData.venueType
+      };
+
+      if (formData.email) {
+        updatePayload.email = formData.email;
+      }
+
       const { error } = await db
         .from('users')
-        .update({
-          display_name: formData.displayName,
-          father_name: formData.fatherName,
-          mobile_number: formData.mobileNumber,
-          email: formData.email,
-          photo_url: formData.photoURL,
-          state: formData.state,
-          district: formData.district,
-          block: formData.block,
-          pincode: formData.pincode,
-          venue_type: formData.venueType
-        })
+        .update(updatePayload)
         .eq('uid', user?.uid);
 
       if (error) throw error;
@@ -10816,9 +10822,8 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Email ID</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Email ID (Optional)</label>
             <input 
-              required
               type="email" 
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
               value={formData.email}
