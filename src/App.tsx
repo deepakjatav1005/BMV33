@@ -467,7 +467,7 @@ const ManagePaymentModal = ({
         payment_status: isNowPaid ? 'Paid' : 'Pending'
       };
 
-      if (isNowPaid && (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'paid' || booking.status === 'approved')) {
+      if (isNowPaid && (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'paid' || booking.status === 'approved' || (booking.status || '').toLowerCase().includes('approved'))) {
         updateData.status = 'completed';
       }
 
@@ -496,9 +496,9 @@ const ManagePaymentModal = ({
   if (!isOpen || !booking) return null;
 
   const totalAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
-  const totalRegular = Math.round(payments.filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + p.amount, 0));
-  const totalAdvance = Math.round(payments.filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + p.amount, 0));
-  const totalDiscount = Math.round(payments.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0));
+  const totalRegular = Math.round((payments || []).filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + (p.amount || 0), 0));
+  const totalAdvance = Math.round((payments || []).filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + (p.amount || 0), 0));
+  const totalDiscount = Math.round((payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (p.amount || 0), 0));
   
   const totalPaid = totalRegular + totalAdvance;
   const bookingReceived = totalPaid + totalDiscount;
@@ -551,7 +551,7 @@ const ManagePaymentModal = ({
                 <Clock className="mr-2 text-orange-600" size={20} />
                 Transaction History
               </h4>
-              {pendingAmount > 0.01 && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
+              {pendingAmount > 1 && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
                 <button 
                   onClick={() => setIsRegistering(true)}
                   className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
@@ -6718,7 +6718,7 @@ const BookingManagerView = ({
                           }}
                           className={cn(
                             "p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all border",
-                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
+                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || (Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0) >= Math.round(booking.updatedAmount || booking.totalAmount || 0) && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
                           )}
                           title="Manage Payments"
                         >
@@ -7283,14 +7283,17 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFont("helvetica", "bold");
   doc.text("INVOICE", 20, 65);
   
+  // Right side: Business Address/Inoice Meta
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
+  doc.setTextColor(100);
   doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + (booking.id || '').substring(0, 8).toUpperCase())}`, 190, 65, { align: 'right' });
   doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 70, { align: 'right' });
   doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 75, { align: 'right' });
-  
+
   // Customer Details (Bill To)
   doc.setFontSize(11);
+  doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("BILL TO:", 20, 85);
   
@@ -7298,16 +7301,22 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFont("helvetica", "normal");
   doc.text(`Name: ${partyName || 'N/A'}`, 20, 93);
   doc.text(`Mobile: ${partyMobile}`, 20, 98);
+  
+  let currentY_BillTo = 103;
   if (booking.partyAddress) {
-    doc.text(`Address: ${booking.partyAddress}`, 20, 103, { maxWidth: 100 });
+    const addr = `Address: ${booking.partyAddress}`;
+    const splitAddr = doc.splitTextToSize(addr, 100);
+    doc.text(splitAddr, 20, currentY_BillTo);
+    currentY_BillTo += (splitAddr.length * 5);
   }
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, 115);
-  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, 120);
+  
+  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, currentY_BillTo + 2);
+  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, currentY_BillTo + 7);
   if (booking.startTime) {
-    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, 125);
+    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, currentY_BillTo + 12);
   }
 
-  // Booking Status (Adjusted Y to prevent overlap if address is long)
+  // Booking Status
   doc.setFont("helvetica", "bold");
   doc.text(`Booking Status:`, 140, 85);
   doc.setFont("helvetica", "normal");
@@ -7319,16 +7328,17 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, 91, { align: 'right' });
 
   // Table Header
+  const tableStartY = Math.max(135, currentY_BillTo + 20);
   doc.setFillColor(245, 245, 245);
-  doc.rect(20, 135, 170, 10, 'F');
+  doc.rect(20, tableStartY, 170, 10, 'F');
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("Description", 25, 142);
-  doc.text("Amount (INR)", 185, 142, { align: 'right' });
+  doc.text("Description", 25, tableStartY + 7);
+  doc.text("Amount (INR)", 185, tableStartY + 7, { align: 'right' });
 
   // Table Rows
-  let currentY = 155;
+  let currentY = tableStartY + 15;
   if (baseAmount > 0) {
     doc.setFont("helvetica", "normal");
     doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY, { maxWidth: 130 });
@@ -7761,36 +7771,37 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
     const filteredBookings = bookings.filter(b => {
-      const matchesName = b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) || b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase());
-      const matchesMobile = b.visitorMobile?.includes(reportFilters.mobile);
+      const bName = (b.visitorName || b.partyName || '').toLowerCase();
+      const bMobile = b.visitorMobile || '';
+      const matchesName = !reportFilters.name || bName.includes(reportFilters.name.toLowerCase());
+      const matchesMobile = !reportFilters.mobile || bMobile.includes(reportFilters.mobile);
       const matchesMode = !reportFilters.paymentMode || b.paymentMode === reportFilters.paymentMode;
       const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
       const bDate = new Date(b.eventDate);
       const matchesStart = !reportFilters.startDate || bDate >= new Date(reportFilters.startDate);
       const matchesEnd = !reportFilters.endDate || bDate <= new Date(reportFilters.endDate);
-      return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType;
+      const matchesYear = !reportFilters.year || b.eventDate.startsWith(reportFilters.year);
+      return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
     });
 
     if (type === 'excel') {
       const data = filteredBookings.map((b, index) => {
-        const subTotal = (b.updatedAmount || b.totalAmount || 0);
-        const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-        const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-        
-        // Total credited = regular + advance + discount
-        const totalCredited = paymentsTotal + discountTotal;
-        const pending = Math.max(0, subTotal - totalCredited);
+        const total = Math.round(b.updatedAmount || b.totalAmount || 0);
+        const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
+        const discTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
+        const cashPaid = totalReceived - discTotal;
+        const pending = Math.max(0, total - totalReceived);
         
         return {
           'S.No': index + 1,
-          'Status': (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed Successfully' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : (b.status || 'Pending'),
+          'Status': (pending <= 1 && total > 0) ? 'Completed' : (b.status === 'cancelled' ? 'Cancelled' : b.status ? b.status.toUpperCase() : 'PENDING'),
           'Party Name': b.partyName || b.visitorName || 'N/A',
           'Mobile': b.visitorMobile || 'N/A',
           'Date': formatDateDDMMYYYY(b.eventDate),
-          'Invoice No': `INV-${(b.id || '').substring(0, 8).toUpperCase()}`,
-          'Actual Amount': subTotal,
-          'Received Amount': paymentsTotal,
-          'Discount': discountTotal,
+          'Invoice No': b.transaction_id || `INV-${(b.id || '').substring(0, 8).toUpperCase()}`,
+          'Actual Amount': total,
+          'Cash Paid': cashPaid,
+          'Discount': discTotal,
           'Pending Amount': pending,
           'Type': b.isManual ? 'Manual' : 'Order'
         };
@@ -7798,36 +7809,36 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
-      XLSX.writeFile(workbook, "booking_report.xlsx");
+      XLSX.writeFile(workbook, `Booking_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     } else {
       const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
       doc.setFontSize(10);
-      doc.text(`Generated on: ${formatDateTime12h(new Date())}`, 14, 30);
+      doc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 30);
       
       const tableHeaders = [
-        ['S.No', 'Status', 'Customer', 'Mobile', 'Address', 'Date', 'Inv No', 'Inv.Amt', 'Paid', 'Pending', 'Type']
+        ['S.No', 'Status', 'Customer', 'Mobile', 'Date', 'Inv No', 'Total', 'Paid(Cash)', 'Disc.', 'Pending', 'Type']
       ];
       
       const pdfData = filteredBookings.map((b, index) => {
-        const subTotal = (b.updatedAmount || b.totalAmount || 0);
-        const paymentsTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-        const discountTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0) || 0;
-        const totalCredited = paymentsTotal + discountTotal;
-        const pending = Math.max(0, subTotal - totalCredited);
+        const total = Math.round(b.updatedAmount || b.totalAmount || 0);
+        const totalRec = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
+        const disc = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
+        const cash = totalRec - disc;
+        const pending = Math.max(0, total - totalRec);
         
         return [
           (index + 1).toString(),
-          (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || pending <= 0.01) ? 'Completed Successfully' : b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Rejected' : 'Pending',
-          (b.partyName || b.visitorName || 'N/A').substring(0, 15),
+          (pending <= 1 && total > 0) ? 'COMPLETED' : (b.status || 'PENDING').toUpperCase(),
+          (b.partyName || b.visitorName || 'N/A').substring(0, 20),
           b.visitorMobile || 'N/A',
-          (b.partyAddress || 'N/A').substring(0, 10),
           formatDateDDMMYYYY(b.eventDate),
-          (b.id || '').substring(0, 5).toUpperCase(),
-          subTotal.toString(),
-          paymentsTotal.toString(),
-          pending.toString(),
+          (b.transaction_id || b.id.substring(0, 8)).toUpperCase(),
+          total.toLocaleString(),
+          cash.toLocaleString(),
+          disc.toLocaleString(),
+          pending.toLocaleString(),
           b.isManual ? 'M' : 'O'
         ];
       });
@@ -7837,11 +7848,11 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
         body: pdfData,
         startY: 40,
         theme: 'grid',
-        styles: { fontSize: 7 },
+        styles: { fontSize: 7, font: 'helvetica' },
         headStyles: { fillColor: [234, 88, 12] }
       });
       
-      doc.save("booking_report.pdf");
+      doc.save(`Booking_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
     }
     toast.success(`Report downloaded as ${type.toUpperCase()}`);
   };
@@ -8092,18 +8103,16 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const stats = useMemo(() => {
     const isPaidFunc = (b: Booking) => {
-      const base = b.updatedAmount || b.totalAmount || 0;
-      const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
-      const totalRec = paymentsTotal > 0 ? paymentsTotal : (b.advance_amount || 0);
-      // We check for full payment or explicit status
-      return (totalRec >= base && base > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+      const base = Math.round(b.updatedAmount || b.totalAmount || 0);
+      const paymentsTotal = Math.round((b.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
+      return (paymentsTotal >= base && base > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
     };
 
     return {
-      total: bookings.length,
-      pending: bookings.filter(b => !b.isManual && b.status === 'pending').length,
-      approved: bookings.filter(b => (b.isManual || b.status === 'confirmed') && !isPaidFunc(b)).length,
-      paid: bookings.filter(b => isPaidFunc(b)).length
+      total: bookings.length || 0,
+      pending: bookings.filter(b => !b.isManual && b.status === 'pending').length || 0,
+      approved: bookings.filter(b => (b.isManual || b.status === 'confirmed' || b.status === 'approved') && !isPaidFunc(b)).length || 0,
+      paid: bookings.filter(b => isPaidFunc(b)).length || 0
     };
   }, [bookings]);
 
@@ -8411,8 +8420,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                     {(() => {
                       const filteredForReport = bookings.filter(b => {
                         if (reportFilters.year && !b.eventDate.startsWith(reportFilters.year)) return false;
-                        if (reportFilters.name && !b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) && !b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase())) return false;
-                        if (reportFilters.mobile && !b.visitorMobile?.includes(reportFilters.mobile)) return false;
+                        if (reportFilters.name && !((b.visitorName || '').toLowerCase().includes(reportFilters.name.toLowerCase()) || (b.partyName || '').toLowerCase().includes(reportFilters.name.toLowerCase()))) return false;
+                        if (reportFilters.mobile && !(b.visitorMobile || '').includes(reportFilters.mobile)) return false;
                         if (reportFilters.startDate && b.eventDate < reportFilters.startDate) return false;
                         if (reportFilters.endDate && b.eventDate > reportFilters.endDate) return false;
                         if (reportFilters.paymentMode && b.paymentMode !== reportFilters.paymentMode) return false;
@@ -8425,15 +8434,15 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       
                       const aggregates = filteredForReport.reduce((acc, b) => {
                         const total = Math.round(b.updatedAmount || b.totalAmount || 0);
-                        const paidTotal = Math.round((b.payments || []).reduce((sum, p) => sum + p.amount, 0));
-                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0));
-                        const actualCashPaid = paidTotal - discountOnly;
+                        const totalReceived = Math.round((b.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
+                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (p.amount || 0), 0));
+                        const cashPaid = totalReceived - discountOnly;
                         
-                        const pending = Math.max(0, total - paidTotal);
+                        const pending = Math.max(0, total - totalReceived);
                         
                         return {
                           total: acc.total + total,
-                          paid: acc.paid + actualCashPaid,
+                          paid: acc.paid + cashPaid,
                           discount: acc.discount + discountOnly,
                           pending: acc.pending + pending
                         };
@@ -8441,21 +8450,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
                       return (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                          <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 flex flex-col items-center">
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Booking</span>
-                            <span className="text-xl font-black text-blue-900">₹{aggregates.total.toLocaleString()}</span>
+                          <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 flex flex-col items-center shadow-sm">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Bookings</span>
+                            <span className="text-xl font-black text-blue-900">₹{(aggregates.total || 0).toLocaleString()}</span>
                           </div>
-                          <div className="bg-green-50/70 p-5 rounded-3xl border border-green-100 flex flex-col items-center">
-                            <span className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Total Paid</span>
-                            <span className="text-xl font-black text-green-900">₹{aggregates.paid.toLocaleString()}</span>
+                          <div className="bg-green-50/70 p-5 rounded-3xl border border-green-100 flex flex-col items-center shadow-sm">
+                            <span className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Total Received</span>
+                            <span className="text-xl font-black text-green-900">₹{(aggregates.paid || 0).toLocaleString()}</span>
                           </div>
-                          <div className="bg-purple-50/70 p-5 rounded-3xl border border-purple-100 flex flex-col items-center">
+                          <div className="bg-purple-50/70 p-5 rounded-3xl border border-purple-100 flex flex-col items-center shadow-sm">
                             <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Total Discount</span>
-                            <span className="text-xl font-black text-purple-900">₹{aggregates.discount.toLocaleString()}</span>
+                            <span className="text-xl font-black text-purple-900">₹{(aggregates.discount || 0).toLocaleString()}</span>
                           </div>
-                          <div className="bg-red-50/70 p-5 rounded-3xl border border-red-100 flex flex-col items-center">
+                          <div className="bg-red-50/70 p-5 rounded-3xl border border-red-100 flex flex-col items-center shadow-sm">
                             <span className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Total Pending</span>
-                            <span className="text-xl font-black text-red-900">₹{aggregates.pending.toLocaleString()}</span>
+                            <span className="text-xl font-black text-red-900">₹{(aggregates.pending || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       );
@@ -8572,8 +8581,8 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
                             }).map((b, index) => {
                               const subTotal = Math.round(b.updatedAmount || b.totalAmount || 0);
-                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + p.amount, 0));
-                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + p.amount, 0));
+                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
+                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
                               const cashPaidTotal = totalReceived - discountTotal;
                               const pending = Math.max(0, subTotal - totalReceived);
                               const isPaid = (pending <= 0.5 && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
@@ -9094,9 +9103,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     <span>Amount</span>
                   </button>
                   <button 
-                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)}
+                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)}
                     onClick={() => {
-                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) {
+                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) {
                         toast.error('Payment is already completed');
                         return;
                       }
@@ -9105,7 +9114,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     }}
                     className={cn(
                       "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
-                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || ((b.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0) >= Math.round(b.updatedAmount || b.totalAmount || 0) && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                     )}
                   >
                     <IndianRupee size={12} className="md:size-4" />
