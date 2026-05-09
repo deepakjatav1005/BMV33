@@ -1,0 +1,126 @@
+106:      is_manual BOOLEAN DEFAULT FALSE,
+1123:  // Re-fetch if visitor manually changes mobile number
+1448:  // Re-check for existing review if visitor manually changes mobile number
+4200:              <p className="text-orange-100 opacity-80">Every venue and provider is manually verified for quality and reliability.</p>
+6103:  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+6110:  const [manualBooking, setManualBooking] = useState<{
+6149:    const item = [...venues, ...services].find(i => i.id === manualBooking.targetId);
+6150:    if (manualBooking.bookingMode === 'partial' && item) {
+6152:        const start = new Date(manualBooking.eventDate);
+6153:        const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+6157:        const selectedAmenities = item.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
+6159:        setManualBooking(prev => ({ ...prev, totalAmount: amenitiesTotal }));
+6161:    } else if (manualBooking.bookingMode === 'complete' && item) {
+6162:       const start = new Date(manualBooking.eventDate);
+6163:       const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+6175:       setManualBooking(prev => ({ ...prev, totalAmount: basePrice * diffDays }));
+6177:  }, [manualBooking.bookingMode, manualBooking.selectedItems, manualBooking.eventDate, manualBooking.endDate, manualBooking.targetId, venues, services]);
+6180:  const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
+6244:        isManual: d.is_manual,
+6311:    // Show only manual bookings in Booking Manager
+6312:    if (!b.isManual) return false;
+6432:    const item = [...venues, ...services].find(v => v.id === manualBooking.targetId);
+6436:    const start = new Date(manualBooking.eventDate);
+6437:    const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+6441:    if (manualBooking.bookingMode === 'complete') {
+6445:      const selectedAmenities = item.catalogue?.filter(c => manualBooking.selectedItems.includes(c.id || '')) || [];
+6449:    if (total !== manualBooking.totalAmount) {
+6450:      setManualBooking(prev => ({ ...prev, totalAmount: total }));
+6452:  }, [manualBooking.targetId, manualBooking.eventDate, manualBooking.endDate, manualBooking.bookingMode, manualBooking.selectedItems]);
+6454:  const handleManualBooking = async (e: React.FormEvent) => {
+6456:    if (!manualBooking.targetId || !manualBooking.eventDate || !manualBooking.partyName) {
+6461:    if (!manualCallSatisfied) {
+6467:    if (manualBooking.eventDate < todayStr) {
+6483:      const targetVenue = venues.find(v => v.id === manualBooking.targetId);
+6488:      let finalTargetName = manualBooking.targetName;
+6489:      let finalTotalAmount = manualBooking.totalAmount;
+6491:      const start = new Date(manualBooking.eventDate);
+6492:      const end = manualBooking.endDate ? new Date(manualBooking.endDate) : start;
+6496:      if (manualBooking.bookingMode === 'partial' && targetVenue?.catalogue) {
+6497:        const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
+6502:        finalTargetName = manualBooking.targetName + ' (Amenities)';
+6511:        finalTargetName = manualBooking.targetName + ' (Venue)';
+6518:        target_id: manualBooking.targetId,
+6521:        event_date: manualBooking.eventDate,
+6522:        end_date: manualBooking.endDate || null,
+6523:        start_time: manualBooking.startTime,
+6524:        end_time: manualBooking.endTime,
+6525:        event_type: manualBooking.eventType,
+6526:        party_name: manualBooking.partyName,
+6527:        party_address: manualBooking.partyAddress,
+6528:        visitor_mobile: manualBooking.mobileNumber,
+6530:        is_manual: true,
+6539:      setIsManualModalOpen(false);
+6541:        `Hello ${manualBooking.partyName}, your booking for *${finalTargetName}* has been confirmed!%0A%0A` +
+6543:        `*Date:* ${formatDateDDMMYYYY(manualBooking.eventDate)}${manualBooking.endDate ? ' to ' + formatDateDDMMYYYY(manualBooking.endDate) : ''}%0A` +
+6544:        `*Time:* ${formatTime12h(manualBooking.startTime)} - ${formatTime12h(manualBooking.endTime)}%0A` +
+6545:        `*Event:* ${manualBooking.eventType}%0A%0A` +
+6549:      sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
+6550:      toast.success('Manual booking added and locked as accepted');
+6551:      setManualBooking({
+6566:      setManualCallSatisfied(false);
+6570:      console.error('Manual Booking Error:', err);
+6574:        toast.error(`Failed to add manual booking: ${err.message || 'Unknown error'}`);
+6609:            onClick={() => setIsManualModalOpen(true)}
+6613:            <span>Manual Entry</span>
+6634:                      {booking.isManual ? booking.partyName : booking.visitorName}
+6636:                    {booking.isManual && (
+6637:                      <span className="bg-gray-100 text-gray-500 text-[6px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Manual</span>
+6757:            <p className="text-gray-500">Your booking requests and manual entries will appear here.</p>
+6782:      {/* Manual Booking Modal */}
+6784:        {isManualModalOpen && (
+6790:              onClick={() => setIsManualModalOpen(false)}
+6801:                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Manual Booking</h2>
+6802:                  <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+6807:                <form onSubmit={handleManualBooking} className="space-y-4 md:space-y-6">
+6814:                        value={manualBooking.targetId}
+6818:                          setManualBooking({...manualBooking, targetId: id, targetName: name});
+6837:                        value={manualBooking.partyName}
+6838:                        onChange={(e) => setManualBooking({...manualBooking, partyName: e.target.value})}
+6849:                        value={manualBooking.mobileNumber}
+6852:                          setManualBooking({...manualBooking, mobileNumber: val});
+6862:                        value={manualBooking.partyAddress}
+6863:                        onChange={(e) => setManualBooking({...manualBooking, partyAddress: e.target.value})}
+6872:                        value={manualBooking.eventDate}
+6873:                        onChange={(e) => setManualBooking({...manualBooking, eventDate: e.target.value})}
+6881:                        value={manualBooking.endDate}
+6882:                        onChange={(e) => setManualBooking({...manualBooking, endDate: e.target.value})}
+6891:                        value={manualBooking.startTime}
+6892:                        onChange={(e) => setManualBooking({...manualBooking, startTime: e.target.value})}
+6901:                        value={manualBooking.endTime}
+6902:                        onChange={(e) => setManualBooking({...manualBooking, endTime: e.target.value})}
+6910:                        value={manualBooking.eventType}
+6911:                        onChange={(e) => setManualBooking({...manualBooking, eventType: e.target.value})}
+6920:                      const item = [...venues, ...services].find(v => v.id === manualBooking.targetId);
+6934:                              onClick={() => setManualBooking({...manualBooking, bookingMode: 'complete'})}
+6937:                                manualBooking.bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+6944:                              onClick={() => setManualBooking({...manualBooking, bookingMode: 'partial'})}
+6947:                                manualBooking.bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+6954:                          {manualBooking.bookingMode === 'partial' && (
+6964:                                        checked={manualBooking.selectedItems.includes(catItem.id || '')}
+6966:                                          if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, catItem.id || '']});
+6967:                                          else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== catItem.id)});
+6990:                        value={manualBooking.totalAmount}
+6991:                        onChange={(e) => setManualBooking({...manualBooking, totalAmount: parseFloat(e.target.value) || 0})}
+6994:                        {manualBooking.bookingMode === 'complete' 
+6996:                          : "Calculated based on selected amenities. You can override manually."}
+7007:                          checked={manualCallSatisfied}
+7008:                          onChange={(e) => setManualCallSatisfied(e.target.checked)}
+7012:                        I have connected with the party via call and I am satisfied to proceed with this manual booking request.
+7019:                    disabled={!manualCallSatisfied}
+7022:                      manualCallSatisfied ? "bg-orange-600 text-white shadow-xl shadow-orange-200 hover:bg-orange-700" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+7025:                    Confirm Manual Booking
+7235:  const partyName = booking.isManual ? booking.partyName : booking.visitorName;
+7236:  const partyMobile = booking.isManual ? booking.visitorMobile : booking.visitorMobile;
+7757:      const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
+7785:          'Type': b.isManual ? 'Manual' : 'Order'
+7821:          b.isManual ? 'M' : 'O'
+7954:            isManual: d.is_manual,
+8094:      pending: bookings.filter(b => !b.isManual && b.status === 'pending').length,
+8095:      approved: bookings.filter(b => (b.isManual || b.status === 'confirmed') && !isPaidFunc(b)).length,
+8409:                        if (reportFilters.bookingType === 'Order' && b.isManual) return false;
+8410:                        if (reportFilters.bookingType === 'Manual' && !b.isManual) return false;
+8526:                          <option value="Manual">Manual</option>
+8556:                              const matchesType = !reportFilters.bookingType || (reportFilters.bookingType === 'Manual' ? b.isManual : !b.isManual);
+8595:                                  <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
+8775:    if (b.isManual) return false;

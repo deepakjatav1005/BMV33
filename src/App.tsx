@@ -499,8 +499,9 @@ const ManagePaymentModal = ({
   const totalAdvance = payments.filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + p.amount, 0);
   const totalDiscount = payments.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0);
   
-  const totalCredited = totalRegular + totalAdvance + totalDiscount;
-  const pendingAmount = Math.max(0, totalAmount - totalCredited);
+  // User requested logic: booking amount = regular + advance + discount
+  const bookingAmount = totalRegular + totalAdvance + totalDiscount;
+  const pendingAmount = Math.max(0, totalAmount - bookingAmount);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -522,12 +523,12 @@ const ManagePaymentModal = ({
         <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100">
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Book.</span>
-              <span className="text-xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Booking Amount</span>
+              <span className="text-xl font-black text-blue-900">₹{bookingAmount.toLocaleString()}</span>
             </div>
             <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100">
-              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid</span>
-              <span className="text-xl font-black text-green-900">₹{totalCredited.toLocaleString()}</span>
+              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Paid Reg.</span>
+              <span className="text-xl font-black text-green-900">₹{totalRegular.toLocaleString()}</span>
             </div>
             <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
               <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest block mb-1">Advance</span>
@@ -538,7 +539,7 @@ const ManagePaymentModal = ({
               <span className="text-xl font-black text-purple-900">₹{totalDiscount.toLocaleString()}</span>
             </div>
             <div className="bg-red-50/50 p-4 rounded-3xl border border-red-100">
-              <span className="text-[9px] font-black text-red-600 uppercase tracking-widest block mb-1">Pending</span>
+              <span className="text-[9px] font-black text-red-600 uppercase tracking-widest block mb-1">Rem. Balance</span>
               <span className="text-xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
             </div>
           </div>
@@ -1698,7 +1699,7 @@ const VideoUpload = ({
   currentVideo = "",
   multiple = false
 }: { 
-  onUpload: (url: string) => void, 
+  onUpload: (url: string) => void | Promise<any>, 
   label?: string,
   currentVideo?: string,
   multiple?: boolean
@@ -1722,21 +1723,24 @@ const VideoUpload = ({
           // Check duration
           const video = document.createElement('video');
           video.preload = 'metadata';
-          await new Promise<void>((resolve, reject) => {
-            video.onloadedmetadata = function() {
-              window.URL.revokeObjectURL(video.src);
-              if (video.duration > 60) { 
-                toast.error(`Video ${file.name} is too long (max 60 seconds)`);
-                reject('duration');
-              } else {
-                resolve();
-              }
-            };
-            video.onerror = () => reject('metadata');
-            video.src = URL.createObjectURL(file);
-          }).then(() => uploadFile(file)).catch((err) => {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              video.onloadedmetadata = function() {
+                window.URL.revokeObjectURL(video.src);
+                if (video.duration > 60) { 
+                  toast.error(`Video ${file.name} is too long (max 60 seconds)`);
+                  reject('duration');
+                } else {
+                  resolve();
+                }
+              };
+              video.onerror = () => reject('metadata');
+              video.src = URL.createObjectURL(file);
+            });
+            await uploadFile(file);
+          } catch (err) {
             if (err === 'metadata') toast.error(`Could not load video metadata for ${file.name}`);
-          });
+          }
       }
     } finally {
       setIsUploading(false);
@@ -1762,7 +1766,7 @@ const VideoUpload = ({
         .from('images')
         .getPublicUrl(filePath);
 
-      onUpload(publicUrl);
+      await onUpload(publicUrl);
       toast.success(`Video ${file.name} uploaded`);
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -1811,7 +1815,7 @@ const ImageUpload = ({
   currentImage = "",
   multiple = false
 }: { 
-  onUpload: (url: string) => void, 
+  onUpload: (url: string | string[]) => void | Promise<any>, 
   label?: string,
   currentImage?: string,
   multiple?: boolean
@@ -1820,56 +1824,66 @@ const ImageUpload = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
+    const files = Array.from(fileList);
     setIsUploading(true);
+    
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const uploadPromises = files.map(async (file) => {
         if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-          toast.error(`File ${file.name} is not a valid image (JPEG, PNG, WEBP, GIF supported)`);
-          continue;
+          throw new Error(`File ${file.name} is not a valid image`);
         }
 
         if (file.size > 20 * 1024 * 1024) { 
-          toast.error(`File ${file.name} is too large (max 20MB)`);
-          continue;
+          throw new Error(`File ${file.name} is too large (max 20MB)`);
         }
 
         if (file.type === 'image/gif') {
-          await uploadRawFile(file);
+          return await uploadRawFile(file);
         } else {
-          await processAndUpload(file);
+          return await processAndUpload(file);
+        }
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      const filteredUrls = urls.filter(u => u) as string[];
+      
+      if (filteredUrls.length > 0) {
+        if (multiple) {
+          await onUpload(filteredUrls);
+        } else {
+          await onUpload(filteredUrls[0]);
         }
       }
+    } catch (err: any) {
+      console.error('Final upload error:', err);
+      toast.error(err.message || 'Upload failed');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const processAndUpload = async (file: File) => {
+  const processAndUpload = async (file: File): Promise<string | null> => {
     try {
-      // Client-side resizing and auto-cropping to square for uniformity
       const img = document.createElement('img');
-      img.crossOrigin = 'anonymous';
       img.src = URL.createObjectURL(file);
       
       await new Promise((resolve, reject) => {
         img.onload = resolve;
-        img.onerror = () => reject(new Error('Failed to load image for processing'));
+        img.onerror = reject;
       });
 
       const canvas = document.createElement('canvas');
-      const SIZE = 1080; // Target high-quality size
+      const SIZE = 1080;
       canvas.width = SIZE;
       canvas.height = SIZE;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      // Auto-crop (Center-crop) and shrink to fit (Cover) logic
       const scale = Math.max(SIZE / img.width, SIZE / img.height);
       const x = (SIZE / 2) - (img.width / 2) * scale;
       const y = (SIZE / 2) - (img.height / 2) * scale;
@@ -1886,7 +1900,6 @@ const ImageUpload = ({
 
       if (!blob) throw new Error('Failed to process image');
 
-      // Use a more unique path to prevent conflicts
       const filePath = `uploads/${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${file.name.replace(/\s+/g, '_')}.jpg`;
       
       const { error } = await db.storage
@@ -1903,15 +1916,15 @@ const ImageUpload = ({
         .from('images')
         .getPublicUrl(filePath);
 
-      onUpload(publicUrl);
       URL.revokeObjectURL(img.src);
-    } catch (err: any) {
-      console.error('Upload Error:', err);
-      toast.error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
+      return publicUrl;
+    } catch (err) {
+      console.error('Process error:', err);
+      throw err;
     }
   };
 
-  const uploadRawFile = async (file: File) => {
+  const uploadRawFile = async (file: File): Promise<string | null> => {
     try {
       const filePath = `uploads/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
       const { error } = await db.storage
@@ -1928,10 +1941,10 @@ const ImageUpload = ({
         .from('images')
         .getPublicUrl(filePath);
 
-      onUpload(publicUrl);
-    } catch (err: any) {
-      console.error('Raw Upload Error:', err);
-      toast.error(`Failed to upload ${file.name}`);
+      return publicUrl;
+    } catch (err) {
+      console.error('Raw upload error:', err);
+      throw err;
     }
   };
 
@@ -3019,22 +3032,32 @@ const RegistrationView = () => {
       if (roleError) throw roleError;
 
       let nextNum = 1;
+      const prefix = formData.role === 'owner' ? 'BVOVO' : (formData.role === 'provider' ? 'BVOSP' : 'UTSAV');
+      
       if (usersWithRole && usersWithRole.length > 0) {
-        // Extract numbers and find max
-        const nums = usersWithRole.map(u => {
-          const idStr = u.registration_id || '';
-          const match = idStr.match(/\d+$/);
-          return match ? parseInt(match[0]) : 0;
-        }).filter(n => n > 0);
+        // Extract numbers only from IDs starting with our target prefix
+        const nums = usersWithRole
+          .filter(u => (u.registration_id || '').startsWith(prefix))
+          .map(u => {
+            const idStr = u.registration_id || '';
+            const match = idStr.match(/\d+$/);
+            return match ? parseInt(match[0]) : 0;
+          })
+          .filter(n => n > 0);
         
         if (nums.length > 0) {
           const maxNum = Math.max(...nums);
+          // Auto-increment logic based on specific start numbers
           if (formData.role === 'owner') {
-            nextNum = Math.max(1, (maxNum - 900000) + 1);
+            // If we have 900001, next is (900001 - 900000) + 1 = 2.
+            // When we generate: 'BVOVO' + (900000 + 2) = BVOVO900002.
+            nextNum = maxNum >= 900000 ? (maxNum - 900000) + 1 : 1;
           } else if (formData.role === 'provider') {
-            nextNum = Math.max(1, (maxNum - 800000) + 1);
+            // If we have 800001, next is (800001 - 800000) + 1 = 2.
+            // When we generate: 'BVOSP' + (800000 + 2) = BVOSP800002.
+            nextNum = maxNum >= 800000 ? (maxNum - 800000) + 1 : 1;
           } else {
-            nextNum = nums.length + 1;
+            nextNum = maxNum + 1;
           }
         }
       }
@@ -3170,7 +3193,7 @@ const RegistrationView = () => {
               <ImageUpload 
                 label="Profile Photo" 
                 currentImage={formData.photoURL}
-                onUpload={(url) => setFormData({...formData, photoURL: url})}
+                onUpload={(url) => setFormData({...formData, photoURL: Array.isArray(url) ? url[0] : url})}
               />
             </div>
           </div>
@@ -6294,7 +6317,10 @@ const BookingManagerView = ({
     };
   }, [user]);
 
-  const filteredBookings = bookings.filter(b => {
+  const filteredBookings = (bookings || []).filter(b => {
+    // Show only manual bookings in Booking Manager
+    if (!b.isManual) return false;
+
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
@@ -8023,10 +8049,18 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       })
       .subscribe();
 
+    const paymentChannel = db
+      .channel(`dashboard_payments_${user?.uid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_payments' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
     return () => {
       db.removeChannel(bookingChannel);
       db.removeChannel(venueChannel);
       db.removeChannel(serviceChannel);
+      db.removeChannel(paymentChannel);
     };
   }, [user?.uid, profile?.role]);
 
@@ -8375,14 +8409,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
                     {/* Aggregate Stats Section */}
                     {(() => {
-                      const yearFiltered = bookings.filter(b => {
-                        if (!reportFilters.year) return true;
-                        return b.eventDate.startsWith(reportFilters.year);
+                      const filteredForReport = bookings.filter(b => {
+                        if (reportFilters.year && !b.eventDate.startsWith(reportFilters.year)) return false;
+                        if (reportFilters.name && !b.visitorName?.toLowerCase().includes(reportFilters.name.toLowerCase()) && !b.partyName?.toLowerCase().includes(reportFilters.name.toLowerCase())) return false;
+                        if (reportFilters.mobile && !b.visitorMobile?.includes(reportFilters.mobile)) return false;
+                        if (reportFilters.startDate && b.eventDate < reportFilters.startDate) return false;
+                        if (reportFilters.endDate && b.eventDate > reportFilters.endDate) return false;
+                        if (reportFilters.paymentMode && b.paymentMode !== reportFilters.paymentMode) return false;
+                        if (reportFilters.bookingType === 'Order' && b.isManual) return false;
+                        if (reportFilters.bookingType === 'Manual' && !b.isManual) return false;
+                        return true;
                       });
 
                       const years = Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a));
                       
-                      const aggregates = yearFiltered.reduce((acc, b) => {
+                      const aggregates = filteredForReport.reduce((acc, b) => {
                         const total = b.updatedAmount || b.totalAmount || 0;
                         const paidTotal = b.payments?.filter(p => p.paymentType !== 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
                         const discTotal = b.payments?.filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -8740,6 +8781,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const visitorBookings = bookings;
   
   const filteredBookings = useMemo(() => visitorBookings.filter(b => {
+    // Show only public bookings in Order Manage
+    if (b.isManual) return false;
+
     const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
@@ -9549,7 +9593,7 @@ const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityI
           <div>
              <ImageUpload 
               label="Photo" 
-              onUpload={(url) => setNewFacility(prev => ({...prev, photoUrl: url || ''}))}
+              onUpload={(url) => setNewFacility(prev => ({...prev, photoUrl: (Array.isArray(url) ? url[0] : url) || ''}))}
             />
              {newFacility.photoUrl && (
                <div className="relative w-10 h-10 mt-1">
@@ -9809,7 +9853,8 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                   multiple={true}
                   onUpload={(url) => {
                     if (url) {
-                      setNewItem(prev => ({...prev, images: [...(prev.images || []), url]}));
+                      const urls = Array.isArray(url) ? url : [url];
+                      setNewItem(prev => ({...prev, images: [...(prev.images || []), ...urls]}));
                     }
                   }}
                 />
@@ -10083,7 +10128,10 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
               <ImageUpload 
                 label="Add Service Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev.images || []), url]}))}
+                onUpload={(url) => {
+                  const urls = Array.isArray(url) ? url : [url];
+                  setFormData(prev => ({...prev, images: [...(prev.images || []), ...urls]}));
+                }}
               />
               <VideoUpload 
                 label="Add Service Video (Max 60s)" 
@@ -10307,7 +10355,10 @@ const EditServiceView = ({ user, profile }: { user: any, profile: UserProfile | 
               <ImageUpload 
                 label="Add Service Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev.images || []), url]}))}
+                onUpload={(url) => {
+                  const urls = Array.isArray(url) ? url : [url];
+                  setFormData(prev => ({...prev, images: [...(prev.images || []), ...urls]}));
+                }}
               />
               <VideoUpload 
                 label="Add Service Video (Max 60s)" 
@@ -10717,7 +10768,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
           <ImageUpload 
             label="Profile Photo" 
             currentImage={formData.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.registrationId}`}
-            onUpload={(url) => setFormData(prev => ({...prev, photoURL: url}))}
+            onUpload={(url) => setFormData(prev => ({...prev, photoURL: Array.isArray(url) ? url[0] : url}))}
           />
           <p className="text-sm text-gray-500 font-mono">ID: {profile?.registrationId}</p>
         </div>
@@ -11007,7 +11058,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               <ImageUpload 
                 label="Add Venue Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData(prev => ({...prev, images: [...prev.images, url]}))}
+                onUpload={(url) => {
+                  const urls = Array.isArray(url) ? url : [url];
+                  setFormData(prev => ({...prev, images: [...(prev.images || []), ...urls]}));
+                }}
               />
               <VideoUpload 
                 label="Add Venue Video (Max 60s)" 
@@ -12989,21 +13043,27 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
-  const handleAddServicePhotoUrl = async (url: string, type: string) => {
+  const handleAddServicePhotoUrl = async (url: string | string[]) => {
     if (!url) return;
+    const urls = Array.isArray(url) ? url : [url];
     setLoading(true);
     try {
-      let finalType = 'image';
-      if (url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+      const inserts = urls.map(u => {
+        let finalType = 'image';
+        if (u.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+        return { 
+          id: generateUUID(),
+          service_type: newServicePhoto.serviceType, 
+          image_url: finalType === 'image' ? u : null,
+          video_url: finalType === 'video' ? u : null,
+          type: finalType
+        };
+      });
       
-      const { error } = await db.from('service_type_photos').insert([{ 
-        service_type: newServicePhoto.serviceType, 
-        image_url: finalType === 'image' ? url : null,
-        video_url: finalType === 'video' ? url : null,
-        type: finalType
-      }]);
+      console.log('Inserting service photos:', inserts);
+      const { error } = await db.from('service_type_photos').insert(inserts);
       if (error) throw error;
-      toast.success(`${finalType.toUpperCase()} added for ${newServicePhoto.serviceType}`);
+      toast.success(`${inserts.length} item(s) added successfully`);
       fetchData();
     } catch (err: any) {
       console.error('Service Photo Save Error:', err);
@@ -13013,24 +13073,29 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
     }
   };
 
-  const handleAddMoment = async (url: string, type: 'image' | 'video' | 'gif') => {
+  const handleAddMoment = async (url: string | string[], type: 'image' | 'video' | 'gif') => {
     if (!url) return;
+    const urls = Array.isArray(url) ? url : [url];
     setLoading(true);
     try {
-      // Auto-detect type if it's generic 'image' but ends in .gif or is a video
-      let finalType = type;
-      if (url.toLowerCase().endsWith('.gif')) finalType = 'gif';
-      if (url.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+      const inserts = urls.map(u => {
+        let finalType = type;
+        if (u.toLowerCase().endsWith('.gif')) finalType = 'gif';
+        if (u.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/)) finalType = 'video';
+        return { 
+          id: generateUUID(),
+          media_url: u,
+          type: finalType
+        };
+      });
 
-      const { error } = await db.from('moments').insert([{ 
-        media_url: url,
-        type: finalType
-      }]);
+      console.log('Inserting moments:', inserts);
+      const { error } = await db.from('moments').insert(inserts);
       if (error) throw error;
-      toast.success('Moment added successfully');
+      toast.success(`${inserts.length} moment(s) added successfully`);
       fetchData();
     } catch (err) {
-      toast.error('Failed to add moment');
+      toast.error('Failed to add moment(s)');
     } finally {
       setLoading(false);
     }
@@ -13729,14 +13794,14 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       <ImageUpload 
                         label="Upload Photo or GIF" 
                         multiple={true}
-                        onUpload={(url) => handleAddServicePhotoUrl(url, 'image')} 
+                        onUpload={(url) => handleAddServicePhotoUrl(url)} 
                       />
                     </div>
                     <div className="space-y-4">
                       <p className="text-sm font-bold text-orange-600">Selected Category: <span className="uppercase">{newServicePhoto.serviceType}</span></p>
                       <VideoUpload 
                         label="Upload Video (Max 60s)" 
-                        onUpload={(url) => handleAddServicePhotoUrl(url, 'video')} 
+                        onUpload={(url) => handleAddServicePhotoUrl(url)} 
                       />
                     </div>
                   </div>
