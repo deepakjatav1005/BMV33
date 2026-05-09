@@ -3011,7 +3011,6 @@ const RegistrationView = () => {
       }
 
       // Fetch the highest registration ID for the specific role to generate next ID
-      // Instead of count, find the max numerical part of existing IDs
       const { data: usersWithRole, error: roleError } = await db
         .from('users')
         .select('registration_id')
@@ -3031,24 +3030,22 @@ const RegistrationView = () => {
         if (nums.length > 0) {
           const maxNum = Math.max(...nums);
           if (formData.role === 'owner') {
-            nextNum = (maxNum - 900000) + 1;
+            nextNum = Math.max(1, (maxNum - 900000) + 1);
           } else if (formData.role === 'provider') {
-            nextNum = (maxNum - 800000) + 1;
+            nextNum = Math.max(1, (maxNum - 800000) + 1);
           } else {
             nextNum = nums.length + 1;
           }
         }
       }
 
-      if (nextNum <= 0) nextNum = 1;
-
       let regId = '';
-      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       if (formData.role === 'owner') {
-        regId = 'BVOVO' + (900000 + nextNum).toString() + randomSuffix;
+        regId = 'BVOVO' + (900000 + nextNum).toString();
       } else if (formData.role === 'provider') {
-        regId = 'BVOSP' + (800000 + nextNum).toString() + randomSuffix;
+        regId = 'BVOSP' + (800000 + nextNum).toString();
       } else {
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         regId = 'UTSAV' + Date.now().toString().slice(-6) + randomSuffix;
       }
       
@@ -4068,7 +4065,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end pb-24">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
                     <div className="flex flex-wrap gap-4">
-                      <Link to="/venues" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
+                      <Link to="/search" className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 transition-all shadow-xl shadow-orange-900/20 flex items-center group">
                         {t('searchNow')}
                         <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                       </Link>
@@ -6298,10 +6295,10 @@ const BookingManagerView = ({
   }, [user]);
 
   const filteredBookings = bookings.filter(b => {
-    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
+    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
-                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid')) ||
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed')) ||
                          (statusFilter === 'cancelled' && b.status === 'cancelled') ||
                          (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
@@ -8743,10 +8740,10 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
   const visitorBookings = bookings;
   
   const filteredBookings = useMemo(() => visitorBookings.filter(b => {
-    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid';
+    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
-                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid')) ||
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed')) ||
                          (statusFilter === 'cancelled' && b.status === 'cancelled') ||
                          (statusFilter === 'paid' && isPaid);
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
@@ -9015,7 +9012,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
             </div>
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
               {/* Owner/Provider Actions */}
-              {b.status === 'pending' && b.ownerId === user?.uid && (
+              {b.status === 'pending' && (b.ownerId === user?.uid || profile?.role === 'admin') && (
                 <>
                   <button 
                     onClick={() => {
@@ -9030,7 +9027,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                 </>
               )}
 
-              {(b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid') && b.ownerId === user?.uid && (
+              {(b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid') && (b.ownerId === user?.uid || profile?.role === 'admin') && (
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   <button 
                     disabled={b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid'}
@@ -9312,12 +9309,17 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSub, setCurrentSub] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [appLogoUrl, setAppLogoUrl] = useState('/logo.png');
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {
       if (!user || !profile) return;
       setLoading(true);
       try {
+        // Fetch App Logo
+        const { data: logoData } = await db.from('admin_settings').select('value').eq('key', 'app_logo_url').maybeSingle();
+        if (logoData?.value) setAppLogoUrl(logoData.value);
+
         const { data: pData } = await db.from('subscription_plans').select('*').eq('role', profile.role).eq('is_active', true);
         if (pData) {
           setPlans(pData.map(d => ({ 
@@ -9374,8 +9376,9 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
-        name: "Event Manager",
+        name: "BEST VANUE OPTION",
         description: `Subscription for ${plan.name}`,
+        image: resolveUrl(appLogoUrl),
         order_id: order.id,
         handler: async function (response: any) {
           // 3. On success, update database
@@ -9914,7 +9917,11 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
             <p className="text-gray-500 font-medium">Add a venue first to manage its catalogue.</p>
           </div>
         )}
-        
+      </div>
+    </div>
+  );
+};
+
 const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | null }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -13782,6 +13789,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100">
                     <ImageUpload 
                       label="Upload Highlight Photo/GIF" 
+                      multiple={true}
                       onUpload={(url) => handleAddMoment(url, 'image')} 
                     />
                     <VideoUpload 

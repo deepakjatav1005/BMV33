@@ -1,0 +1,16 @@
+14:      registration_id VARCHAR(255) UNIQUE,
+2892:        .select('registration_id, password, display_name')
+2904:      const whatsappMsg = `*Password Recovery - Event Manager!*%0A%0AHello ${users.display_name}, here are your login details:%0A%0A*Your ID:* ${users.registration_id}%0A*Your Password:* ${users.password}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you!`;
+3017:        .select('registration_id')
+3026:          const idStr = u.registration_id || '';
+3060:        registration_id: regId,
+3084:          if (errMsg.includes('registration_id')) {
+3296:          registrationId: adminUserInDb.registration_id,
+3328:        .eq('registration_id', (regId || "").toUpperCase());
+3356:        registrationId: rawProfile.registration_id,
+4671:      const ownerRegId = ownerProfile?.registration_id || ownerProfile?.registrationId || 'BVO';
+5447:      const providerRegId = providerProfile?.registration_id || providerProfile?.registrationId || 'BVO';
+11639:                registrationId: rawProfile.registration_id,
+11674:                registrationId: rawProfile.registration_id,
+12636:          registrationId: d.registration_id,
+14014:    registration_id TEXT UNIQUE,
