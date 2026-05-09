@@ -467,7 +467,7 @@ const ManagePaymentModal = ({
         payment_status: isNowPaid ? 'Paid' : 'Pending'
       };
 
-      if (isNowPaid && (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'paid' || booking.status === 'approved' || (booking.status || '').toLowerCase().includes('approved'))) {
+      if (isNowPaid && booking.status !== 'cancelled') {
         updateData.status = 'completed';
       }
 
@@ -523,26 +523,18 @@ const ManagePaymentModal = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100 shadow-sm">
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-1">Total Venue Amt.</span>
-              <span className="text-xl font-black text-blue-900">₹{totalAmount.toLocaleString()}</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 shadow-sm">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Booking Amount</span>
+              <span className="text-2xl font-black text-blue-900">₹{(totalAmount || 0).toLocaleString()}</span>
             </div>
-            <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100 shadow-sm">
-              <span className="text-[9px] font-black text-green-600 uppercase tracking-widest block mb-1">Regular Paid</span>
-              <span className="text-xl font-black text-green-900">₹{totalRegular.toLocaleString()}</span>
+            <div className="bg-green-50/50 p-6 rounded-3xl border border-green-100 shadow-sm">
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest block mb-1">Received Amount</span>
+              <span className="text-2xl font-black text-green-900">₹{(bookingReceived || 0).toLocaleString()}</span>
             </div>
-            <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100 shadow-sm">
-              <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest block mb-1">Advance Paid</span>
-              <span className="text-xl font-black text-orange-900">₹{totalAdvance.toLocaleString()}</span>
-            </div>
-            <div className="bg-purple-50/50 p-4 rounded-3xl border border-purple-100 shadow-sm">
-              <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest block mb-1">Discount Amount</span>
-              <span className="text-xl font-black text-purple-900">₹{totalDiscount.toLocaleString()}</span>
-            </div>
-            <div className="bg-red-50/50 p-4 rounded-3xl border border-red-100 shadow-sm transition-all hover:bg-red-50">
-              <span className="text-[9px] font-black text-red-600 uppercase tracking-widest block mb-1">Rem. Balance</span>
-              <span className="text-xl font-black text-red-900">₹{pendingAmount.toLocaleString()}</span>
+            <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100 shadow-sm">
+              <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block mb-1">Pending Amount</span>
+              <span className="text-2xl font-black text-red-900">₹{Math.max(0, pendingAmount).toLocaleString()}</span>
             </div>
           </div>
 
@@ -6708,9 +6700,9 @@ const BookingManagerView = ({
                           <Edit2 size={18} />
                         </button>
                         <button 
-                          disabled={booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)}
+                          disabled={(booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)}
                           onClick={() => {
-                            if (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || ((booking.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (booking.updatedAmount || booking.totalAmount || 0) && (booking.updatedAmount || booking.totalAmount || 0) > 0)) {
+                            if ((booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) {
                               toast.error('Payment already completed - Records are locked');
                               return;
                             }
@@ -6719,7 +6711,7 @@ const BookingManagerView = ({
                           }}
                           className={cn(
                             "p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all border",
-                            (booking.paymentStatus === 'Paid' || booking.status === 'paid' || booking.status === 'completed' || (Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0) >= Math.round(booking.updatedAmount || booking.totalAmount || 0) && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
+                            ((booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
                           )}
                           title="Manage Payments"
                         >
@@ -7412,7 +7404,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "italic");
-  const words = `Amount in words (Balance): ${numberToWords(balanceDue)}`;
+  const words = `Amount in words (Balance): ${numberToWords(Math.round(balanceDue || 0))}`;
   const splitWords = doc.splitTextToSize(words, 170);
   doc.text(splitWords, 20, currentY);
 
@@ -8370,7 +8362,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                         <IndianRupee size={24} />
                       </div>
                       <div className="text-3xl font-black text-gray-900 mb-1">{stats.paid}</div>
-                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Paid</div>
+                      <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Complete</div>
                     </div>
                   </div>
                 </div>
@@ -8440,19 +8432,22 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                         const cashPaid = totalReceived - discountOnly;
                         
                         const pending = Math.max(0, total - totalReceived);
+                        const isPaid = (pending <= 1 && total > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
                         
                         return {
-                          total: acc.total + total,
-                          paid: acc.paid + cashPaid,
-                          discount: acc.discount + discountOnly,
-                          pending: acc.pending + pending
+                          total: (acc.total || 0) + total,
+                          paid: (acc.paid || 0) + cashPaid,
+                          discount: (acc.discount || 0) + discountOnly,
+                          pending: (acc.pending || 0) + pending,
+                          count: (acc.count || 0) + 1,
+                          completeCount: (acc.completeCount || 0) + (isPaid ? 1 : 0)
                         };
-                      }, { total: 0, paid: 0, discount: 0, pending: 0 });
+                      }, { total: 0, paid: 0, discount: 0, pending: 0, count: 0, completeCount: 0 });
 
                       return (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                           <div className="bg-blue-50/70 p-5 rounded-3xl border border-blue-100 flex flex-col items-center shadow-sm">
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Bookings</span>
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1 text-center">Total Bookings ({aggregates.count})</span>
                             <span className="text-xl font-black text-blue-900">₹{(aggregates.total || 0).toLocaleString()}</span>
                           </div>
                           <div className="bg-green-50/70 p-5 rounded-3xl border border-green-100 flex flex-col items-center shadow-sm">
@@ -8466,6 +8461,10 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                           <div className="bg-red-50/70 p-5 rounded-3xl border border-red-100 flex flex-col items-center shadow-sm">
                             <span className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Total Pending</span>
                             <span className="text-xl font-black text-red-900">₹{(aggregates.pending || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="bg-indigo-50/70 p-5 rounded-3xl border border-indigo-100 flex flex-col items-center shadow-sm">
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Complete Count</span>
+                            <span className="text-xl font-black text-indigo-900">{aggregates.completeCount || 0}</span>
                           </div>
                         </div>
                       );
@@ -8584,34 +8583,35 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               const subTotal = Math.round(b.updatedAmount || b.totalAmount || 0);
                               const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
                               const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
-                              const cashPaidTotal = totalReceived - discountTotal;
+                              const cashPaidTotal = Math.max(0, totalReceived - discountTotal);
                               const pending = Math.max(0, subTotal - totalReceived);
-                              const isPaid = (pending <= 0.5 && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+                              const isPaid = (pending <= 1 && subTotal > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
                               
                               return (
                                 <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
                                   <td className="py-4 text-sm text-gray-500">{index + 1}</td>
                                   <td className="py-4">
                                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                      isPaid || b.status === 'confirmed' ? 'bg-green-100 text-green-600' : 
-                                      b.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'
+                                      isPaid ? 'bg-green-100 text-green-600' : 
+                                      b.status === 'confirmed' || b.status === 'approved' ? 'bg-blue-100 text-blue-600' : 
+                                      b.status === 'pending' ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'
                                     }`}>
-                                      {isPaid ? 'Completed' : b.status === 'confirmed' ? 'Approved' : b.status}
+                                      {isPaid ? 'Completed' : (b.status || 'PENDING').toUpperCase()}
                                     </span>
                                   </td>
-                                  <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName}</td>
-                                  <td className="py-4 text-sm text-gray-600">{b.visitorMobile}</td>
+                                  <td className="py-4 font-bold text-gray-900">{b.partyName || b.visitorName || 'N/A'}</td>
+                                  <td className="py-4 text-sm text-gray-600">{b.visitorMobile || 'N/A'}</td>
                                   <td className="py-4 text-xs text-gray-500 max-w-[150px] truncate">{b.partyAddress || 'N/A'}</td>
                                   <td className="py-4 text-sm text-gray-600">
-                                    {formatDateDDMMYYYY(b.eventDate)} {formatTime12h(b.startTime)}
+                                    {formatDateDDMMYYYY(b.eventDate)} {b.startTime ? formatTime12h(b.startTime) : ''}
                                   </td>
                                   <td className="py-4 text-xs font-mono text-gray-500">
-                                    {b.transaction_id || ('INV-' + b.id.substring(0, 8).toUpperCase())}
+                                    {(b.transaction_id || ('INV-' + (b.id || '').substring(0, 8))).toUpperCase()}
                                   </td>
-                                  <td className="py-4 font-bold text-gray-900">₹{subTotal.toLocaleString()}</td>
-                                  <td className="py-4 font-bold text-orange-600">₹{cashPaidTotal.toLocaleString()}</td>
-                                  <td className="py-4 font-bold text-green-600">₹{discountTotal.toLocaleString()}</td>
-                                  <td className="py-4 font-black text-blue-600">₹{pending.toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-gray-900">₹{(subTotal || 0).toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-orange-600">₹{(cashPaidTotal || 0).toLocaleString()}</td>
+                                  <td className="py-4 font-bold text-green-600">₹{(discountTotal || 0).toLocaleString()}</td>
+                                  <td className="py-4 font-black text-blue-600">₹{(pending || 0).toLocaleString()}</td>
                                   <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
                                   <td className="py-4">
                                     <button 
