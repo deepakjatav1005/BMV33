@@ -8096,16 +8096,18 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const stats = useMemo(() => {
     const isPaidFunc = (b: Booking) => {
-      const base = Math.round(b.updatedAmount || b.totalAmount || 0);
-      const paymentsTotal = Math.round((b.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
-      return (paymentsTotal >= base && base > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
+      const base = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
+      const paymentsTotal = Math.round((b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+      return (paymentsTotal >= base && base > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
     };
+
+    const countCompleted = bookings.filter(b => isPaidFunc(b)).length;
 
     return {
       total: bookings.length || 0,
       pending: bookings.filter(b => !b.isManual && b.status === 'pending').length || 0,
       approved: bookings.filter(b => (b.isManual || b.status === 'confirmed' || b.status === 'approved') && !isPaidFunc(b)).length || 0,
-      paid: bookings.filter(b => isPaidFunc(b)).length || 0
+      completed: countCompleted
     };
   }, [bookings]);
 
@@ -8361,7 +8363,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
                         <IndianRupee size={24} />
                       </div>
-                      <div className="text-3xl font-black text-gray-900 mb-1">{stats.paid}</div>
+                      <div className="text-3xl font-black text-gray-900 mb-1">{stats.completed}</div>
                       <div className="text-sm font-bold text-gray-500 uppercase tracking-wider">Complete</div>
                     </div>
                   </div>
@@ -8426,21 +8428,21 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       const years = Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a));
                       
                       const aggregates = filteredForReport.reduce((acc, b) => {
-                        const total = Math.round(b.updatedAmount || b.totalAmount || 0);
-                        const totalReceived = Math.round((b.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
-                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (p.amount || 0), 0));
-                        const cashPaid = totalReceived - discountOnly;
+                        const total = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
+                        const totalReceived = Math.round((b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+                        const cashPaid = Math.max(0, totalReceived - discountOnly);
                         
                         const pending = Math.max(0, total - totalReceived);
                         const isPaid = (pending <= 1 && total > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
                         
                         return {
-                          total: (acc.total || 0) + total,
-                          paid: (acc.paid || 0) + cashPaid,
-                          discount: (acc.discount || 0) + discountOnly,
-                          pending: (acc.pending || 0) + pending,
-                          count: (acc.count || 0) + 1,
-                          completeCount: (acc.completeCount || 0) + (isPaid ? 1 : 0)
+                          total: (Number(acc.total) || 0) + total,
+                          paid: (Number(acc.paid) || 0) + cashPaid,
+                          discount: (Number(acc.discount) || 0) + discountOnly,
+                          pending: (Number(acc.pending) || 0) + pending,
+                          count: (Number(acc.count) || 0) + 1,
+                          completeCount: (Number(acc.completeCount) || 0) + (isPaid ? 1 : 0)
                         };
                       }, { total: 0, paid: 0, discount: 0, pending: 0, count: 0, completeCount: 0 });
 
@@ -8580,9 +8582,9 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               const matchesYear = !reportFilters.year || b.eventDate.startsWith(reportFilters.year);
                               return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
                             }).map((b, index) => {
-                              const subTotal = Math.round(b.updatedAmount || b.totalAmount || 0);
-                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
-                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
+                             const subTotal = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
+                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
                               const cashPaidTotal = Math.max(0, totalReceived - discountTotal);
                               const pending = Math.max(0, subTotal - totalReceived);
                               const isPaid = (pending <= 1 && subTotal > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
