@@ -235,5 +235,6 @@ export interface BookingPayment {
   paymentMode: 'Cash' | 'Online' | 'PhonePe' | 'GPay' | 'Other';
   paymentDate: string;
   paymentType: 'Advance' | 'Regular' | 'Discount' | 'Pending' | 'Round off';
+  transaction_id?: string;
   createdAt: any;
 }

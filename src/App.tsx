@@ -240,6 +240,7 @@ import {
   Clock, 
   Shield,
   ShieldCheck,
+  Lock as LucideLock,
   Database,
   Activity,
   FileText,
@@ -503,7 +504,7 @@ const ManagePaymentModal = ({
   const totalPaid = totalRegular + totalAdvance;
   const bookingReceived = totalPaid + totalDiscount;
   const pendingAmount = Math.max(0, totalAmount - bookingReceived);
-  const isFullyPaid = pendingAmount < 1 && totalAmount > 0;
+  const isFullyPaid = pendingAmount <= 0 && totalAmount > 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -544,7 +545,7 @@ const ManagePaymentModal = ({
                 <Clock className="mr-2 text-orange-600" size={20} />
                 Transaction History
               </h4>
-              {!isFullyPaid && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
+              {pendingAmount > 0 && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
                 <button 
                   onClick={() => setIsRegistering(true)}
                   className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
@@ -662,7 +663,7 @@ const ManagePaymentModal = ({
                       </div>
                       <div>
                         <div className="flex items-center space-x-3 mb-1">
-                          <span className="font-black text-xl text-gray-900">₹{p.amount.toLocaleString()}</span>
+                          <span className="font-black text-xl text-gray-900">₹{(Number(p.amount) || 0).toLocaleString()}</span>
                           <span className={cn(
                             "text-[10px] uppercase font-black px-2.5 py-1 rounded-full tracking-wider",
                             p.paymentType === 'Discount' ? "bg-purple-100 text-purple-600" : 
@@ -1871,21 +1872,24 @@ const ImageUpload = ({
       });
 
       const canvas = document.createElement('canvas');
-      const SIZE = 1080;
+      const SIZE = 1200; // Increased size slightly
       canvas.width = SIZE;
       canvas.height = SIZE;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      const scale = Math.max(SIZE / img.width, SIZE / img.height);
+      // Fill with white background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, SIZE, SIZE);
+
+      // Fit image into square frame while maintaining aspect ratio (object-contain behavior)
+      const scale = Math.min(SIZE / img.width, SIZE / img.height);
       const x = (SIZE / 2) - (img.width / 2) * scale;
       const y = (SIZE / 2) - (img.height / 2) * scale;
       const width = img.width * scale;
       const height = img.height * scale;
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, SIZE, SIZE);
       ctx.drawImage(img, x, y, width, height);
 
       const blob = await new Promise<Blob | null>((resolve) => 
@@ -3137,13 +3141,80 @@ const RegistrationView = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-16">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-black text-gray-900">Join Our Network</h1>
+        <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Registration Portal</h1>
         <Link to="/" className="flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-orange-50 px-4 py-2 rounded-full">
           <Home size={20} />
           <span>Back to Home</span>
         </Link>
       </div>
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
+
+      <AnimatePresence>
+        {successData.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="bg-orange-600 p-10 text-white text-center flex-shrink-0">
+                <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle size={48} className="text-white" />
+                </div>
+                <h2 className="text-3xl font-black uppercase tracking-tighter">Registration Successful!</h2>
+                <p className="opacity-90 mt-2 font-medium">Welcome to the BVO Professional Network</p>
+              </div>
+              
+              <div className="p-6 md:p-10 overflow-y-auto space-y-6 md:space-y-8 flex-grow custom-scrollbar" style={{ scrollbarWidth: 'thin' }}>
+                <div className="bg-orange-50 p-6 rounded-[2rem] border border-orange-100 text-center shadow-inner">
+                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Your Unique Business ID</p>
+                  <p className="text-3xl md:text-4xl font-black text-gray-900 font-mono tracking-wider">{successData.regId}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:gap-6">
+                  <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 shadow-sm relative group overflow-hidden">
+                    <div className="absolute top-0 right-0 p-2 bg-orange-100 text-orange-600 rounded-bl-xl opacity-0 group-hover:opacity-100 transition-opacity">
+                      <LucideLock size={14} />
+                    </div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Temporary Password</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-2xl font-black text-gray-900 tracking-tight">{successData.mobileNumber}</p>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(successData.mobileNumber);
+                          toast.success('Password copied');
+                        }}
+                        className="bg-white px-4 py-2 rounded-xl text-orange-600 font-black text-[10px] uppercase tracking-widest border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
+                      >
+                        COPY
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-3 font-bold italic border-t border-gray-200 pt-3">Default: Mobile number as initial password.</p>
+                  </div>
+
+                  <div className="p-6 border-2 border-dashed border-gray-200 rounded-3xl text-sm text-gray-500 leading-relaxed">
+                    <p className="font-bold text-gray-700 mb-2">Next Steps:</p>
+                    <ul className="space-y-2 list-disc list-inside">
+                      <li>Use your ID and Mobile to Login</li>
+                      <li>Complete your business profile</li>
+                      <li>Add photos and services to your catalogue</li>
+                      <li>Subscribe to a plan to start receiving leads</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-100 active:scale-95"
+                >
+                  Proceed to Login
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-orange-100 relative">
         <div className="bg-orange-600 p-8 text-white text-center flex flex-col items-center">
           <AppLogo size="lg" showText={false} className="mb-4" />
           <h1 className="text-3xl font-bold">Partner Registration</h1>
@@ -3939,6 +4010,21 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
   const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  useEffect(() => {
+    if (forceRateOpen) {
+       setTimeout(() => {
+         const rateBtn = document.querySelector('[title="Rate App"]') as HTMLButtonElement;
+         if (rateBtn) {
+           rateBtn.click();
+         } else {
+           // Fallback if button not found
+           const event = new CustomEvent('open-app-rating');
+           window.dispatchEvent(event);
+         }
+       }, 500);
+    }
+  }, [forceRateOpen]);
+
   const [activeTab, setActiveTab] = useState(0);
   const [isAppRatingOpen, setIsAppRatingOpen] = useState(forceRateOpen);
   const [loading, setLoading] = useState(true);
@@ -4388,19 +4474,24 @@ const TestimonialsSection = () => {
 };
 
 const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
-  const [bookedDates, setBookedDates] = useState<{date: string, status: string}[]>([]);
+  const [bookedDates, setBookedDates] = useState<{date: string, status: string, startTime?: string, endTime?: string}[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     const fetchBookings = async () => {
       const { data, error } = await db
         .from('bookings')
-        .select('event_date, status')
+        .select('event_date, status, start_time, end_time')
         .eq('target_id', targetId)
-        .in('status', ['confirmed', 'paid']);
+        .in('status', ['confirmed', 'paid', 'approved', 'completed']);
       
       if (!error && data) {
-        setBookedDates(data.map(d => ({ date: d.event_date, status: d.status })));
+        setBookedDates(data.map(d => ({ 
+          date: d.event_date, 
+          status: d.status,
+          startTime: d.start_time,
+          endTime: d.end_time
+        })));
       }
     };
 
@@ -4454,23 +4545,28 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
           <div key={`empty-${i}`} />
         ))}
         {days.map(date => {
-          const booking = bookedDates.find(d => d.date === date);
-          const isBooked = !!booking;
+          const matchedBookings = bookedDates.filter(d => d.date === date);
+          const isBooked = matchedBookings.length > 0;
           const isToday = date === format(new Date(), 'yyyy-MM-dd');
           return (
             <div 
               key={date} 
               className={cn(
-                "aspect-square flex flex-col items-center justify-center rounded-xl text-sm font-medium transition-all relative overflow-hidden",
-                isBooked ? "bg-red-50 text-red-600 border border-red-100" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
-                isToday && !isBooked && "border-2 border-orange-500"
+                "aspect-square flex flex-col items-center justify-center rounded-xl text-[10px] md:text-sm font-medium transition-all relative overflow-hidden group",
+                isBooked ? "bg-red-50 text-red-600 border border-red-100 shadow-inner" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
+                isToday && !isBooked && "ring-2 ring-orange-500 ring-offset-2 ring-offset-white"
               )}
             >
-              <span className={isBooked ? "text-[10px] mb-1" : ""}>{date.split('-')[2]}</span>
+              <span className={cn(isBooked ? "font-black" : "")}>{date.split('-')[2]}</span>
               {isBooked && (
-                <span className="text-[7px] font-black uppercase leading-none text-center px-1">
-                  Booked
-                </span>
+                <div className="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
+                  {matchedBookings.slice(0, 2).map((b, idx) => (
+                    <span key={idx} className="text-[6px] md:text-[7px] font-black text-red-700 leading-none whitespace-nowrap mb-0.5 last:mb-0">
+                      {b.startTime ? formatTime12h(b.startTime) : 'Booked'}
+                    </span>
+                  ))}
+                  {matchedBookings.length > 2 && <span className="text-[5px] font-bold text-red-500">+{matchedBookings.length - 2}</span>}
+                </div>
               )}
             </div>
           );
@@ -6720,7 +6816,7 @@ const BookingManagerView = ({
                         <button 
                           onClick={async () => {
                             try {
-                              const pdfBlob = await generateInvoice(booking, 0, profile);
+                              const pdfBlob = await generateInvoice(booking, 0, profile, bookings);
                               const url = URL.createObjectURL(pdfBlob);
                               const link = document.createElement('a');
                               link.href = url;
@@ -7201,7 +7297,7 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
   }
 };
 
-const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null) => {
+const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = []) => {
   const doc = new jsPDF();
   
   // Fetch App Branding from admin_settings
@@ -7233,9 +7329,25 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const totalReceived = Math.round((booking.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
-  const isPaid = (balanceDue <= 1 && subTotalActual > 0) || (booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid';
-  const partyName = booking.isManual ? booking.partyName : booking.visitorName;
+  const isPaid = (balanceDue <= 0 && subTotalActual > 0) || (booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid';
+  const partyName = booking.isManual ? booking.partyName : (booking.visitorName || booking.partyName);
   const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
+
+  // CUSTOM INVOICE NUMBER LOGIC
+  // BVO/user numerical id/PB or MB/000+1 serial
+  const userNumericId = (providerProfile?.registrationId || '000000').replace(/\D/g, '');
+  const bookingTypePrefix = booking.isManual ? 'MB' : 'PB';
+  
+  // Calculate Serial Number (starts from 1 every year)
+  const currentYear = new Date().getFullYear();
+  const providerBookingsThisYear = allBookings.filter(b => {
+    const bYear = new Date(b.createdAt || new Date()).getFullYear();
+    const bOwnerId = b.ownerId;
+    return bOwnerId === booking.ownerId && bYear === currentYear;
+  });
+  
+  const serialNo = (providerBookingsThisYear.length + 1).toString().padStart(3, '0');
+  const customInvoiceNo = `BVO/${userNumericId}/${bookingTypePrefix}/${serialNo}`;
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
@@ -7280,7 +7392,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100);
-  doc.text(`Invoice No: ${booking.transaction_id || ('INV-' + (booking.id || '').substring(0, 8).toUpperCase())}`, 190, 65, { align: 'right' });
+  doc.text(`Invoice No: ${customInvoiceNo}`, 190, 65, { align: 'right' });
   doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 70, { align: 'right' });
   doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 75, { align: 'right' });
 
@@ -7378,7 +7490,9 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     
     (booking.payments || []).forEach(p => {
        const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
-       doc.text(`${label} (${formatDateDDMMYYYY(p.paymentDate)}):`, 25, currentY);
+       const mode = p.paymentMode ? ` (${p.paymentMode})` : '';
+       const tid = p.transaction_id ? ` [ID: ${p.transaction_id}]` : '';
+       doc.text(`${label}${mode}${tid} (${formatDateDDMMYYYY(p.paymentDate)}):`, 25, currentY);
        doc.text(`INR ${Math.round(p.amount || 0).toLocaleString()}`, 185, currentY, { align: 'right' });
        currentY += 6;
     });
@@ -7465,7 +7579,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 // --- Rating Card View ---
 const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | null, venues: Venue[], services: ServiceProvider[] }) => {
   const [selectedId, setSelectedId] = useState('');
-  const [activeType, setActiveType] = useState<'venue' | 'service'>(profile?.role === 'owner' ? 'venue' : 'service');
+  const [activeType, setActiveType] = useState<'venue' | 'service' | 'app'>(profile?.role === 'owner' ? 'venue' : 'service');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [appLogoUrl, setAppLogoUrl] = useState<string>('/logo.png');
   const [appName, setAppName] = useState<string>('BEST VANUE OPTION');
@@ -7491,20 +7605,30 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 
   const items = useMemo(() => {
     if (activeType === 'venue') return venues;
-    return services;
+    if (activeType === 'service') return services;
+    return [];
   }, [activeType, venues, services]);
 
   useEffect(() => {
-    if (items.length > 0 && !selectedId) {
+    if (items.length > 0 && !selectedId && activeType !== 'app') {
       setSelectedId(items[0].id || '');
     }
-  }, [items, selectedId]);
+    if (activeType === 'app') {
+      setSelectedId('app-rating');
+    }
+  }, [items, selectedId, activeType]);
 
-  const selectedItem = useMemo(() => items.find(i => i.id === selectedId), [items, selectedId]);
+  const selectedItem = useMemo(() => activeType === 'app' ? { name: appName } : items.find(i => i.id === selectedId), [items, selectedId, activeType, appName]);
 
   useEffect(() => {
     if (selectedId) {
-      const url = `${window.location.origin}/#${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
+      let url = '';
+      if (activeType === 'app') {
+        url = `${window.location.origin}/#/app-rating`;
+      } else {
+        url = `${window.location.origin}/#${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
+      }
+      
       QRCode.toDataURL(url, { 
         width: 600, 
         margin: 2,
@@ -7535,7 +7659,8 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 
     // Header: Business Info
     const name = selectedItem?.name || profile?.displayName || "BUSINESS NAME";
-    const address = (selectedItem as any)?.address || (selectedItem ? [selectedItem.block, selectedItem.district, selectedItem.state].filter(Boolean).join(", ") : "") || profile?.block + ", " + profile?.district || "Address not specified";
+    const itemAsAny = selectedItem as any;
+    const address = itemAsAny?.address || (selectedItem ? [itemAsAny.block, itemAsAny.district, itemAsAny.state].filter(Boolean).join(", ") : "") || profile?.block + ", " + profile?.district || "Address not specified";
     const typeLabel = activeType === 'venue' ? (selectedItem as any)?.venueType : (selectedItem as any)?.serviceType;
 
     doc.setFont("helvetica", "bold");
@@ -7626,59 +7751,65 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
           <h2 className="text-2xl font-bold text-gray-900">Rating Accept Card</h2>
           <p className="text-gray-500 text-sm mt-1">Download your custom QR card for customers to rate your business</p>
         </div>
-        <button 
-          onClick={downloadCard}
-          className="flex items-center space-x-2 bg-orange-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg active:scale-95"
-        >
-          <Download size={20} />
-          <span>Download PDF Card</span>
-        </button>
+        <div className="flex bg-gray-100 p-1 rounded-xl">
+           <button 
+             onClick={() => { setActiveType('venue'); setSelectedId(''); }}
+             className={cn("px-4 py-2 rounded-lg font-bold text-xs transition-all", activeType === 'venue' ? "bg-orange-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-200")}
+           >
+             Venue
+           </button>
+           <button 
+             onClick={() => { setActiveType('service'); setSelectedId(''); }}
+             className={cn("px-4 py-2 rounded-lg font-bold text-xs transition-all", activeType === 'service' ? "bg-orange-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-200")}
+           >
+             Service
+           </button>
+           <button 
+             onClick={() => { setActiveType('app'); setSelectedId('app-rating'); }}
+             className={cn("px-4 py-2 rounded-lg font-bold text-xs transition-all", activeType === 'app' ? "bg-orange-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-200")}
+           >
+             App Rating
+           </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-6">
           <div>
             <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Select Business to Generate For</label>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {profile?.role === 'owner' && (
-                <button 
-                  onClick={() => setActiveType('venue')}
-                  className={cn(
-                    "py-2 rounded-xl text-xs font-bold transition-all border",
-                    activeType === 'venue' ? "bg-orange-600 text-white border-orange-600" : "bg-gray-50 text-gray-500 border-gray-200"
-                  )}
-                >
-                  Venues
-                </button>
-              )}
-              {profile?.role === 'provider' && (
-                <button 
-                  onClick={() => setActiveType('service')}
-                  className={cn(
-                    "py-2 rounded-xl text-xs font-bold transition-all border",
-                    activeType === 'service' ? "bg-orange-600 text-white border-orange-600" : "bg-gray-50 text-gray-500 border-gray-200"
-                  )}
-                >
-                  Services
-                </button>
-              )}
-            </div>
-            
-            <select 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold"
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-            >
-              {items.map(item => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-              {items.length === 0 && <option value="">No items found</option>}
-            </select>
+            {activeType !== 'app' ? (
+              <select 
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none font-bold text-gray-900 shadow-sm"
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {items.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+                {items.length === 0 && <option value="">No items found</option>}
+              </select>
+            ) : (
+              <div className="w-full px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl font-bold text-orange-600 shadow-inner">
+                Official {appName} Rating Card
+              </div>
+            )}
           </div>
 
           <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 italic text-sm text-orange-700">
-            Scanning this QR code will directly take your customers to your {activeType === 'venue' ? 'Venue' : 'Service'} page where they can leave ratings and reviews.
+            {activeType === 'app' 
+              ? "Scanning this QR code will directly take your customers to the App Rating & Review page."
+              : `Scanning this QR code will directly take your customers to your ${activeType === 'venue' ? 'Venue' : 'Service'} page where they can leave ratings and reviews.`
+            }
           </div>
+
+          <button 
+            onClick={downloadCard}
+            disabled={!selectedId}
+            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-xl shadow-orange-100 flex items-center justify-center space-x-2"
+          >
+            <Download size={20} />
+            <span>Download PDF Card</span>
+          </button>
         </div>
 
         <div className="flex flex-col items-center">
@@ -7692,7 +7823,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
                  {selectedItem?.name || "Business Name"}
                </p>
                <p className="text-[10px] font-bold text-gray-500 uppercase px-4 truncate">
-                 {(selectedItem as any)?.address || (selectedItem ? [selectedItem.block, selectedItem.district, selectedItem.state].filter(Boolean).join(", ") : "") || "Address Placeholder"}
+                  {(() => { const i = selectedItem as any; return i?.address || (selectedItem ? [i?.block, i?.district, i?.state].filter(Boolean).join(", ") : ""); })() || "Address Placeholder"}
                </p>
              </div>
 
@@ -8428,13 +8559,13 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                       const years = Array.from(new Set(bookings.map(b => b.eventDate.split('-')[0]))).sort((a,b) => b.localeCompare(a));
                       
                       const aggregates = filteredForReport.reduce((acc, b) => {
-                        const total = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
-                        const totalReceived = Math.round((b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
-                        const discountOnly = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+                        const total = Math.floor(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
+                        const totalReceived = Math.floor((b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+                        const discountOnly = Math.floor((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
                         const cashPaid = Math.max(0, totalReceived - discountOnly);
                         
                         const pending = Math.max(0, total - totalReceived);
-                        const isPaid = (pending <= 1 && total > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
+                        const isPaid = (pending <= 0 && total > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
                         
                         return {
                           total: (Number(acc.total) || 0) + total,
@@ -8582,12 +8713,12 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                               const matchesYear = !reportFilters.year || b.eventDate.startsWith(reportFilters.year);
                               return matchesName && matchesMobile && matchesMode && matchesStart && matchesEnd && matchesType && matchesYear;
                             }).map((b, index) => {
-                             const subTotal = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
-                              const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
-                              const discountTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+                             const subTotal = Math.floor(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
+                              const totalReceived = Math.floor((b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+                              const discountTotal = Math.floor((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
                               const cashPaidTotal = Math.max(0, totalReceived - discountTotal);
                               const pending = Math.max(0, subTotal - totalReceived);
-                              const isPaid = (pending <= 1 && subTotal > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
+                              const isPaid = (pending <= 0 && subTotal > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
                               
                               return (
                                 <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
@@ -8619,7 +8750,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                     <button 
                                       onClick={async () => {
                                         try {
-                                          const pdfBlob = await generateInvoice(b, 0, profile);
+                                          const pdfBlob = await generateInvoice(b, 0, profile, bookings);
                                           const url = URL.createObjectURL(pdfBlob);
                                           const link = document.createElement('a');
                                           link.href = url;
@@ -9106,9 +9237,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     <span>Amount</span>
                   </button>
                   <button 
-                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)}
+                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)}
                     onClick={() => {
-                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) {
+                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)) {
                         toast.error('Payment is already completed');
                         return;
                       }
@@ -9117,7 +9248,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                     }}
                     className={cn(
                       "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
-                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(b.updatedAmount || b.totalAmount || 0) - Math.round(b.payments?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(b.updatedAmount || b.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed opacity-50" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                     )}
                   >
                     <IndianRupee size={12} className="md:size-4" />
@@ -9126,7 +9257,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   <button 
                     onClick={async () => {
                       try {
-                        const pdfBlob = await generateInvoice(b, 0, profile);
+                        const pdfBlob = await generateInvoice(b, 0, profile, bookings);
                         const url = URL.createObjectURL(pdfBlob);
                         const link = document.createElement('a');
                         link.href = url;
@@ -9491,52 +9622,92 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
     }
   };
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader className="animate-spin text-orange-600" /></div>;
+  if (loading) return <div className="py-40 flex flex-col items-center justify-center space-y-4"><RefreshCw className="animate-spin text-orange-600" size={48} /><p className="text-orange-600 font-bold animate-pulse">Loading Premium Plans...</p></div>;
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
-      {currentSub && (
-        <div className="bg-green-50 border border-green-100 p-6 rounded-2xl flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-green-800">Active Subscription</h3>
-            <p className="text-sm text-green-600">Valid until {formatDateDDMMYYYY(currentSub.endDate)}</p>
+    <div className="space-y-12">
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 md:p-10 rounded-[2.5rem] border border-orange-100 shadow-2xl shadow-orange-100/20 gap-8 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-orange-50 rounded-full -mr-20 -mt-20 blur-3xl opacity-50 group-hover:scale-110 transition-transform duration-700" />
+        <div className="flex items-center gap-8 relative z-10">
+          <div className="bg-white p-4 rounded-3xl shadow-xl border border-orange-50">
+            <AppLogo size="xl" />
           </div>
-          <ShieldCheck className="text-green-600" size={32} />
         </div>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {plans.map(plan => (
-          <div key={plan.id} className="bg-gray-50 border border-gray-100 p-8 rounded-3xl relative overflow-hidden group">
-            <div className="relative z-10">
-              <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-              <div className="text-3xl font-bold text-orange-600 mb-6">₹{plan.price}<span className="text-sm text-gray-500 font-normal">/{plan.duration}</span></div>
-              <ul className="space-y-3 mb-8 text-sm text-gray-600">
-                {plan.benefits && plan.benefits.length > 0 ? (
-                  plan.benefits.map((benefit, i) => (
-                    <li key={i} className="flex items-start"><Check size={16} className="text-green-500 mr-2 mt-0.5" /> {benefit}</li>
-                  ))
-                ) : (
-                  <>
-                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Business Listing</li>
-                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Booking Inquiries</li>
-                    <li className="flex items-center"><Check size={16} className="text-green-500 mr-2" /> Catalogue Access</li>
-                  </>
-                )}
-              </ul>
-              <button 
-                onClick={() => handleSubscribe(plan)}
-                disabled={currentSub?.planId === plan.id}
-                className={cn(
-                  "w-full py-3 rounded-xl font-bold transition-all",
-                  currentSub?.planId === plan.id ? "bg-gray-200 text-gray-500" : "bg-orange-600 text-white hover:bg-orange-700"
-                )}
-              >
-                {currentSub?.planId === plan.id ? 'Current Plan' : 'Subscribe Now'}
-              </button>
+        <div className="text-center md:text-right relative z-10">
+          <h2 className="text-4xl font-black text-gray-900 tracking-tighter leading-none mb-3">ELITE <span className="text-orange-600">PLANS</span></h2>
+          <p className="text-gray-500 font-black uppercase tracking-widest text-[10px] md:text-xs">Professional Business Expansion Protocol</p>
+          <div className="flex justify-center md:justify-end gap-2 mt-4">
+            <span className="w-2 h-2 rounded-full bg-orange-600 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse delay-100" />
+            <span className="w-2 h-2 rounded-full bg-orange-200 animate-pulse delay-200" />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto space-y-12">
+        {currentSub && (
+          <div className="bg-green-50 border border-green-200 p-8 rounded-[2rem] flex flex-col md:flex-row justify-between items-center shadow-sm">
+            <div className="flex items-center space-x-6 mb-4 md:mb-0">
+              <div className="bg-green-600 p-4 rounded-2xl text-white shadow-lg">
+                <ShieldCheck size={32} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-green-800 uppercase tracking-tight">Active Plan Benefits</h3>
+                <p className="text-green-600 font-bold">Valid until: {format(new Date(currentSub.endDate), 'dd MMM yyyy')}</p>
+              </div>
+            </div>
+            <div className="bg-white px-6 py-3 rounded-2xl border border-green-100 font-black text-green-600 shadow-sm">
+              PREMIUM STATUS
             </div>
           </div>
-        ))}
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {plans.map(plan => (
+            <div key={plan.id} className={cn(
+              "bg-white border-4 p-8 rounded-[2.5rem] relative overflow-hidden transition-all hover:scale-[1.02] shadow-xl",
+              currentSub?.planId === plan.id ? "border-green-500 shadow-green-100" : "border-gray-50 hover:border-orange-200 shadow-gray-100"
+            )}>
+              {currentSub?.planId === plan.id && (
+                <div className="absolute top-0 right-0 bg-green-500 text-white px-6 py-2 rounded-bl-3xl font-black text-[10px] uppercase tracking-widest">
+                  Active
+                </div>
+              )}
+              <div className="relative z-10">
+                <h3 className="text-2xl font-black mb-1 uppercase tracking-tight text-gray-900">{plan.name}</h3>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Designed for professional {plan.role}s</p>
+                <div className="text-5xl font-black text-orange-600 mb-8 tracking-tighter">
+                  ₹{plan.price}
+                  <span className="text-sm text-gray-400 font-bold uppercase tracking-widest ml-2">/ {plan.duration}</span>
+                </div>
+                
+                <div className="space-y-4 mb-10">
+                  {(plan.benefits && plan.benefits.length > 0 ? plan.benefits : ['Unlimited Listing', 'Direct Customer Contact', 'Featured Visibility']).map((benefit, i) => (
+                    <div key={i} className="flex items-center space-x-3 text-gray-600 font-medium">
+                      <div className="bg-orange-100 p-1 rounded-lg text-orange-600">
+                        <Check size={14} />
+                      </div>
+                      <span className="text-sm">{benefit}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={() => handleSubscribe(plan)}
+                  disabled={currentSub?.planId === plan.id}
+                  className={cn(
+                    "w-full py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all",
+                    currentSub?.planId === plan.id 
+                      ? "bg-green-50 text-green-600 cursor-default" 
+                      : "bg-gray-900 text-white hover:bg-orange-600 hover:shadow-2xl hover:shadow-orange-200 active:scale-95"
+                  )}
+                >
+                  {currentSub?.planId === plan.id ? 'Active Plan' : 'Buy This Plan'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -10616,7 +10787,10 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               <ImageUpload 
                 label="Add Venue Photos" 
                 multiple={true}
-                onUpload={(url) => setFormData(prev => ({...prev, images: [...(prev?.images || []), url]}))}
+                onUpload={(url) => {
+                  const urls = Array.isArray(url) ? url : [url];
+                  setFormData(prev => ({...prev, images: [...(prev?.images || []), ...urls]}));
+                }}
               />
               <VideoUpload 
                 label="Add Venue Video (Max 60s)" 
@@ -11823,6 +11997,12 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleOpenRating = () => setIsAppRatingOpen(true);
+    window.addEventListener('open-app-rating', handleOpenRating);
+    return () => window.removeEventListener('open-app-rating', handleOpenRating);
+  }, []);
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-orange-50">
@@ -12249,164 +12429,173 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.text(`VISIT FOR ONLINE BOOKING- WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.985, { align: 'center' });
 
     } else if (selectedType === 3) {
-      // APP BRANDING BANNER - MATCHING PROVIDED HTML/CSS STRUCTURE
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      // APP BRANDING BANNER - IMPROVED WITH BACKGROUND COMBINATION & BOUNDARY CHECKS
+      // Background Layers
+      doc.setFillColor(15, 23, 42); // slate-900 Top
+      doc.rect(0, 0, pageWidth, pageHeight * 0.25, 'F');
       
+      doc.setFillColor(255, 255, 255); // White Middle
+      doc.rect(0, pageHeight * 0.25, pageWidth, pageHeight * 0.65, 'F');
+      
+      doc.setFillColor(234, 88, 12); // orange-600 Footer
+      doc.rect(0, pageHeight * 0.9, pageWidth, pageHeight * 0.1, 'F');
+
       const margin = pageWidth * 0.05;
       
-      // 1. HEADER (Centered as per HTML)
+      // 1. HEADER BRANDING
       const headerY = pageHeight * 0.1;
-      doc.setFontSize(pageHeight * 0.1);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(30, 58, 138); // Blue
-      doc.text("BEST VANUE OPTION", pageWidth / 2, headerY, { align: 'center' });
-      
-      doc.setFontSize(pageHeight * 0.045);
-      doc.setTextColor(55, 65, 81); // Gray-700
-      doc.text("VANUE & EVENT & SERVICE PROVIDERS", pageWidth / 2, headerY + (pageHeight * 0.06), { align: 'center' });
-      
-      doc.setFontSize(pageHeight * 0.03);
-      doc.setFont("helvetica", "normal");
-      doc.text("All in one booking platform for marriage, party, meetings & special occasions".toUpperCase(), pageWidth / 2, headerY + (pageHeight * 0.1), { align: 'center' });
-
-      // 2. MAIN FLEX SECTION (1:2:1 Ratio structure)
-      const mainY = headerY + (pageHeight * 0.18);
-      
-      // -- LEFT: Service Provider Image --
-      const leftColX = margin;
-      const leftColW = pageWidth * 0.2;
-      doc.setFillColor(243, 244, 246);
-      doc.rect(leftColX, mainY, leftColW, pageHeight * 0.45, 'F');
-      // Stick man illustration
-      doc.setFillColor(31, 41, 55);
-      doc.circle(leftColX + (leftColW / 2), mainY + (pageHeight * 0.1), pageHeight * 0.04, 'F');
-      doc.rect(leftColX + (leftColW * 0.2), mainY + (pageHeight * 0.15), leftColW * 0.6, pageHeight * 0.25, 'F');
-      
-      // -- CENTER: Service Lists (2 Columns) --
-      const centerColX = leftColX + leftColW + (pageWidth * 0.05);
-      const centerColW = pageWidth * 0.45;
-      const col1X = centerColX;
-      const col2X = centerColX + (centerColW / 2);
-      const listHSpacing = pageHeight * 0.038;
-      
-      const services1 = ["CATERORS", "DHOL AND BAND", "DJ AND SOUND", "DRONE VIDEOGRAPHER", "EVENT CLOTH & JEWELLERY", "EVENT MANAGER", "FAST FOOD SERVICE", "FLOWER DECORATOR", "GHODA GADI", "GIFT HAMPERS", "HALWAI", "HELPERS"];
-      const services2 = ["LAUNDRY SERVICES", "LIGHT DECORATOR", "MAKEUP ARTISTS", "MEHENDI ARTISTS", "MUSICAL GROUP", "PHOTOGRAPHER", "PUJARI JI", "STAGE DECORATOR", "TENT HOUSE", "VEHICLE ON RENT", "OTHER SERVICES"];
-      
-      doc.setFontSize(pageHeight * 0.028);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(31, 41, 55);
-      services1.forEach((s, i) => doc.text(`${i + 1}. ${s}`, col1X, mainY + (i * listHSpacing)));
-      services2.forEach((s, i) => doc.text(`${i + 13}. ${s}`, col2X, mainY + (i * listHSpacing)));
-
-      // -- RIGHT: Logo + Venue Types --
-      const rightColX = centerColX + centerColW + (pageWidth * 0.05);
-      const rightColW = pageWidth * 0.2;
-      
-      // Logo Placeholder
+      // Logo in header
       if (appLogoUrl) {
         try {
-          const l64 = await imageUrlToBase64(appLogoUrl);
-          if (l64) doc.addImage(l64, 'PNG', rightColX, mainY, rightColW, rightColW);
+          const lBase64 = await imageUrlToBase64(appLogoUrl);
+          if (lBase64) doc.addImage(lBase64, 'PNG', margin, headerY - (pageHeight * 0.07), pageHeight * 0.15, pageHeight * 0.15);
         } catch(e) {}
       }
 
-      const vTypes = ["HOTEL", "MARRIAGE GARDEN", "MARRIAGE HALL", "RESORT", "COMMUNITY HALL"];
+      const hTextX = margin + (pageHeight * 0.18);
+      doc.setFontSize(pageHeight * 0.12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(59, 130, 246); // blue-500
+      doc.text("BEST VANUE", hTextX, headerY);
+      const bvw = doc.getTextWidth("BEST VANUE ");
+      doc.setTextColor(239, 68, 68); // red-500
+      doc.text("OPTION", hTextX + bvw, headerY);
+      
       doc.setFontSize(pageHeight * 0.035);
       doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text(appTagline.toUpperCase(), hTextX, headerY + (pageHeight * 0.06), { maxWidth: pageWidth * 0.7 });
+
+      // 2. MAIN FLEX SECTION
+      const mainY = pageHeight * 0.35;
+      const listHSpacing = pageHeight * 0.045;
+      
+      // -- LEFT: Venues --
+      const vColX = margin;
+      const vColW = pageWidth * 0.3;
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setTextColor(234, 88, 12);
+      doc.setFont("helvetica", "bold");
+      doc.text("VENUE CATEGORIES:", vColX, mainY - (pageHeight * 0.03));
+      
+      doc.setFontSize(pageHeight * 0.035);
       doc.setTextColor(0, 0, 0);
-      vTypes.forEach((v, i) => {
-        doc.text(v, rightColX + (rightColW / 2), mainY + rightColW + (pageHeight * 0.08) + (i * pageHeight * 0.06), { align: 'center' });
+      doc.setFont("helvetica", "normal");
+      ["• MARRIAGE GARDENS", "• HOTELS & RESORTS", "• MARRIAGE HALLS", "• RESTAURANTS", "• COMMUNITY HALLS", "• PARTY HALLS", "• MEETING HALLS"].forEach((v, i) => {
+        doc.text(v, vColX, mainY + (i * listHSpacing));
       });
 
-      // 3. FOOTER
-      const footerY = pageHeight * 0.88;
-      doc.setFontSize(pageHeight * 0.035);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      const fCta = "Register now for online booking & grow your business".toUpperCase();
-      doc.text(fCta, pageWidth / 2, footerY, { align: 'center' });
+      // -- CENTER: Services --
+      const sCol1X = vColX + vColW + (pageWidth * 0.05);
+      const sColW = pageWidth * 0.55;
+      const subCol1 = sCol1X;
+      const subCol2 = sCol1X + (sColW / 2);
       
-      doc.setTextColor(37, 99, 235); // Blue link
-      doc.text(`WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, footerY + (pageHeight * 0.05), { align: 'center' });
-    } else if (selectedType === 4) {
-      // APP RATING BANNER
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setTextColor(37, 99, 235);
+      doc.setFont("helvetica", "bold");
+      doc.text("SERVICE PROVIDERS:", sCol1X, mainY - (pageHeight * 0.03));
+      
+      doc.setFontSize(pageHeight * 0.03);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "normal");
+      
+      const servicesLeft = ["• CATERORS", "• DHOL & BAND", "• DJ & SOUND", "• DRONE VIDEO", "• EVENT CLOTH", "• EVENT MANAGER", "• FAST FOOD", "• FLOWER DECOR", "• GHODA GADI", "• GIFT HAMPERS"];
+      const servicesRight = ["• HALWAI", "• HELPERS", "• LAUNDRY", "• LIGHT DECOR", "• MAKEUP", "• MEHENDI", "• MUSICAL GROUP", "• PHOTO", "• PUJARI JI", "• STAGE DECOR", "• TENT HOUSE", "• VEHICLE RENT"];
+      
+      servicesLeft.forEach((s, i) => {
+        doc.text(s, subCol1, mainY + (i * listHSpacing));
+      });
+      servicesRight.forEach((s, i) => {
+        doc.text(s, subCol2, mainY + (i * listHSpacing));
+      });
 
-      // Decorative Border
-      doc.setDrawColor(37, 99, 235); // Blue
+      // -- ILLUSTRATION / ICON at bottom right of main --
+      try {
+        const url = `${window.location.origin}/#/registration`;
+        const qr = await QRCode.toDataURL(url, { width: 500, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } });
+        doc.addImage(qr, 'PNG', pageWidth - margin - (pageHeight * 0.2), pageHeight * 0.65, pageHeight * 0.2, pageHeight * 0.2);
+        doc.setFontSize(pageHeight * 0.02);
+        doc.setFont("helvetica", "bold");
+        doc.text("REGISTER YOUR BUSINESS", pageWidth - margin - (pageHeight * 0.1), pageHeight * 0.87, { align: 'center' });
+      } catch(e) {}
+
+      const footerY3 = pageHeight * 0.96;
+      doc.setFontSize(pageHeight * 0.04);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("FOR ONLINE BOOKING: WWW.BESTVANUEOPTION.COM", pageWidth / 2, footerY3, { align: 'center' });
+      
+      if (appLogoUrl) {
+        try {
+          const l64 = await imageUrlToBase64(appLogoUrl);
+          if (l64) doc.addImage(l64, 'PNG', pageWidth - margin - (pageHeight * 0.15), footerY3 - (pageHeight * 0.03), pageHeight * 0.06, pageHeight * 0.06);
+        } catch(e) {}
+      }
+
+    } else if (selectedType === 4) {
+      // APP RATING BANNER - UPDATED TO MATCH VENUE/SERVICE CARD STYLE
+      doc.setFillColor(255, 247, 237); // orange-50
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      doc.setDrawColor(234, 88, 12); // orange-600
       doc.setLineWidth(pageWidth * 0.02);
       doc.rect(pageWidth * 0.03, pageWidth * 0.03, pageWidth * 0.94, pageHeight - (pageWidth * 0.06), 'S');
       
       const margin = pageWidth * 0.05;
-      const topY = pageHeight * 0.1;
       
-      // Header Box
-      doc.setFillColor(243, 244, 246);
-      doc.rect(margin, topY - (pageHeight * 0.02), pageWidth - (2 * margin), pageHeight * 0.25, 'F');
-      const headerLogoSize = pageHeight * 0.32;
+      // Header: App Info
       if (appLogoUrl) {
         try {
           const l64 = await imageUrlToBase64(appLogoUrl);
-          if (l64) doc.addImage(l64, 'PNG', margin + (pageWidth * 0.05), topY, headerLogoSize, headerLogoSize);
-        } catch(e) {}
+          if (l64) doc.addImage(l64, 'PNG', pageWidth/2 - (pageHeight * 0.1), pageHeight * 0.08, pageHeight * 0.2, pageHeight * 0.2);
+        } catch(e) {
+             doc.setFillColor(37, 99, 235);
+             doc.circle(pageWidth/2, pageHeight * 0.18, pageHeight * 0.08, 'F');
+        }
       }
-
-      const midTextX = margin + headerLogoSize + (pageWidth * 0.08);
-      doc.setFontSize(pageHeight * 0.14);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text(appName.toUpperCase(), midTextX, topY + (headerLogoSize * 0.4));
-      
-      doc.setFontSize(pageHeight * 0.07);
-      doc.setTextColor(31, 41, 55);
-      doc.setFont("helvetica", "normal");
-      doc.text(appTagline.toUpperCase(), midTextX, topY + (headerLogoSize * 0.7));
-
-      // Main Text
-      // Highlight Box for "PLEASE RATE"
-      doc.setFillColor(239, 246, 255); // Soft Blue
-      doc.rect(margin, pageHeight * 0.38, pageWidth - (2 * margin), pageHeight * 0.18, 'F');
 
       doc.setFontSize(pageHeight * 0.08);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text("PLEASE RATE AND REVIEW OUR APP AND", pageWidth / 2, pageHeight * 0.44, { align: 'center' });
-      doc.text("WEBSITE", pageWidth / 2, pageHeight * 0.52, { align: 'center' });
-
-      // QR Code with Brackets
-      const qrSize = pageHeight * 0.45;
-      const bQrX = (pageWidth - qrSize) / 2;
-      const bQrY = pageHeight * 0.6;
+      doc.text(appName.toUpperCase(), pageWidth / 2, pageHeight * 0.35, { align: 'center' });
       
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(3);
-      const brS = qrSize * 0.2;
-      doc.line(bQrX - 6, bQrY - 6, bQrX - 6 + brS, bQrY - 6);
-      doc.line(bQrX - 6, bQrY - 6, bQrX - 6, bQrY - 6 + brS);
-      doc.line(bQrX + qrSize + 6, bQrY - 6, bQrX + qrSize + 6 - brS, bQrY - 6);
-      doc.line(bQrX + qrSize + 6, bQrY - 6, bQrX + qrSize + 6, bQrY - 6 + brS);
-      doc.line(bQrX - 6, bQrY + qrSize + 6, bQrX - 6 + brS, bQrY + qrSize + 6);
-      doc.line(bQrX - 6, bQrY + qrSize + 6, bQrX - 6, bQrY + qrSize + 6 - brS);
-      doc.line(bQrX + qrSize + 6, bQrY + qrSize + 6, bQrX + qrSize + 6 - brS, bQrY + qrSize + 6);
-      doc.line(bQrX + qrSize + 6, bQrY + qrSize + 6, bQrX + qrSize + 6, bQrY + qrSize + 6 - brS);
+      doc.setFontSize(pageHeight * 0.04);
+      doc.setTextColor(234, 88, 12);
+      doc.text(appTagline.toUpperCase(), pageWidth / 2, pageHeight * 0.42, { align: 'center' });
 
+      // QR Body
+      doc.setFontSize(pageHeight * 0.06);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont("helvetica", "bold");
+      doc.text("SCAN TO RATE & REVIEW OUR APP", pageWidth / 2, pageHeight * 0.52, { align: 'center' });
+
+      const qrSize = pageHeight * 0.35;
+      const bQrX = (pageWidth - qrSize) / 2;
+      const bQrY = pageHeight * 0.56;
+      
       try {
-        const qr = await QRCode.toDataURL(window.location.origin + "/#/app-rating", { width: 1000, margin: 4 });
+        const qr = await QRCode.toDataURL(window.location.origin + "/#/app-rating", { 
+          width: 1000, 
+          margin: 2,
+          color: { dark: '#ea580c', light: '#ffffff' } 
+        });
         doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
 
-      doc.setFontSize(pageHeight * 0.07);
-      doc.setTextColor(31, 41, 55);
+      doc.setFontSize(pageHeight * 0.04);
+      doc.setTextColor(156, 163, 175); // Gray-400
       doc.setFont("helvetica", "bold");
-      doc.text("SCAN FOR RATE AND REVIEW", pageWidth / 2, bQrY + qrSize + (pageHeight * 0.15), { align: 'center' });
+      doc.text("YOUR FEEDBACK MATTERS TO US", pageWidth / 2, bQrY + qrSize + (pageHeight * 0.06), { align: 'center' });
 
       // Footer
-      doc.setFontSize(pageHeight * 0.05);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.97, { align: 'center' });
+      doc.setFillColor(234, 88, 12);
+      doc.rect(margin, pageHeight * 0.92, pageWidth - (2 * margin), pageHeight * 0.05, 'F');
+      doc.setFontSize(pageHeight * 0.035);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`VISIT - WWW.${appName.replace(/\s+/g, '').toUpperCase()}.COM`, pageWidth / 2, pageHeight * 0.955, { align: 'center' });
     }
+
 
     doc.save(`Flex_${selectedType}_${sizeObj.value}_${Date.now()}.pdf`);
   };
@@ -13555,6 +13744,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       setLoading(true);
                       const formData = new FormData(e.currentTarget);
                       const newPlan = {
+                        id: generateUUID(),
                         name: formData.get('name') as string,
                         role: formData.get('role') as string,
                         price: parseFloat(formData.get('price') as string),
