@@ -920,11 +920,13 @@ const formatDateDDMMYYYY = (date: Date | string | null | undefined) => {
   }
 };
 
-const generateTransactionId = (ownerRegId: string, count: number) => {
+const generateTransactionId = (ownerRegId: string, count: number, isManual: boolean = false) => {
   // Extract only the numeric part from the registration ID (e.g., BVOVO900001 -> 900001)
-  const idNumber = ownerRegId.replace(/\D/g, '') || '00000';
-  const serial = (count + 1).toString().padStart(3, '0');
-  return `BVO/${idNumber}/${serial}`;
+  const idNumber = ownerRegId.replace(/\D/g, '') || '000000';
+  const type = isManual ? 'MB' : 'PB';
+  // Serial number resets annually, passed as a count of bookings for the user in the current year
+  const serial = (count + 1).toString().padStart(4, '0');
+  return `BVO/${idNumber}/${type}/${serial}`;
 };
 
 const MultiSelect = ({ 
@@ -4431,19 +4433,19 @@ const TestimonialsSection = () => {
               className="flex space-x-8 whitespace-nowrap py-4"
             >
               {[...feedbacks, ...feedbacks].map((fb, idx) => (
-                <div key={`${fb.id}-${idx}`} className="inline-block w-[350px] md:w-[450px] bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-xl transition-all whitespace-normal">
-                  <div className="flex items-center space-x-1 text-yellow-500 mb-6">
+                <div key={`${fb.id}-${idx}`} className="inline-block w-[320px] md:w-[400px] bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all whitespace-normal">
+                  <div className="flex items-center space-x-1 text-yellow-500 mb-4">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={16} fill={i < fb.rating ? "currentColor" : "none"} className={i < fb.rating ? "text-yellow-500" : "text-gray-200"} />
+                      <Star key={i} size={14} fill={i < fb.rating ? "currentColor" : "none"} className={i < fb.rating ? "text-yellow-500" : "text-gray-200"} />
                     ))}
                   </div>
-                  <p className="text-gray-600 italic leading-relaxed mb-8 line-clamp-3">"{fb.comment}"</p>
+                  <p className="text-gray-600 italic leading-relaxed mb-6 line-clamp-3 text-sm">"{fb.comment}"</p>
                   <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl shadow-inner uppercase">
+                    <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-lg shadow-inner uppercase">
                       {fb.userName?.charAt(0) || 'U'}
                     </div>
                     <div>
-                      <h4 className="font-bold text-gray-900">{fb.userName}</h4>
+                      <h4 className="font-bold text-gray-900 text-sm">{fb.userName}</h4>
                       <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Verified User</p>
                     </div>
                   </div>
@@ -7337,24 +7339,32 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
   // CUSTOM INVOICE NUMBER LOGIC
   // BVO/user numerical id/PB or MB/000+1 serial
-  const userNumericId = (providerProfile?.registrationId || '000000').replace(/\D/g, '');
   const bookingTypePrefix = booking.isManual ? 'MB' : 'PB';
   
   // Calculate Serial Number (starts from 1 every year)
   const currentYear = new Date().getFullYear();
-  const providerBookingsThisYear = allBookings.filter(b => {
-    const bYear = new Date(b.createdAt || new Date()).getFullYear();
-    const bOwnerId = b.ownerId;
-    return bOwnerId === booking.ownerId && bYear === currentYear;
-  });
+  const providerBookingsThisYear = allBookings
+    .filter(b => {
+      const bYear = new Date(b.createdAt || new Date()).getFullYear();
+      const bOwnerId = b.ownerId;
+      return bOwnerId === booking.ownerId && bYear === currentYear;
+    })
+    .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   
-  const serialNo = (providerBookingsThisYear.length + 1).toString().padStart(3, '0');
+  const bookingIndex = providerBookingsThisYear.findIndex(b => b.id === booking.id);
+  const serialNo = (bookingIndex !== -1 ? bookingIndex + 1 : providerBookingsThisYear.length + 1).toString().padStart(3, '0');
+  
+  // Refined numerical ID extraction: take the last numeric part from registrationId
+  const regIdStr = providerProfile?.registrationId || '000000';
+  const regParts = regIdStr.split('-');
+  const userNumericId = regParts.length > 1 ? regParts[regParts.length - 1].replace(/\D/g, '') : regIdStr.replace(/\D/g, '');
+  
   const customInvoiceNo = `BVO/${userNumericId}/${bookingTypePrefix}/${serialNo}`;
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
+    if (isPaid) return 'COMPLETED';
     const status = (booking.status || 'pending').toLowerCase();
-    if (status === 'completed') return 'COMPLETED';
     if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
     return status.toUpperCase();
   };
@@ -8108,6 +8118,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               paymentMode: p.payment_mode,
               paymentDate: p.payment_date,
               paymentType: p.payment_type || 'Regular',
+              transaction_id: p.transaction_id,
               createdAt: p.created_at
             })),
             createdAt: d.created_at
@@ -9270,8 +9281,18 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                         URL.revokeObjectURL(url);
                         toast.success('Invoice downloaded successfully');
                         
-                        // Mark as generated
-                        db.from('bookings').update({ is_invoice_generated: true }).eq('id', b.id).then(() => {
+                        // Mark as generated and update status if fully paid
+                        const paymentsTotal = (b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+                        const totalAmount = Number(b.updatedAmount || b.totalAmount || 0);
+                        const isFullyPaid = paymentsTotal >= totalAmount && totalAmount > 0;
+                        
+                        const updates: any = { is_invoice_generated: true };
+                        if (isFullyPaid) {
+                          updates.status = 'completed';
+                          updates.payment_status = 'Paid';
+                        }
+                        
+                        db.from('bookings').update(updates).eq('id', b.id).then(() => {
                            if (onUpdate) onUpdate();
                         });
                       } catch (err) {

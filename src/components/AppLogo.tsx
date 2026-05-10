@@ -35,11 +35,11 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
   }, []);
 
   const sizeClasses = {
-    xs: 'h-6',
-    sm: 'h-8',
-    md: 'h-12',
-    lg: 'h-24',
-    xl: 'h-32'
+    xs: 'h-6 w-6',
+    sm: 'h-8 w-8',
+    md: 'h-12 w-12',
+    lg: 'h-24 w-24',
+    xl: 'h-32 w-32'
   };
 
   return (
