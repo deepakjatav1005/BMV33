@@ -4788,6 +4788,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       }));
 
       const bookingData = {
+        id: generateUUID(),
         user_id: user?.uid || 'visitor',
         visitor_name: visitorName,
         visitor_mobile: visitorMobile,
@@ -5581,6 +5582,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       }));
 
       const bookingData = {
+        id: generateUUID(),
         user_id: user?.uid || 'visitor',
         target_id: service?.id,
         target_type: 'service',
