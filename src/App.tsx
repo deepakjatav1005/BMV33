@@ -4263,13 +4263,13 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
           <div ref={topProvidersScrollRef} className="flex overflow-x-auto pb-8 gap-6 scrollbar-hide">
             {featuredServices.length > 0 ? (
               featuredServices.slice(0, 8).map(s => (
-                <div key={s.id} className="min-w-[280px] md:min-w-[320px] snap-start">
+                <div key={s.id} className="min-w-[320px] md:min-w-[400px] snap-start">
                   <ServiceCard service={s} />
                 </div>
               ))
             ) : (
               [1, 2, 3, 4].map(i => (
-                <div key={i} className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl h-64 animate-pulse border border-gray-100" />
+                <div key={i} className="min-w-[320px] md:min-w-[400px] bg-white rounded-2xl h-64 animate-pulse border border-gray-100" />
               ))
             )}
           </div>
@@ -4476,20 +4476,21 @@ const TestimonialsSection = () => {
 };
 
 const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
-  const [bookedDates, setBookedDates] = useState<{date: string, status: string, startTime?: string, endTime?: string}[]>([]);
+  const [bookedDates, setBookedDates] = useState<{date: string, endDate?: string, status: string, startTime?: string, endTime?: string}[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     const fetchBookings = async () => {
       const { data, error } = await db
         .from('bookings')
-        .select('event_date, status, start_time, end_time')
+        .select('event_date, end_date, status, start_time, end_time')
         .eq('target_id', targetId)
         .in('status', ['confirmed', 'paid', 'approved', 'completed']);
       
       if (!error && data) {
         setBookedDates(data.map(d => ({ 
           date: d.event_date, 
+          endDate: d.end_date,
           status: d.status,
           startTime: d.start_time,
           endTime: d.end_time
@@ -4547,7 +4548,12 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
           <div key={`empty-${i}`} />
         ))}
         {days.map(date => {
-          const matchedBookings = bookedDates.filter(d => d.date === date);
+          const matchedBookings = bookedDates.filter(d => {
+            if (d.endDate) {
+              return date >= d.date && date <= d.endDate;
+            }
+            return d.date === date;
+          });
           const isBooked = matchedBookings.length > 0;
           const isToday = date === format(new Date(), 'yyyy-MM-dd');
           return (
@@ -6586,7 +6592,7 @@ const BookingManagerView = ({
       
       const targetVenue = venues.find(v => v.id === manualBooking.targetId);
       const isService = !targetVenue;
-      const tid = generateTransactionId(profile?.registrationId || 'BVO', count || 0);
+      const tid = generateTransactionId(profile?.registrationId || 'BVO', count || 0, true);
 
       let extraServices: any[] = [];
       let finalTargetName = manualBooking.targetName;
@@ -7352,7 +7358,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   
   const bookingIndex = providerBookingsThisYear.findIndex(b => b.id === booking.id);
-  const serialNo = (bookingIndex !== -1 ? bookingIndex + 1 : providerBookingsThisYear.length + 1).toString().padStart(3, '0');
+  const serialNo = (bookingIndex !== -1 ? bookingIndex + 1 : providerBookingsThisYear.length + 1).toString().padStart(4, '0');
   
   // Refined numerical ID extraction: take the last numeric part from registrationId
   const regIdStr = providerProfile?.registrationId || '000000';
@@ -7493,27 +7499,44 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     doc.setFontSize(10);
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.text("Received Payments:", 25, currentY);
+    doc.text("Received Payment Transactions:", 25, currentY);
     currentY += 8;
     
+    doc.setFillColor(250, 250, 250);
+    doc.rect(20, currentY, 170, 7, 'F');
+    doc.setFontSize(8);
+    doc.text("Date", 25, currentY + 5);
+    doc.text("Type / Mode", 50, currentY + 5);
+    doc.text("Transaction ID", 100, currentY + 5);
+    doc.text("Amount (INR)", 185, currentY + 5, { align: 'right' });
+    currentY += 12;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.setTextColor(100);
+    doc.setTextColor(50);
     
     (booking.payments || []).forEach(p => {
        const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
-       const mode = p.paymentMode ? ` (${p.paymentMode})` : '';
-       const tid = p.transaction_id ? ` [ID: ${p.transaction_id}]` : '';
-       doc.text(`${label}${mode}${tid} (${formatDateDDMMYYYY(p.paymentDate)}):`, 25, currentY);
-       doc.text(`INR ${Math.round(p.amount || 0).toLocaleString()}`, 185, currentY, { align: 'right' });
-       currentY += 6;
+       const mode = p.paymentMode ? `${p.paymentMode}` : 'N/A';
+       const tid = p.id?.substring(0, 8).toUpperCase() || 'N/A';
+       
+       doc.text(formatDateDDMMYYYY(p.paymentDate), 25, currentY);
+       doc.text(`${label} (${mode})`, 50, currentY);
+       doc.text(tid, 100, currentY);
+       doc.text(Math.round(p.amount || 0).toLocaleString(), 185, currentY, { align: 'right' });
+       
+       currentY += 8;
+       if (currentY > 260) {
+         doc.addPage();
+         currentY = 20;
+       }
     });
 
     currentY += 4;
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("Total Paid:", 110, currentY);
+    doc.text("Total Amount Paid:", 110, currentY);
     doc.setTextColor(22, 101, 52); // Dark Green
     doc.text(`INR ${totalReceived.toLocaleString()}`, 190, currentY, { align: 'right' });
     currentY += 12;
@@ -9067,10 +9090,14 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
               transaction_id: response.razorpay_payment_id
             }]);
 
+            const updatedBookingRes = await db.from('bookings').select('updated_amount, total_amount').eq('id', booking.id).single();
+            const target = updatedBookingRes.data?.updated_amount || updatedBookingRes.data?.total_amount || 0;
+            const isFull = amountPaid >= target && target > 0;
+
             const { error } = await db.from('bookings').update({ 
-               status: 'paid',
-               payment_status: 'Paid',
-               advance_amount: amountPaid // For first payment usually, but since it marks as PAID it assumes full payment
+               status: isFull ? 'completed' : 'paid',
+               payment_status: isFull ? 'Paid' : 'Partial',
+               advance_amount: amountPaid
             }).eq('id', booking.id);
             
             if (error) {
