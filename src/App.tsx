@@ -104,8 +104,23 @@
       is_invoice_generated BOOLEAN DEFAULT FALSE,
       invoice_url TEXT,
       is_manual BOOLEAN DEFAULT FALSE,
+      is_locked TINYINT(1) DEFAULT 0,
       extra_services JSON,
+      advance_amount DECIMAL(10,2) DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- 4.1 Booking Payments Table
+  CREATE TABLE IF NOT EXISTS booking_payments (
+      id VARCHAR(36) PRIMARY KEY,
+      booking_id VARCHAR(36) NOT NULL,
+      amount DECIMAL(15, 2) NOT NULL,
+      payment_mode VARCHAR(50),
+      transaction_id VARCHAR(100),
+      payment_date DATE,
+      payment_type VARCHAR(50) DEFAULT 'Regular',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_booking_id (booking_id)
   );
 
   -- 5. App Feedback Table
@@ -522,9 +537,18 @@ const ManagePaymentModal = ({
         className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col"
       >
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900">Payment Records</h3>
-            <p className="text-sm text-gray-500 font-medium">{booking.partyName || booking.visitorName} • {booking.targetName}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">Payment Records</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm text-gray-500 font-medium">{booking.partyName || booking.visitorName} • {booking.targetName}</p>
+                {booking.isLocked && (
+                  <span className="bg-red-100 text-red-600 text-[8px] md:text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-tight">
+                    <Lock size={10} /> Locked
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
             <X size={24} />
@@ -6428,7 +6452,7 @@ const ManuallyBookingView = ({
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
     try {
-      const { error } = await db.from('bookings').update({ is_locked: isLocked }).eq('id', id);
+      const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
       if (error) throw error;
       toast.success(isLocked ? 'Booking Locked' : 'Booking Unlocked');
       if (onUpdate) onUpdate();
@@ -6691,6 +6715,11 @@ const ManuallyBookingView = ({
                     {booking.isManual && (
                       <span className="bg-gray-100 text-gray-500 text-[6px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Manual</span>
                     )}
+                    {booking.isLocked && (
+                      <span className="bg-red-50 text-red-600 text-[6px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 uppercase border border-red-100">
+                        <Lock size={10} /> Locked
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] md:text-sm text-gray-500 font-medium truncate">{booking.targetName} • {booking.eventType}</p>
                   <div className="flex flex-wrap items-center gap-x-2 md:gap-x-4 gap-y-1 mt-1.5 md:mt-2 text-[9px] md:text-sm text-gray-400">
@@ -6730,17 +6759,17 @@ const ManuallyBookingView = ({
                     </span>
                     <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                       {/* Lock/Unlock Toggle */}
-                      {(booking.status === 'confirmed' || booking.status === 'approved') && (booking.ownerId === user?.uid || profile?.role === 'admin') && (
+                      {(booking.status === 'confirmed' || booking.status === 'approved' || booking.status === 'paid') && (booking.ownerId === user?.uid || profile?.role === 'admin') && (
                         <button
                           onClick={() => handleToggleLock(booking.id, !booking.isLocked)}
                           className={cn(
                             "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
                             booking.isLocked 
-                              ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
-                              : "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                              ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" 
+                              : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                           )}
                         >
-                          {booking.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                          {booking.isLocked ? <Lock size={16} className="text-red-600" /> : <Unlock size={16} className="text-green-600" />}
                           <span>{booking.isLocked ? 'Unlock Booking' : 'Lock Booking'}</span>
                         </button>
                       )}
@@ -8052,8 +8081,10 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
             paymentStatus: d.payment_status ? (d.payment_status.charAt(0).toUpperCase() + d.payment_status.slice(1)) : 'Pending',
             paymentMode: d.payment_mode,
             isManual: d.is_manual,
+            isLocked: !!d.is_locked,
             is_invoice_generated: d.is_invoice_generated,
             invoice_url: d.invoice_url,
+            extra_services: d.extra_services || [],
             payments: relatedPayments.map((p: any) => ({
               id: p.id,
               bookingId: p.booking_id,
@@ -8932,7 +8963,7 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
     try {
-      const { error } = await db.from('bookings').update({ is_locked: isLocked }).eq('id', id);
+      const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
       if (error) throw error;
       toast.success(isLocked ? 'Booking Locked' : 'Booking Unlocked');
       if (onUpdate) onUpdate();
@@ -9019,17 +9050,17 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
               )}
 
               {/* Lock/Unlock Toggle */}
-              {(b.status === 'confirmed' || b.status === 'approved') && (b.ownerId === user?.uid || profile?.role === 'admin') && (
+              {(b.status === 'confirmed' || b.status === 'approved' || b.status === 'paid') && (b.ownerId === user?.uid || profile?.role === 'admin') && (
                 <button
                   onClick={() => handleToggleLock(b.id, !b.isLocked)}
                   className={cn(
                     "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
                     b.isLocked 
-                      ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
-                      : "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                      ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" 
+                      : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                   )}
                 >
-                  {b.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                  {b.isLocked ? <Lock size={16} className="text-red-600" /> : <Unlock size={16} className="text-green-600" />}
                   <span>{b.isLocked ? 'Unlock' : 'Lock'}</span>
                 </button>
               )}
