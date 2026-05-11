@@ -1632,7 +1632,27 @@ const ReviewSection = ({
       </div>
 
       <div className="space-y-6">
-        <h3 className="text-2xl font-bold text-gray-900">Guest Reviews ({reviews.length})</h3>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h3 className="text-2xl font-bold text-gray-900">Guest Reviews ({reviews.length})</h3>
+          
+          <div className="inline-flex items-center bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 space-x-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-3xl font-black text-gray-900 leading-none">{currentRating || '0.0'}</span>
+              <div className="flex items-center text-yellow-500">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={18} fill={i < Math.round(currentRating) ? "currentColor" : "none"} className={i < Math.round(currentRating) ? "text-yellow-500" : "text-gray-200"} />
+                ))}
+              </div>
+            </div>
+            <div className="h-10 w-px bg-gray-100" />
+            <div className="text-left">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                Average Rating
+              </p>
+              <p className="text-xs font-black text-gray-900">{reviews.length} Experiences</p>
+            </div>
+          </div>
+        </div>
         {loading ? (
           <div className="text-center py-10">
             <div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -1810,12 +1830,14 @@ const ImageUpload = ({
   onUpload, 
   label = "Upload Image", 
   currentImage = "",
-  multiple = false
+  multiple = false,
+  isCircle = false
 }: { 
   onUpload: (url: string | string[]) => void | Promise<any>, 
   label?: string,
   currentImage?: string,
-  multiple?: boolean
+  multiple?: boolean,
+  isCircle?: boolean
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1952,7 +1974,10 @@ const ImageUpload = ({
     <div className="space-y-2">
       <label className="block text-sm font-bold text-gray-700">{label}</label>
       <div className="flex items-center space-x-4">
-        <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group">
+        <div className={cn(
+          "relative w-24 h-24 overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center group",
+          isCircle ? "rounded-full" : "rounded-2xl"
+        )}>
           {currentImage ? (
             <div className="relative w-full h-full group">
               <img src={resolveUrl(currentImage)} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -4405,18 +4430,22 @@ const TestimonialsSection = () => {
           <h2 className="text-4xl font-black text-gray-900 tracking-tight mb-4">What Our Users Say</h2>
           <p className="text-gray-500 text-lg max-w-2xl mx-auto mb-8">Real stories from real people who planned their perfect events with us.</p>
           
-          <div className="inline-flex flex-col items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <div className="flex items-center space-x-3 mb-2">
-              <span className="text-4xl font-black text-gray-900">{appRating || '0.0'}</span>
+          <div className="inline-flex items-center bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 space-x-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-3xl font-black text-gray-900 leading-none">{appRating || '0.0'}</span>
               <div className="flex items-center text-yellow-500">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={24} fill={i < Math.round(appRating) ? "currentColor" : "none"} className={i < Math.round(appRating) ? "text-yellow-500" : "text-gray-200"} />
+                  <Star key={i} size={18} fill={i < Math.round(appRating) ? "currentColor" : "none"} className={i < Math.round(appRating) ? "text-yellow-500" : "text-gray-200"} />
                 ))}
               </div>
             </div>
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-              Overall App Rating ({totalFeedback} Reviews)
-            </p>
+            <div className="h-10 w-px bg-gray-100" />
+            <div className="text-left">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                Total Reviews
+              </p>
+              <p className="text-xs font-black text-gray-900">{totalFeedback} Verified Users</p>
+            </div>
           </div>
         </div>
 
@@ -4485,7 +4514,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
         .from('bookings')
         .select('event_date, end_date, status, start_time, end_time')
         .eq('target_id', targetId)
-        .in('status', ['confirmed', 'paid', 'approved', 'completed']);
+        .in('status', ['pending', 'confirmed', 'paid', 'approved', 'completed']);
       
       if (!error && data) {
         setBookedDates(data.map(d => ({ 
@@ -4556,38 +4585,58 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
           });
           const isBooked = matchedBookings.length > 0;
           const isToday = date === format(new Date(), 'yyyy-MM-dd');
+          
+          // Get the primary status for display
+          const primaryStatus = matchedBookings.length > 0 ? (matchedBookings[0].status || 'booked').toLowerCase() : null;
+          
           return (
             <div 
               key={date} 
               className={cn(
                 "aspect-square flex flex-col items-center justify-center rounded-xl text-[10px] md:text-sm font-medium transition-all relative overflow-hidden group",
-                isBooked ? "bg-red-50 text-red-600 border border-red-100 shadow-inner" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
+                isBooked ? "bg-orange-50 text-orange-700 border border-orange-100 shadow-inner" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
                 isToday && !isBooked && "ring-2 ring-orange-500 ring-offset-2 ring-offset-white"
               )}
             >
               <span className={cn(isBooked ? "font-black" : "")}>{date.split('-')[2]}</span>
               {isBooked && (
-                <div className="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
-                  {matchedBookings.slice(0, 2).map((b, idx) => (
-                    <span key={idx} className="text-[6px] md:text-[7px] font-black text-red-700 leading-none whitespace-nowrap mb-0.5 last:mb-0">
-                      {b.startTime ? formatTime12h(b.startTime) : 'Booked'}
-                    </span>
-                  ))}
-                  {matchedBookings.length > 2 && <span className="text-[5px] font-bold text-red-500">+{matchedBookings.length - 2}</span>}
+                <div className="absolute inset-0 bg-orange-600/5 transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full mb-0.5 shadow-sm",
+                    primaryStatus === 'paid' || primaryStatus === 'completed' ? "bg-green-500" : 
+                    primaryStatus === 'pending' ? "bg-yellow-500" : "bg-orange-500"
+                  )} />
+                  <span className={cn(
+                    "text-[6px] md:text-[8px] font-black uppercase px-1 rounded-sm shadow-sm border",
+                    primaryStatus === 'paid' ? 'bg-green-100 text-green-900 border-green-200' : 
+                    primaryStatus === 'completed' ? 'bg-emerald-100 text-emerald-900 border-emerald-200' :
+                    primaryStatus === 'pending' ? 'bg-yellow-100 text-yellow-900 border-yellow-200' :
+                    'bg-orange-100 text-orange-900 border-orange-200'
+                  )}>
+                    {primaryStatus === 'paid' ? 'PAID' : primaryStatus === 'completed' ? 'DONE' : primaryStatus === 'pending' ? 'PENDING' : 'BOOKED'}
+                  </span>
                 </div>
               )}
             </div>
           );
         })}
       </div>
-      <div className="mt-6 flex items-center space-x-4 text-xs font-medium">
+      <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
         <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-red-50 border border-red-100 rounded-full" />
-          <span className="text-gray-500">Booked</span>
+          <div className="w-4 h-4 rounded-md bg-orange-500 border border-orange-200" />
+          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Confirmed</span>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-gray-50 border border-gray-100 rounded-full" />
-          <span className="text-gray-500">Available</span>
+          <div className="w-4 h-4 rounded-md bg-yellow-500 border border-yellow-200" />
+          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Pending</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 rounded-md bg-green-500 border border-green-200" />
+          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Paid/Completed</span>
+        </div>
+        <div className="flex items-center space-x-2 ml-auto">
+          <div className="w-4 h-4 rounded-md bg-gray-100 border border-gray-200" />
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">Available</span>
         </div>
       </div>
     </div>
@@ -7335,8 +7384,28 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
   const subTotalActual = Math.round(fullTotalRecord + (expenditure || 0));
   
-  // Accurately sum all payments
-  const totalReceived = Math.round((booking.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
+  // Accurately sum all payments, fetch if empty
+  let invoicePayments = booking.payments || [];
+  if (invoicePayments.length === 0) {
+    try {
+      const { data } = await db.from('booking_payments').select('*').eq('booking_id', booking.id);
+      if (data) {
+        invoicePayments = data.map((p: any) => ({
+          id: p.id,
+          bookingId: p.booking_id,
+          amount: p.amount,
+          paymentMode: p.payment_mode,
+          paymentDate: p.payment_date,
+          paymentType: p.payment_type,
+          createdAt: p.created_at
+        }));
+      }
+    } catch (e) {
+      console.error('Invoice: Failed to fetch payments', e);
+    }
+  }
+
+  const totalReceived = Math.round(invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0));
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
   const isPaid = (balanceDue <= 0 && subTotalActual > 0) || (booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid';
@@ -7515,7 +7584,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     doc.setFontSize(9);
     doc.setTextColor(50);
     
-    (booking.payments || []).forEach(p => {
+    invoicePayments.forEach(p => {
        const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
        const mode = p.paymentMode ? `${p.paymentMode}` : 'N/A';
        const tid = p.id?.substring(0, 8).toUpperCase() || 'N/A';
@@ -9125,6 +9194,9 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       };
 
       const rzp = new Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        toast.error('Payment Failed: ' + response.error.description);
+      });
       rzp.open();
 
     } catch (err) {
@@ -9638,6 +9710,8 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
               id: generateUUID(),
               user_id: user?.uid,
               plan_id: plan.id,
+              plan_name: plan.name,
+              duration: plan.duration,
               start_date: startDate.toISOString(),
               end_date: endDate.toISOString(),
               status: 'active',
@@ -9664,6 +9738,9 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       };
       
       const rzp = new Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        toast.error('Payment Failed: ' + response.error.description);
+      });
       rzp.open();
       
     } catch (err) {
@@ -11008,6 +11085,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
         <div className="flex flex-col items-center mb-6 space-y-4">
           <ImageUpload 
             label="Profile Photo" 
+            isCircle={true}
             currentImage={formData.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.registrationId}`}
             onUpload={(url) => setFormData(prev => ({...prev, photoURL: Array.isArray(url) ? url[0] : url}))}
           />
