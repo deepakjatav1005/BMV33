@@ -4518,8 +4518,8 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
       
       if (!error && data) {
         setBookedDates(data.map(d => ({ 
-          date: d.event_date, 
-          endDate: d.end_date,
+          date: d.event_date ? d.event_date.split('T')[0] : '', 
+          endDate: d.end_date ? d.end_date.split('T')[0] : '',
           status: d.status,
           startTime: d.start_time,
           endTime: d.end_time
@@ -6408,15 +6408,16 @@ const BookingManagerView = ({
         paymentMode: d.payment_mode,
         is_invoice_generated: d.is_invoice_generated,
         invoice_url: d.invoice_url,
-        payments: (d.booking_payments || []).map((p: any) => ({
-          id: p.id,
-          bookingId: p.booking_id,
-          amount: p.amount,
-          paymentMode: p.payment_mode,
-          paymentDate: p.payment_date,
-          paymentType: p.payment_type,
-          createdAt: p.created_at
-        })),
+          payments: (d.booking_payments || []).map((p: any) => ({
+            id: p.id,
+            bookingId: p.booking_id,
+            amount: p.amount,
+            paymentMode: p.payment_mode,
+            paymentDate: p.payment_date,
+            paymentType: p.payment_type,
+            transaction_id: p.transaction_id,
+            createdAt: p.created_at
+          })),
         createdAt: d.created_at
       } as Booking)));
     }
@@ -6670,8 +6671,9 @@ const BookingManagerView = ({
         finalTargetName = manualBooking.targetName + ' (Venue)';
       }
 
+      const bookingId = generateUUID();
       const { error } = await db.from('bookings').insert([{
-        id: generateUUID(),
+        id: bookingId,
         user_id: user?.uid,
         owner_id: user?.uid,
         target_id: manualBooking.targetId,
@@ -6695,18 +6697,34 @@ const BookingManagerView = ({
         extra_services: extraServices
       }]);
       if (error) throw error;
+
+      // Register payment record if Paid
+      if (paymentStatus === 'Paid' && Math.round(finalTotalAmount) > 0) {
+        await db.from('booking_payments').insert([{
+          booking_id: bookingId,
+          amount: Math.round(finalTotalAmount),
+          payment_mode: 'Cash',
+          payment_date: manualBooking.eventDate,
+          payment_type: 'Regular',
+          transaction_id: tid
+        }]);
+      }
       setIsManualModalOpen(false);
-      const whatsappMsg = `*Booking Confirmation - BEST VANUE OPTION*%0A%0A` +
-        `Hello ${manualBooking.partyName}, your booking for *${finalTargetName}* has been confirmed!%0A%0A` +
-        `*Booking Details:*%0A` +
+      const whatsappMsg = `*BOOKING CONFIRMATION - BEST VANUE OPTION*%0A%0A` +
+        `Hello *${manualBooking.partyName}*, your booking for *${finalTargetName}* has been confirmed!%0A%0A` +
+        `*BOOKING DETAILS:*%0A` +
+        `━━━━━━━━━━━━━━━%0A` +
         `*Date:* ${formatDateDDMMYYYY(manualBooking.eventDate)}${manualBooking.endDate ? ' to ' + formatDateDDMMYYYY(manualBooking.endDate) : ''}%0A` +
         `*Time:* ${formatTime12h(manualBooking.startTime)} - ${formatTime12h(manualBooking.endTime)}%0A` +
         `*Event:* ${manualBooking.eventType}%0A%0A` +
-        `*Total Amount:* ₹${finalTotalAmount.toLocaleString()}%0A%0A` +
-        `Thank you for choosing our service!`;
+        `*FINANCIAL SUMMARY:*%0A` +
+        `*Total Amount:* ₹${finalTotalAmount.toLocaleString()}%0A` +
+        `*Paid Status:* ${paymentStatus || 'Pending'}%0A%0A` +
+        `Thank you for choosing *BEST VANUE OPTION*! We are committed to making your event grand and successful.`;
       
       sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
       toast.success('Manual booking added and locked as accepted');
+      fetchBookings();
       setManualBooking({
         partyName: '',
         partyAddress: '',
@@ -7397,6 +7415,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
           paymentMode: p.payment_mode,
           paymentDate: p.payment_date,
           paymentType: p.payment_type,
+          transaction_id: p.transaction_id || p.id?.substring(0, 8).toUpperCase(),
           createdAt: p.created_at
         }));
       }
@@ -9712,6 +9731,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
               plan_id: plan.id,
               plan_name: plan.name,
               duration: plan.duration,
+              validation_duration: plan.duration, // Storing duration for validation
               start_date: startDate.toISOString(),
               end_date: endDate.toISOString(),
               status: 'active',

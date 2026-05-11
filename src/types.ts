@@ -39,6 +39,9 @@ export interface UserSubscription {
   id: string;
   userId: string;
   planId: string;
+  planName?: string;
+  duration?: 'month' | 'year';
+  validation_duration?: string;
   startDate: string;
   endDate: string;
   status: 'active' | 'expired';

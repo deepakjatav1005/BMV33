@@ -139,6 +139,7 @@ CREATE TABLE public.subscription_plans (
     name TEXT NOT NULL,
     price NUMERIC NOT NULL,
     role TEXT,
+    duration TEXT, -- added duration field
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -148,10 +149,16 @@ CREATE TABLE public.user_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
     plan_id UUID REFERENCES public.subscription_plans(id),
+    plan_name TEXT,
+    duration TEXT,
+    validation_duration TEXT,
     status TEXT DEFAULT 'active',
     start_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     end_date TIMESTAMP WITH TIME ZONE,
+    amount NUMERIC,
     payment_id TEXT,
+    order_id TEXT,
+    signature TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
