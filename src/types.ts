@@ -222,6 +222,7 @@ export interface Booking {
   paymentMode?: 'Cash' | 'Online';
   paymentStatus?: 'Pending' | 'Paid';
   isManual?: boolean;
+  isLocked?: boolean;
   is_invoice_generated?: boolean;
   invoice_url?: string;
   transaction_id?: string;

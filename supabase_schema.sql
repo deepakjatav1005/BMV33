@@ -98,6 +98,7 @@ CREATE TABLE public.bookings (
     transaction_id TEXT,
     is_invoice_generated BOOLEAN DEFAULT FALSE,
     is_manual BOOLEAN DEFAULT FALSE,
+    is_locked BOOLEAN DEFAULT FALSE,
     extra_services JSONB DEFAULT '[]',
     invoice_url TEXT,
     advance_amount NUMERIC DEFAULT 0,

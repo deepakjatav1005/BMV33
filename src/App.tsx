@@ -240,7 +240,8 @@ import {
   Clock, 
   Shield,
   ShieldCheck,
-  Lock as LucideLock,
+  Lock,
+  Unlock,
   Database,
   Activity,
   FileText,
@@ -435,6 +436,12 @@ const ManagePaymentModal = ({
     const currentTotal = Math.round(payments.reduce((sum, p) => sum + (p.amount || 0), 0));
     const inputAmount = Math.round(parseFloat(newPayment.amount.toString()) || 0);
 
+    const pending = targetAmount - currentTotal;
+    if (pending <= 0 && targetAmount > 0) {
+      toast.error('Payment already completed. Cannot add more transactions.');
+      return;
+    }
+
     if (currentTotal + inputAmount > targetAmount + 0.5) {
       toast.error(`Overpayment not allowed. Due amount is ₹${Math.max(0, targetAmount - currentTotal).toLocaleString()}`);
       return;
@@ -465,7 +472,8 @@ const ManagePaymentModal = ({
       const isNowPaid = totalCredited >= finalTargetAmount && finalTargetAmount > 0;
       const updateData: any = {
         advance_amount: totalCredited,
-        payment_status: isNowPaid ? 'Paid' : 'Pending'
+        payment_status: isNowPaid ? 'Paid' : 'Pending',
+        is_locked: true // Lock the booking as soon as a payment is added
       };
 
       if (isNowPaid && booking.status !== 'cancelled') {
@@ -3200,7 +3208,7 @@ const RegistrationView = () => {
                 <div className="grid grid-cols-1 gap-4 md:gap-6">
                   <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 shadow-sm relative group overflow-hidden">
                     <div className="absolute top-0 right-0 p-2 bg-orange-100 text-orange-600 rounded-bl-xl opacity-0 group-hover:opacity-100 transition-opacity">
-                      <LucideLock size={14} />
+                      <Lock size={14} />
                     </div>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Temporary Password</p>
                     <div className="flex items-center justify-between">
@@ -4594,26 +4602,34 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
               key={date} 
               className={cn(
                 "aspect-square flex flex-col items-center justify-center rounded-xl text-[10px] md:text-sm font-medium transition-all relative overflow-hidden group",
-                isBooked ? "bg-orange-50 text-orange-700 border border-orange-100 shadow-inner" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
+                isBooked ? (
+                  primaryStatus === 'confirmed' || primaryStatus === 'approved' 
+                    ? "bg-red-50 text-red-700 border-2 border-red-500 shadow-sm" 
+                    : "bg-orange-50 text-orange-700 border border-orange-100 shadow-inner"
+                ) : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
                 isToday && !isBooked && "ring-2 ring-orange-500 ring-offset-2 ring-offset-white"
               )}
             >
               <span className={cn(isBooked ? "font-black" : "")}>{date.split('-')[2]}</span>
               {isBooked && (
-                <div className="absolute inset-0 bg-orange-600/5 transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
+                <div className="absolute inset-0 bg-transparent transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
+                  {(primaryStatus === 'confirmed' || primaryStatus === 'approved') && (
+                    <div className="absolute inset-0 border-2 border-red-600 rounded-xl m-0.5 pointer-events-none opacity-40 animate-pulse" />
+                  )}
                   <div className={cn(
                     "w-1.5 h-1.5 rounded-full mb-0.5 shadow-sm",
-                    primaryStatus === 'paid' || primaryStatus === 'completed' ? "bg-green-500" : 
-                    primaryStatus === 'pending' ? "bg-yellow-500" : "bg-orange-500"
+                    (primaryStatus === 'paid' || primaryStatus === 'completed' || primaryStatus === 'paid') ? "bg-green-500" : 
+                    primaryStatus === 'pending' ? "bg-yellow-500" : 
+                    (primaryStatus === 'confirmed' || primaryStatus === 'approved') ? "bg-red-600" : "bg-orange-500"
                   )} />
                   <span className={cn(
                     "text-[6px] md:text-[8px] font-black uppercase px-1 rounded-sm shadow-sm border",
-                    primaryStatus === 'paid' ? 'bg-green-100 text-green-900 border-green-200' : 
-                    primaryStatus === 'completed' ? 'bg-emerald-100 text-emerald-900 border-emerald-200' :
+                    (primaryStatus === 'paid' || primaryStatus === 'completed') ? 'bg-green-100 text-green-900 border-green-200' : 
                     primaryStatus === 'pending' ? 'bg-yellow-100 text-yellow-900 border-yellow-200' :
+                    (primaryStatus === 'confirmed' || primaryStatus === 'approved') ? 'bg-red-100 text-red-900 border-red-200' :
                     'bg-orange-100 text-orange-900 border-orange-200'
                   )}>
-                    {primaryStatus === 'paid' ? 'PAID' : primaryStatus === 'completed' ? 'DONE' : primaryStatus === 'pending' ? 'PENDING' : 'BOOKED'}
+                    {(primaryStatus === 'paid' || primaryStatus === 'completed') ? 'PAID' : primaryStatus === 'pending' ? 'PENDING' : 'CONFIRMED'}
                   </span>
                 </div>
               )}
@@ -4623,15 +4639,15 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
       </div>
       <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
         <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded-md bg-orange-500 border border-orange-200" />
+          <div className="w-4 h-4 rounded-md bg-red-600 border border-red-200 shadow-sm" />
           <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Confirmed</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded-md bg-yellow-500 border border-yellow-200" />
+        <div className="flex items-center space-x-2 text-yellow-600">
+          <div className="w-4 h-4 rounded-md bg-yellow-500 border border-yellow-200 shadow-sm" />
           <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Pending</span>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 rounded-md bg-green-500 border border-green-200" />
+        <div className="flex items-center space-x-2 text-green-600">
+          <div className="w-4 h-4 rounded-md bg-green-500 border border-green-200 shadow-sm" />
           <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Paid/Completed</span>
         </div>
         <div className="flex items-center space-x-2 ml-auto">
@@ -6238,7 +6254,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   );
 };
 
-const BookingManagerView = ({ 
+const ManuallyBookingView = ({ 
   user, 
   profile, 
   bookings: parentBookings, 
@@ -6260,12 +6276,15 @@ const BookingManagerView = ({
   const [currentPage, setCurrentPage] = useState(1);
   const bookingsPerPage = 20;
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [newAmount, setNewAmount] = useState(0);
+  const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
+  const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
+  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
+  const [isCallSatisfied, setIsCallSatisfied] = useState(false);
+  const [newAmount, setNewAmount] = useState<number>(0);
   const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
   const [paymentStatus, setPaymentStatus] = useState<'Pending' | 'Paid'>('Pending');
+  
   const [manualBooking, setManualBooking] = useState<{
     partyName: string;
     partyAddress: string;
@@ -6324,9 +6343,9 @@ const BookingManagerView = ({
        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
        
        let basePrice = 0;
-       if ('pricePerDay' in item) {
+       if (item && 'pricePerDay' in item) {
          basePrice = (item as Venue).pricePerDay || 0;
-       } else if ('priceRange' in item) {
+       } else if (item && 'priceRange' in item) {
          const priceMatch = (item as ServiceProvider).priceRange?.match(/\d+/);
          basePrice = priceMatch ? parseInt(priceMatch[0]) : 0;
        }
@@ -6334,10 +6353,8 @@ const BookingManagerView = ({
        setManualBooking(prev => ({ ...prev, totalAmount: basePrice * diffDays }));
     }
   }, [manualBooking.bookingMode, manualBooking.selectedItems, manualBooking.eventDate, manualBooking.endDate, manualBooking.targetId, venues, services]);
-  const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
-  const [isCallSatisfied, setIsCallSatisfied] = useState(false);
+  
   const [manualCallSatisfied, setManualCallSatisfied] = useState(false);
-  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
   useEffect(() => {
@@ -6346,94 +6363,17 @@ const BookingManagerView = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (parentBookings) setBookings(parentBookings);
-  }, [parentBookings]);
-
-  // Sync selectedBooking with updated bookings list for live level updates
-  useEffect(() => {
-    if (selectedBooking) {
-      const fresh = bookings.find(b => b.id === selectedBooking.id);
-      if (fresh) setSelectedBooking(fresh);
-    }
-  }, [bookings]);
-
-  useEffect(() => {
-    if (parentVenues) setVenues(parentVenues);
-  }, [parentVenues]);
-
-  useEffect(() => {
-    if (parentServices) setServices(parentServices);
-  }, [parentServices]);
-
   const fetchBookings = async () => {
     if (!user) return;
     if (onUpdate) {
       onUpdate();
       return;
     }
-    const query = db
-      .from('bookings')
-      .select('*, booking_payments(*)');
-    
-    if (profile?.role !== 'admin') {
-      query.eq('owner_id', user?.uid);
-    }
-    
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (!error && data) {
-      setBookings(data.map(d => ({
-        ...d,
-        userId: d.user_id,
-        ownerId: d.owner_id,
-        targetId: d.target_id,
-        targetType: d.target_type,
-        targetName: d.target_name,
-        eventDate: d.event_date,
-        endDate: d.end_date,
-        eventType: d.event_type,
-        partyName: d.party_name,
-        partyAddress: d.party_address,
-        visitorName: d.visitor_name,
-        visitorMobile: d.visitor_mobile,
-        startTime: d.start_time,
-        endTime: d.end_time,
-        status: d.status,
-        isManual: d.is_manual,
-        totalAmount: d.total_amount || 0,
-        advance_amount: d.advance_amount || 0,
-        updatedAmount: d.updated_amount,
-        paymentStatus: d.payment_status,
-        paymentMode: d.payment_mode,
-        is_invoice_generated: d.is_invoice_generated,
-        invoice_url: d.invoice_url,
-          payments: (d.booking_payments || []).map((p: any) => ({
-            id: p.id,
-            bookingId: p.booking_id,
-            amount: p.amount,
-            paymentMode: p.payment_mode,
-            paymentDate: p.payment_date,
-            paymentType: p.payment_type,
-            transaction_id: p.transaction_id,
-            createdAt: p.created_at
-          })),
-        createdAt: d.created_at
-      } as Booking)));
-    }
-    setLoading(false);
   };
 
   useEffect(() => {
     if (!user) return;
     fetchBookings();
-
-    const channel = db
-      .channel(`booking_manager_changes_${user?.uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
-        fetchBookings();
-      })
-      .subscribe();
 
     const fetchMyItems = async () => {
       const vQuery = db.from('venues').select('*');
@@ -6462,21 +6402,19 @@ const BookingManagerView = ({
     };
 
     fetchMyItems();
-    return () => {
-      db.removeChannel(channel);
-    };
   }, [user]);
 
   const filteredBookings = (bookings || []).filter(b => {
-    // Show only manual bookings in Booking Manager
+    // Show only manual bookings without payments in Manual Booking
     if (!b.isManual) return false;
+    
+    // Hide if payment exists (moves to Manage Payment)
+    if (b.payments && b.payments.length > 0) return false;
 
-    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
-                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed')) ||
-                         (statusFilter === 'cancelled' && b.status === 'cancelled') ||
-                         (statusFilter === 'paid' && isPaid);
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'approved')) ||
+                         (statusFilter === 'cancelled' && b.status === 'cancelled');
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesStatus && matchesDate;
   });
@@ -6488,103 +6426,43 @@ const BookingManagerView = ({
   const currentBookings = sortedBookings.slice(indexOfFirstBooking, indexOfLastBooking);
   const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
-  const handleStatusUpdate = async (id: string, status: 'confirmed' | 'cancelled') => {
-    if (status === 'confirmed') {
-      if (!isCallSatisfied) {
-        toast.error('Caller verification is required before confirming');
-        return;
-      }
+  const handleToggleLock = async (id: string, isLocked: boolean) => {
+    try {
+      const { error } = await db.from('bookings').update({ is_locked: isLocked }).eq('id', id);
+      if (error) throw error;
+      toast.success(isLocked ? 'Booking Locked' : 'Booking Unlocked');
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      toast.error('Failed to update lock status');
     }
-    
+  };
+
+  const handleStatusUpdate = async (id: string, status: 'confirmed' | 'cancelled') => {
     try {
       const { error } = await db.from('bookings').update({ status }).eq('id', id);
       if (error) throw error;
-      
-      const booking = bookings.find(b => b.id === id);
-      if (status === 'confirmed' && booking) {
-        const msg = `Congratulations! Your booking for ${booking.targetName} on ${formatDateDDMMYYYY(booking.eventDate)} has been CONFIRMED. We look forward to serving you!`;
-        sendWhatsAppAlert(booking.visitorMobile || '', msg);
-      }
-      
       toast.success(`Booking ${status} successfully`);
-      setIsAcceptModalOpen(false);
-      setIsCallSatisfied(false);
       if (onUpdate) onUpdate();
-      await fetchBookings();
     } catch (err) {
-      console.error('Update status error:', err);
       toast.error('Failed to update booking status');
     }
   };
 
   const handleUpdateAmount = async () => {
     if (!selectedBooking) return;
-    
-    // Check if new amount is already covered by existing payments
-    const paymentsTotal = (selectedBooking.payments || []).reduce((acc, p) => acc + p.amount, 0);
-    const isNowPaid = paymentsTotal >= newAmount && newAmount > 0;
-    
-    const updateData: any = { 
-      updated_amount: newAmount,
-      extra_services: editableExtraServices,
-      is_invoice_generated: false 
-    };
-    
-    if (isNowPaid) {
-      updateData.payment_status = 'Paid';
-      updateData.status = 'paid';
-    }
-
-    const { error } = await db.from('bookings').update(updateData).eq('id', selectedBooking.id);
-    if (!error) {
-      toast.success('Booking amount updated');
-      setIsAmountModalOpen(false);
-      setSelectedBooking(null);
-      if (onUpdate) onUpdate();
-      fetchBookings();
-    } else {
-      toast.error('Failed to update amount');
-    }
-  };
-
-  const handleUpdatePaymentStatus = async () => {
-    if (!selectedBooking) {
-      console.error('No booking selected for payment update');
-      return;
-    }
-    
-    if (selectedBooking.paymentStatus === 'Paid' || selectedBooking.status === 'paid') {
-      toast.error('This booking is already marked as PAID and cannot be updated.');
-      setIsPaymentModalOpen(false);
-      return;
-    }
-
-    setLoading(true);
     try {
-      console.log('Attempting to update payment status:', {
-        bookingId: selectedBooking.id,
-        newPaymentStatus: paymentStatus,
-        currentStatus: selectedBooking.status
-      });
-
-      const { error } = await db.from('bookings').update({ 
-        payment_status: paymentStatus,
-        status: paymentStatus === 'Paid' ? 'paid' : selectedBooking.status
+      const { error } = await db.from('bookings').update({
+        total_amount: newAmount,
+        updated_amount: newAmount,
+        extra_services: editableExtraServices
       }).eq('id', selectedBooking.id);
-
+      
       if (error) throw error;
-      
+      toast.success('Amount updated successfully');
+      setIsAmountModalOpen(false);
       if (onUpdate) onUpdate();
-      fetchBookings();
-      
-      toast.success(`Payment status updated to ${paymentStatus}${paymentStatus === 'Paid' ? ' and marked as Completed' : ''}`);
-      setIsPaymentModalOpen(false);
-      setSelectedBooking(null);
-    } catch (err: any) {
-      console.error('Payment status update failed:', err);
-      toast.error(`Failed to update payment status: ${err.message || 'Unknown error'}`);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      toast.error('Failed to update amount');
     }
   };
 
@@ -6850,76 +6728,23 @@ const BookingManagerView = ({
                     )}>
                       {(booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? 'Completed' : (booking.status === 'confirmed' ? 'Accepted' : booking.status)}
                     </span>
-                    {(booking.status === 'confirmed' || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? (
-                      <div className="flex items-center gap-2">
-                        <button 
-                          disabled={booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid'}
-                          onClick={() => {
-                            if (booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') {
-                              toast.error('Amount cannot be updated after first payment or invoice generation');
-                              return;
-                            }
-                            setSelectedBooking(booking);
-                            setNewAmount(booking.updatedAmount || booking.totalAmount);
-                            setEditableExtraServices(booking.extra_services || []);
-                            setIsAmountModalOpen(true);
-                          }}
+                    <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                      {/* Lock/Unlock Toggle */}
+                      {(booking.status === 'confirmed' || booking.status === 'approved') && (booking.ownerId === user?.uid || profile?.role === 'admin') && (
+                        <button
+                          onClick={() => handleToggleLock(booking.id, !booking.isLocked)}
                           className={cn(
-                            "p-2 rounded-xl transition-all",
-                            (booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                            "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
+                            booking.isLocked 
+                              ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
+                              : "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
                           )}
-                          title={(booking.is_invoice_generated || (booking.payments && booking.payments.length > 0) || booking.status === 'paid' || booking.status === 'completed' || booking.paymentStatus === 'Paid') ? "Locked after payment or invoice" : "Update Amount"}
                         >
-                          <Edit2 size={18} />
+                          {booking.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                          <span>{booking.isLocked ? 'Unlock Booking' : 'Lock Booking'}</span>
                         </button>
-                        <button 
-                          disabled={(booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)}
-                          onClick={() => {
-                            if ((booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) {
-                              toast.error('Payment already completed - Records are locked');
-                              return;
-                            }
-                            setSelectedBooking(booking);
-                            setIsPaymentRecordModalOpen(true);
-                          }}
-                          className={cn(
-                            "p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all border",
-                            ((booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid' || (Math.max(0, Math.round(booking.updatedAmount || booking.totalAmount || 0) - Math.round(booking.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) < 1 && Math.round(booking.updatedAmount || booking.totalAmount || 0) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm"
-                          )}
-                          title="Manage Payments"
-                        >
-                          <IndianRupee size={16} className="md:size-[18px]" />
-                        </button>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const pdfBlob = await generateInvoice(booking, 0, profile, bookings);
-                              const url = URL.createObjectURL(pdfBlob);
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = `Invoice-${booking.id.substring(0, 8).toUpperCase()}.pdf`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                              URL.revokeObjectURL(url);
-                              toast.success('Invoice downloaded successfully');
-                              
-                              db.from('bookings').update({ is_invoice_generated: true }).eq('id', booking.id).then(() => {
-                                if (onUpdate) onUpdate();
-                                fetchBookings();
-                              });
-                            } catch (err) {
-                              console.error('Download error:', err);
-                              toast.error('Failed to generate invoice');
-                            }
-                          }}
-                          className="p-1.5 md:p-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-lg md:rounded-xl hover:bg-purple-100 transition-all"
-                          title="Download Invoice"
-                        >
-                          <Download size={16} className="md:size-[18px]" />
-                        </button>
-                      </div>
-                        ) : null}
+                      )}
+                    </div>
                       </div>
                     )}
                   </div>
@@ -7606,7 +7431,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     invoicePayments.forEach(p => {
        const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
        const mode = p.paymentMode ? `${p.paymentMode}` : 'N/A';
-       const tid = p.id?.substring(0, 8).toUpperCase() || 'N/A';
+       const tid = p.transaction_id || p.id?.substring(0, 8).toUpperCase() || 'N/A';
        
        doc.text(formatDateDDMMYYYY(p.paymentDate), 25, currentY);
        doc.text(`${label} (${mode})`, 50, currentY);
@@ -7653,9 +7478,16 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   try {
     const logoBase64 = await imageUrlToBase64(appLogoUrl);
     if (logoBase64) {
+      // Draw a circular frame for the logo
+      doc.setDrawColor(77, 121, 255); // Blue ring
+      doc.setLineWidth(0.8);
+      doc.circle(26, 276, 7.5, 'S');
+      
+      doc.setDrawColor(255, 77, 77); // Red ring inner
+      doc.setLineWidth(0.3);
+      doc.circle(26, 276, 6.8, 'S');
+
       doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
-      doc.setDrawColor(77, 121, 255);
-      doc.circle(26, 276, 7, 'S');
     }
   } catch (err) {
     console.warn('Could not fetch app logo for invoice footer');
@@ -8005,7 +7837,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment'>(initialTab);
   const [reportFilters, setReportFilters] = useState({
     name: '',
     mobile: '',
@@ -8327,9 +8159,10 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <BarChart2 size={20} />, roles: ['owner', 'provider', 'user'] },
-    { id: 'booking-manager', label: 'Booking Manager', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
+    { id: 'manually-booking', label: 'Manually Booking', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
+    { id: 'public-booking', label: 'Public Booking', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'manage-payment', label: 'Manage Payment', icon: <IndianRupee size={20} />, roles: ['owner', 'provider'] },
     { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
-    { id: 'orders', label: 'Order Manage', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} /> },
     { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
@@ -8630,16 +8463,24 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
               {activeTab === 'venues' && (
                 <VenueManageView user={user} venues={venues} />
               )}
-              {activeTab === 'orders' && (
-                <OrderManageView user={user} profile={profile} bookings={bookings} onUpdate={fetchDashboardData} />
+              {activeTab === 'public-booking' && (
+                <PublicBookingView user={user} profile={profile} bookings={bookings} onUpdate={fetchDashboardData} />
               )}
-              {activeTab === 'booking-manager' && (
-                <BookingManagerView 
+              {activeTab === 'manually-booking' && (
+                <ManuallyBookingView 
                   user={user} 
                   profile={profile} 
                   bookings={bookings} 
                   venues={venues} 
                   services={services} 
+                  onUpdate={fetchDashboardData} 
+                />
+              )}
+              {activeTab === 'manage-payment' && (
+                <ManagePaymentView 
+                  user={user} 
+                  profile={profile} 
+                  bookings={bookings} 
                   onUpdate={fetchDashboardData} 
                 />
               )}
@@ -9041,36 +8882,30 @@ const VenueManageView = ({ user, venues }: { user: any, venues: Venue[] }) => {
   );
 };
 
-const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
+const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
 
-  const visitorBookings = bookings;
-  
-  const filteredBookings = useMemo(() => visitorBookings.filter(b => {
-    // Show only public bookings in Order Manage
+  const filteredBookings = useMemo(() => bookings.filter(b => {
+    // Show only public bookings without payments in Public Booking
     if (b.isManual) return false;
+    
+    // Hide if payment exists (moves to Manage Payment)
+    if (b.payments && b.payments.length > 0) return false;
 
-    const isPaid = b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed';
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
-                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed')) ||
-                         (statusFilter === 'cancelled' && b.status === 'cancelled') ||
-                         (statusFilter === 'paid' && isPaid);
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'approved')) ||
+                         (statusFilter === 'cancelled' && b.status === 'cancelled');
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     
     return matchesStatus && matchesDate;
-  }), [visitorBookings, statusFilter, dateFilter]);
+  }), [bookings, statusFilter, dateFilter]);
 
   const sortedBookings = useMemo(() => [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [filteredBookings]);
   
-  const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
-  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [newAmount, setNewAmount] = useState(0);
-  const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
-
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
 
   const handleStatus = async (id: string, status: string) => {
@@ -9095,132 +8930,14 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     }
   };
 
-  // Live Synchronize selectedBooking with prop changes
-  useEffect(() => {
-    if (selectedBooking) {
-      const fresh = bookings.find(b => b.id === selectedBooking.id);
-      if (fresh) setSelectedBooking(fresh);
-    }
-  }, [bookings]);
-
-  const handleUpdateAmount = async () => {
-    if (!selectedBooking) return;
-    
-    // Check if new amount is already covered by existing payments
-    const paymentsTotal = (selectedBooking.payments || []).reduce((acc, p) => acc + p.amount, 0);
-    const isNowPaid = paymentsTotal >= newAmount && newAmount > 0;
-    
-    const updateData: any = { 
-      updated_amount: newAmount,
-      extra_services: editableExtraServices,
-      is_invoice_generated: false 
-    };
-    
-    if (isNowPaid) {
-      updateData.payment_status = 'Paid';
-      updateData.status = 'paid';
-    }
-
-    const { error } = await db.from('bookings').update(updateData).eq('id', selectedBooking.id);
-    if (!error) {
-      toast.success('Booking amount updated');
-      setIsAmountModalOpen(false);
-      setSelectedBooking(null);
-      if (onUpdate) onUpdate();
-    } else {
-      toast.error('Failed to update amount');
-    }
-  };
-
-  const handlePayment = async (booking: Booking) => {
-    if (!user || !profile) return;
-
+  const handleToggleLock = async (id: string, isLocked: boolean) => {
     try {
-      // 1. Create order on server
-      const response = await fetch('/api/razorpay/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: booking.totalAmount,
-          currency: 'INR',
-          receipt: `booking_${booking.id}`,
-          notes: {
-            userId: user?.uid,
-            bookingId: booking.id,
-            targetName: booking.targetName
-          }
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to create order');
-      const order = await response.json();
-
-      // 2. Open Razorpay Checkout
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency,
-        name: "Event Manager",
-        description: `Payment for ${booking.targetName}`,
-        order_id: order.id,
-        handler: async function (response: any) {
-          // 3. On success, update database
-          try {
-            const amountPaid = order.amount / 100;
-            
-            // Record payment
-            await db.from('booking_payments').insert([{
-              booking_id: booking.id,
-              amount: amountPaid,
-              payment_mode: 'Online',
-              payment_date: format(new Date(), 'yyyy-MM-dd'),
-              payment_type: 'Regular',
-              transaction_id: response.razorpay_payment_id
-            }]);
-
-            const updatedBookingRes = await db.from('bookings').select('updated_amount, total_amount').eq('id', booking.id).single();
-            const target = updatedBookingRes.data?.updated_amount || updatedBookingRes.data?.total_amount || 0;
-            const isFull = amountPaid >= target && target > 0;
-
-            const { error } = await db.from('bookings').update({ 
-               status: isFull ? 'completed' : 'paid',
-               payment_status: isFull ? 'Paid' : 'Partial',
-               advance_amount: amountPaid
-            }).eq('id', booking.id);
-            
-            if (error) {
-              console.error('Razorpay Payment Update Error:', error);
-              if (error.message?.includes('column "payment_status" does not exist') || error.message?.includes('schema cache')) {
-                toast.error('Database schema error: payment_status column missing or cache stale.');
-              } else {
-                toast.error(`Failed to update payment status: ${error.message || 'Unknown error'}`);
-              }
-              throw error;
-            }
-            toast.success(`Payment successful for ${booking.targetName}`);
-          } catch (err: any) {
-            console.error('Razorpay handler error:', err);
-          }
-        },
-        prefill: {
-          name: profile.displayName || profile.mobileNumber,
-          email: profile.email || '',
-          contact: profile.mobileNumber
-        },
-        theme: {
-          color: "#ea580c"
-        }
-      };
-
-      const rzp = new Razorpay(options);
-      rzp.on('payment.failed', function (response: any) {
-        toast.error('Payment Failed: ' + response.error.description);
-      });
-      rzp.open();
-
+      const { error } = await db.from('bookings').update({ is_locked: isLocked }).eq('id', id);
+      if (error) throw error;
+      toast.success(isLocked ? 'Booking Locked' : 'Booking Unlocked');
+      if (onUpdate) onUpdate();
     } catch (err) {
-      console.error('Razorpay error:', err);
-      toast.error('Payment initialization failed');
+      toast.error('Failed to update lock status');
     }
   };
 
@@ -9228,20 +8945,19 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
     <div className="space-y-6 md:space-y-10 px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="w-full">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Orders</h2>
-          <p className="text-sm text-gray-500 mt-1">Guest inquiries and booking requests</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 truncate">Public Booking</h2>
+          <p className="text-sm text-gray-500 mt-1">Accept and manage public booking requests</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <select 
-            className="flex-1 md:flex-none px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            className="flex-1 md:flex-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">Status</option>
+            <option value="all">All Status</option>
             <option value="pending">Pending</option>
-            <option value="confirmed">Approved</option>
-            <option value="cancelled">Rejected</option>
-            <option value="paid">Paid</option>
+            <option value="confirmed">Accepted</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <input 
             type="date" 
@@ -9253,193 +8969,74 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
       </div>
 
       <div className="space-y-4">
-        {sortedBookings.map(b => {
-           const subTotal = (b.updatedAmount || b.totalAmount || 0);
-           const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
-           const totalRec = paymentsTotal > 0 ? paymentsTotal : (b.advance_amount || 0);
-           const isActuallyPaid = (totalRec >= subTotal && subTotal > 0) || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid';
-
-           return (
+        {sortedBookings.map(b => (
           <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="w-full">
               <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
-                <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.targetName}</span>
+                <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.visitorName || b.partyName}</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase",
-                  isActuallyPaid ? "bg-green-100 text-green-700" : 
-                  b.status === 'confirmed' ? "bg-blue-100 text-blue-700" :
-                  b.status === 'pending' ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+                  b.status === 'confirmed' ? "bg-green-100 text-green-700" :
+                  b.status === 'pending' ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"
                 )}>
-                  {isActuallyPaid ? 'Completed' : (b.status === 'confirmed' ? 'Accepted' : b.status)}
+                  {b.status === 'confirmed' ? 'Accepted' : b.status}
                 </span>
+                {b.isLocked && (
+                  <span className="px-2 py-0.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase bg-red-100 text-red-700 flex items-center gap-1">
+                    <Lock size={10} /> LOCKED
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap items-center text-[9px] md:text-sm text-gray-500 gap-1.5 md:gap-x-4 md:gap-y-2 mt-2">
-                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={10} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
-                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={10} className="mr-1 text-orange-600" /> {(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
-                {b.startTime && <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold"><Clock size={10} className="mr-1" /> {formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>}
-              </div>
-              
-              <div className="mt-3 md:mt-4 p-3 md:p-4 bg-white rounded-2xl border border-gray-100 space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-xs md:text-sm">
-                  <div className="flex items-center space-x-2 overflow-hidden">
-                    <User size={12} className="text-gray-400 shrink-0" />
-                    <span className="text-gray-500 shrink-0">Sender:</span>
-                    <span className="font-bold text-gray-900 truncate">{b.visitorName}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 overflow-hidden">
-                    <Phone size={12} className="text-gray-400 shrink-0" />
-                    <span className="text-gray-500 shrink-0">Mobile:</span>
-                    <span className="font-bold text-gray-900 truncate">{b.visitorMobile}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 overflow-hidden">
-                    <Tag size={12} className="text-gray-400 shrink-0" />
-                    <span className="text-gray-500 shrink-0">Event:</span>
-                    <span className="font-bold text-gray-900 truncate">{b.eventType || 'N/A'}</span>
-                  </div>
-                  {b.partyAddress && (
-                    <div className="flex items-center space-x-2 overflow-hidden md:col-span-2">
-                      <MapPin size={12} className="text-gray-400 shrink-0" />
-                      <span className="text-gray-500 shrink-0">Address:</span>
-                      <span className="font-bold text-gray-900 truncate">{b.partyAddress}</span>
-                    </div>
-                  )}
-                </div>
-
-                {b.extra_services && b.extra_services.length > 0 && (
-                  <div className="pt-2 border-t border-gray-50">
-                    <div className="flex flex-wrap gap-2">
-                      {b.extra_services.map((s, idx) => (
-                        <div key={idx} className="flex items-center bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold border border-orange-100">
-                          <CheckCircle size={10} className="mr-1" />
-                          {s.name} (₹{s.amount.toLocaleString()})
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {b.message && (
-                  <div className="pt-2 border-t border-gray-50">
-                    <p className="text-[10px] md:text-xs text-gray-500 italic flex items-start">
-                      <MessageSquare size={10} className="mr-1 mt-0.5 shrink-0" />
-                      <span className="line-clamp-2">"{b.message}"</span>
-                    </p>
-                  </div>
-                )}
+                <span className="flex items-center"><Calendar size={12} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
+                <span className="flex items-center"><User size={12} className="mr-1 text-orange-600" /> {b.visitorMobile}</span>
+                <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 rounded-lg border border-orange-100 font-bold"><IndianRupee size={12} className="mr-1" /> {Number(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
+                {b.eventType && <span className="flex items-center px-2 py-1 bg-white border border-gray-100 rounded-lg"><Music size={12} className="mr-1 text-orange-600" /> {b.eventType}</span>}
               </div>
             </div>
+            
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
-              {/* Owner/Provider Actions */}
-              {b.status === 'pending' && (b.ownerId === user?.uid || profile?.role === 'admin') && (
-                <>
-                  <button 
-                    onClick={() => {
-                      setSelectedBooking(b);
-                      setIsAcceptModalOpen(true);
-                    }} 
-                    className="flex-1 md:flex-none justify-center bg-green-600 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold hover:bg-green-700 flex items-center"
-                  >
-                    Accept
-                  </button>
-                  <button onClick={() => handleStatus(b.id, 'cancelled')} className="flex-1 md:flex-none justify-center bg-red-600 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-bold hover:bg-red-700 flex items-center">Reject</button>
-                </>
+              {b.status === 'pending' && (
+                <button 
+                  onClick={() => {
+                    setSelectedBooking(b);
+                    setIsAcceptModalOpen(true);
+                  }}
+                  className="flex-1 md:flex-none justify-center px-4 py-2 bg-green-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 border border-green-700 shadow-md"
+                >
+                  <Check size={16} />
+                  <span>Accept</span>
+                </button>
+              )}
+              {b.status === 'pending' && (
+                <button 
+                  onClick={() => handleStatus(b.id, 'cancelled')}
+                  className="flex-1 md:flex-none justify-center px-4 py-2 bg-white text-red-600 border border-red-100 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2"
+                >
+                  <X size={16} />
+                  <span>Reject</span>
+                </button>
               )}
 
-              {(b.status === 'confirmed' || b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid') && (b.ownerId === user?.uid || profile?.role === 'admin') && (
-                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                  <button 
-                    disabled={b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid'}
-                    onClick={() => {
-                      if (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') {
-                        toast.error('Amount cannot be updated after first payment or invoice generation');
-                        return;
-                      }
-                      setSelectedBooking(b);
-                      setNewAmount(b.updatedAmount || b.totalAmount);
-                      setEditableExtraServices(b.extra_services || []);
-                      setIsAmountModalOpen(true);
-                    }}
-                    className={cn(
-                      "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
-                      (b.is_invoice_generated || (b.payments && b.payments.length > 0) || b.status === 'paid' || b.paymentStatus === 'Paid') ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed" : "bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100"
-                    )}
-                  >
-                    <Edit2 size={12} className="md:size-4" />
-                    <span>Amount</span>
-                  </button>
-                  <button 
-                    disabled={b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)}
-                    onClick={() => {
-                      if (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)) {
-                        toast.error('Payment is already completed');
-                        return;
-                      }
-                      setSelectedBooking(b);
-                      setIsPaymentRecordModalOpen(true);
-                    }}
-                    className={cn(
-                      "flex-1 md:flex-none justify-center px-3 py-2 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all border",
-                      (b.status === 'paid' || b.status === 'completed' || b.paymentStatus === 'Paid' || (Math.max(0, Math.round(Number(b.updatedAmount || b.totalAmount || 0)) - Math.round((b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))) < 1 && Math.round(Number(b.updatedAmount || b.totalAmount || 0)) > 0)) ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed opacity-50" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
-                    )}
-                  >
-                    <IndianRupee size={12} className="md:size-4" />
-                    <span>Payments</span>
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      try {
-                        const pdfBlob = await generateInvoice(b, 0, profile, bookings);
-                        const url = URL.createObjectURL(pdfBlob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                        toast.success('Invoice downloaded successfully');
-                        
-                        // Mark as generated and update status if fully paid
-                        const paymentsTotal = (b.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-                        const totalAmount = Number(b.updatedAmount || b.totalAmount || 0);
-                        const isFullyPaid = paymentsTotal >= totalAmount && totalAmount > 0;
-                        
-                        const updates: any = { is_invoice_generated: true };
-                        if (isFullyPaid) {
-                          updates.status = 'completed';
-                          updates.payment_status = 'Paid';
-                        }
-                        
-                        db.from('bookings').update(updates).eq('id', b.id).then(() => {
-                           if (onUpdate) onUpdate();
-                        });
-                      } catch (err) {
-                        console.error('Download error:', err);
-                        toast.error('Failed to generate invoice');
-                      }
-                    }}
-                    className="flex-1 md:flex-none justify-center px-3 py-2 bg-purple-50 text-purple-600 border border-purple-100 rounded-xl text-[10px] md:text-sm font-bold flex items-center space-x-1.5 transition-all hover:bg-purple-100"
-                  >
-                    <Download size={12} className="md:size-4" />
-                    <span>Invoice</span>
-                  </button>
-                </div>
-              )}
-              
-              {/* User Actions */}
-              {b.status === 'confirmed' && b.userId === user?.uid && (
-                <button 
-                  onClick={() => handlePayment(b)}
-                  className="w-full md:w-auto bg-orange-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-orange-700 flex items-center justify-center space-x-2"
+              {/* Lock/Unlock Toggle */}
+              {(b.status === 'confirmed' || b.status === 'approved') && (b.ownerId === user?.uid || profile?.role === 'admin') && (
+                <button
+                  onClick={() => handleToggleLock(b.id, !b.isLocked)}
+                  className={cn(
+                    "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
+                    b.isLocked 
+                      ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" 
+                      : "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                  )}
                 >
-                  <CreditCard size={16} />
-                  <span>Pay Now</span>
+                  {b.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                  <span>{b.isLocked ? 'Unlock' : 'Lock'}</span>
                 </button>
               )}
             </div>
           </div>
-        )})}
-        {sortedBookings.length === 0 && <p className="text-gray-500 text-center py-10">No matching orders found.</p>}
+        ))}
+        {sortedBookings.length === 0 && <p className="text-gray-500 text-center py-10">No public bookings found.</p>}
       </div>
 
       {isAcceptModalOpen && (
@@ -9490,10 +9087,162 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ManagePaymentView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('');
+  const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
+  const [isPaymentRecordModalOpen, setIsPaymentRecordModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [newAmount, setNewAmount] = useState(0);
+  const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
+
+  const filteredBookings = useMemo(() => bookings.filter(b => {
+    // Show only locked bookings
+    if (!b.isLocked) return false;
+
+    const subTotal = (b.updatedAmount || b.totalAmount || 0);
+    const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    const pendingAmount = Math.max(0, subTotal - paymentsTotal);
+
+    // Hide if fully paid
+    if (pendingAmount < 1 && subTotal > 0) return false;
+
+    const matchesDate = !dateFilter || b.eventDate === dateFilter;
+    return matchesDate;
+  }), [bookings, dateFilter]);
+
+  const sortedBookings = useMemo(() => [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [filteredBookings]);
+
+  const handleUpdateAmount = async () => {
+    if (!selectedBooking) return;
+    
+    // Lock if payment already exists
+    if (selectedBooking.payments && selectedBooking.payments.length > 0) {
+      toast.error('Amount cannot be updated after first payment transaction');
+      return;
+    }
+
+    const { error } = await db.from('bookings').update({ 
+      updated_amount: newAmount,
+      extra_services: editableExtraServices,
+      is_invoice_generated: false 
+    }).eq('id', selectedBooking.id);
+
+    if (!error) {
+      toast.success('Booking amount updated');
+      setIsAmountModalOpen(false);
+      setSelectedBooking(null);
+      if (onUpdate) onUpdate();
+    } else {
+      toast.error('Failed to update amount');
+    }
+  };
+
+  return (
+    <div className="space-y-6 md:space-y-10 px-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="w-full">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Manage Payment</h2>
+          <p className="text-sm text-gray-500 mt-1">Update amounts and record transactions for locked bookings</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <input 
+            type="date" 
+            className="flex-1 md:flex-none px-2 py-2 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-xl text-[10px] md:text-sm font-bold focus:ring-2 focus:ring-orange-500"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {sortedBookings.map(b => {
+           const subTotal = (b.updatedAmount || b.totalAmount || 0);
+           const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
+           const pendingAmount = Math.round(subTotal - paymentsTotal);
+
+           return (
+          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="w-full">
+              <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
+                <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.targetName}</span>
+                <span className="px-2 py-0.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase bg-orange-100 text-orange-700">
+                  LOCKED
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center text-[9px] md:text-sm text-gray-500 gap-1.5 md:gap-x-4 md:gap-y-2 mt-2">
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><Calendar size={10} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={10} className="mr-1 text-orange-600" /> Total: {subTotal.toLocaleString()}</span>
+                <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-green-100 text-green-700 shadow-sm">Paid: {paymentsTotal.toLocaleString()}</span>
+                <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold">Pending: {pendingAmount.toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <button 
+                disabled={b.payments && b.payments.length > 0}
+                onClick={() => {
+                  if (b.payments && b.payments.length > 0) {
+                    toast.error('Amount cannot be updated after first payment transaction');
+                    return;
+                  }
+                  setSelectedBooking(b);
+                  setNewAmount(b.updatedAmount || b.totalAmount);
+                  setEditableExtraServices(b.extra_services || []);
+                  setIsAmountModalOpen(true);
+                }}
+                className={cn(
+                  "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
+                  (b.payments && b.payments.length > 0) ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                )}
+              >
+                <Edit2 size={16} />
+                <span>Update Amount</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setSelectedBooking(b);
+                  setIsPaymentRecordModalOpen(true);
+                }}
+                className="flex-1 md:flex-none justify-center px-4 py-2 bg-green-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 hover:bg-green-700 shadow-lg shadow-green-100"
+              >
+                <Plus size={16} />
+                <span>Add Payment</span>
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    const pdfBlob = await generateInvoice(b, 0, profile, bookings);
+                    const url = URL.createObjectURL(pdfBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    toast.success('Invoice downloaded successfully');
+                  } catch (err) {
+                    toast.error('Failed to generate invoice');
+                  }
+                }}
+                className="flex-1 md:flex-none justify-center px-4 py-2 bg-purple-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 hover:bg-purple-700 shadow-lg shadow-purple-100"
+              >
+                <Download size={16} />
+                <span>Invoice</span>
+              </button>
+            </div>
+          </div>
+        )})}
+        {sortedBookings.length === 0 && <p className="text-gray-500 text-center py-10">No locked bookings with pending payments found.</p>}
+      </div>
 
       {isAmountModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <h3 className="text-2xl font-bold mb-6">Update Booking Amount</h3>
             <div className="space-y-6">
               {editableExtraServices.length > 0 && (
@@ -9515,7 +9264,6 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                               updated[idx] = { ...updated[idx], amount: newVal };
                               setEditableExtraServices(updated);
                               
-                              // Auto-recalculate subtotal if desired
                               const newExtrasTotal = updated.reduce((sum, s) => sum + s.amount, 0);
                               const oldExtrasTotal = editableExtraServices.reduce((sum, s) => sum + s.amount, 0);
                               setNewAmount(prev => prev - oldExtrasTotal + newExtrasTotal);
@@ -9527,7 +9275,6 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   </div>
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-bold mb-1 text-gray-700">Final Total Amount (INR)</label>
                 <input 
@@ -9535,12 +9282,11 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold text-orange-600" 
                   value={newAmount} 
                   onChange={e => setNewAmount(parseFloat(e.target.value) || 0)}
-                  placeholder="Enter new amount"
                 />
               </div>
-              <div className="flex space-x-4 pt-4">
+              <div className="flex space-x-4">
                 <button onClick={() => setIsAmountModalOpen(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold">Cancel</button>
-                <button onClick={handleUpdateAmount} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Update Amount</button>
+                <button onClick={handleUpdateAmount} className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold">Update</button>
               </div>
             </div>
           </div>
@@ -9553,9 +9299,7 @@ const OrderManageView = ({ user, profile, bookings, onUpdate }: { user: any, pro
           onClose={() => setIsPaymentRecordModalOpen(false)}
           booking={selectedBooking}
           currentUserUid={user?.uid}
-          onUpdate={() => {
-            if (onUpdate) onUpdate();
-          }}
+          onUpdate={onUpdate}
         />
       )}
     </div>
@@ -9725,26 +9469,31 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
           }
 
           try {
-            const { error } = await db.from('user_subscriptions').insert([{
+            const { error: subError } = await db.from('user_subscriptions').insert([{
               id: generateUUID(),
               user_id: user?.uid,
               plan_id: plan.id,
-              plan_name: plan.name,
-              duration: plan.duration,
-              validation_duration: plan.duration, // Storing duration for validation
-              start_date: startDate.toISOString(),
-              end_date: endDate.toISOString(),
+              plan_name: plan.name || 'Premium Plan',
+              duration: plan.duration || 'Monthly',
+              validation_duration: plan.duration || 'Monthly',
               status: 'active',
               amount: plan.price,
               payment_id: response.razorpay_payment_id,
               order_id: response.razorpay_order_id,
-              signature: response.razorpay_signature
+              signature: response.razorpay_signature,
+              created_at: new Date().toISOString()
             }]);
-            if (error) throw error;
+            
+            if (subError) throw subError;
+            
+            // Also update the user's role if needed or store in a separate table
+            // But we already have the subscription record.
+            
             toast.success(`Subscribed to ${plan.name}`);
             window.location.reload();
-          } catch (err) {
-            toast.error('Failed to record subscription');
+          } catch (err: any) {
+            console.error('Subscription Insert Error:', err);
+            toast.error('Failed to record subscription detail: ' + (err.message || 'Unknown error'));
           }
         },
         prefill: {
