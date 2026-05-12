@@ -77,6 +77,9 @@
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- NOTE: If you receive "Duplicate column name", it means the column already exists.
+  -- You can safely ignore that specific error.
+  
   -- 4. Bookings Table
   CREATE TABLE IF NOT EXISTS bookings (
       id CHAR(36) PRIMARY KEY,

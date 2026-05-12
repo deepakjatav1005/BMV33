@@ -494,11 +494,23 @@ async function startServer() {
   });
 
   // File Upload Logic
-  const uploadDir = path.join(process.cwd(), "uploads");
+  // Use environment variable UPLOAD_DIR if available (for persistent storage outside app root)
+  const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+  
   if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(`>>> [STORAGE] Created upload directory at: ${uploadDir}`);
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      console.log(`>>> [STORAGE] Created/Verified upload directory at: ${uploadDir}`);
+    } catch (err) {
+      console.error(`>>> [STORAGE ERROR] Could not create upload directory at ${uploadDir}:`, err);
+    }
+  } else {
+    console.log(`>>> [STORAGE] Using upload directory: ${uploadDir}`);
   }
+
+  // Serve uploads. 
+  // IMPORTANT: On production VPS, it is better to point UPLOAD_DIR outside your deploy/build folder 
+  // so that new uploads don't wipe out your existing files.
   app.use("/uploads", express.static(uploadDir));
 
   // ESM Interop for multer
