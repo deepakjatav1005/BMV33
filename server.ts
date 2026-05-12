@@ -23,6 +23,8 @@ let lastDbCheck = 0;
 let lastOutboundIp = "Checking...";
 const DB_CHECK_INTERVAL = 5000; // Check every 5s if requested
 
+// adding comment to check override issue
+
 async function getOutboundIp() {
   try {
     const response = await fetch('https://api.ipify.org?format=json');
@@ -495,7 +497,7 @@ async function startServer() {
 
   // File Upload Logic
   // Use environment variable UPLOAD_DIR if available (for persistent storage outside app root)
-  const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+  const uploadDir = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads"));
   
   if (!fs.existsSync(uploadDir)) {
     try {
