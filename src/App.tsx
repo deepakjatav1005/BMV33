@@ -314,6 +314,7 @@ import {
   MessageCircle,
   ArrowLeft,
   QrCode,
+  Bot
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { motion, AnimatePresence } from 'motion/react';
@@ -4560,7 +4561,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
         .from('bookings')
         .select('event_date, end_date, status, start_time, end_time')
         .eq('target_id', targetId)
-        .in('status', ['pending', 'confirmed', 'paid', 'approved', 'completed']);
+        .in('status', ['confirmed', 'paid', 'approved', 'completed']);
       
       if (!error && data) {
         setBookedDates(data.map(d => ({ 
@@ -4661,15 +4662,7 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
       <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 rounded-md bg-red-600 border border-red-200 shadow-sm" />
-          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Confirmed</span>
-        </div>
-        <div className="flex items-center space-x-2 text-yellow-600">
-          <div className="w-4 h-4 rounded-md bg-yellow-500 border border-yellow-200 shadow-sm" />
-          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Pending</span>
-        </div>
-        <div className="flex items-center space-x-2 text-green-600">
-          <div className="w-4 h-4 rounded-md bg-green-500 border border-green-200 shadow-sm" />
-          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Paid/Completed</span>
+          <span className="text-xs font-bold text-gray-600 uppercase tracking-tight">Booked</span>
         </div>
         <div className="flex items-center space-x-2 ml-auto">
           <div className="w-4 h-4 rounded-md bg-gray-100 border border-gray-200" />
@@ -4698,7 +4691,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
     const [isCallSatisfied, setIsCallSatisfied] = useState(false);
     const [ownerProfile, setOwnerProfile] = useState<any>(null);
-    const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0 });
+    const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0, totalRequests: 0 });
 
     // Update form when profile loads
     useEffect(() => {
@@ -4753,7 +4746,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       if (userData) setOwnerProfile(userData);
 
       // Fetch owner stats
-      const [vCount, sCount, bCount, pCount] = await Promise.all([
+      const [vCount, sCount, bCount, pCount, tCount] = await Promise.all([
         db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
         db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.owner_id),
         db.from('bookings').select('id', { count: 'exact', head: true })
@@ -4761,13 +4754,16 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
           .in('status', ['completed', 'paid', 'confirmed', 'approved']),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', data.owner_id)
-          .eq('status', 'pending')
+          .eq('status', 'pending'),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', data.owner_id)
       ]);
 
       setStats({
         totalItems: (vCount.count || 0) + (sCount.count || 0),
         completed: bCount.count || 0,
-        pending: pCount.count || 0
+        pending: pCount.count || 0,
+        totalRequests: tCount.count || 0
       });
     }
     setLoading(false);
@@ -4984,9 +4980,9 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                   <CheckCircle size={10} className="mr-1" />
                   {stats.completed} Completed
                 </div>
-                <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Pending Booking Requests">
+                <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Total Booking Requests Received (All Statuses)">
                   <Clock size={10} className="mr-1" />
-                  {stats.pending} Requests
+                  {stats.totalRequests} Requests
                 </div>
                 <div className="flex items-center text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter" title="Total Managed Venues & Services">
                   <DbIcon size={10} className="mr-1" />
@@ -7225,7 +7221,7 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
   }
 };
 
-const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = []) => {
+const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
   const doc = new jsPDF();
   
   // Fetch App Branding from admin_settings
@@ -7248,13 +7244,13 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
 
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const fullTotalRecord = Math.round(Number(booking.updatedAmount) || Number(booking.totalAmount) || 0);
-  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0));
+  const fullTotalRecord = Math.round(Number(booking.updatedAmount || 0) || Number(booking.totalAmount || 0) || 0);
+  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount || 0) || 0), 0));
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
-  const subTotalActual = Math.round(fullTotalRecord + (Number(expenditure) || 0));
+  const subTotalActual = Math.round(fullTotalRecord + (Number(expenditure || 0) || 0));
   
   // Accurately sum all payments, fetch if empty
-  let invoicePayments = (booking.payments || []).map(p => ({...p, amount: Number(p.amount) || 0}));
+  let invoicePayments = (booking.payments || []).map(p => ({...p, amount: Number(p.amount || 0) || 0}));
   if (invoicePayments.length === 0) {
     try {
       const { data } = await db.from('booking_payments').select('*').eq('booking_id', booking.id);
@@ -7275,8 +7271,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
   }
 
-  const totalReceived = Math.round(invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0));
-  const balanceDue = Math.max(0, subTotalActual - totalReceived);
+  const totalReceived = Math.round(invoicePayments.reduce((sum, p) => sum + (Number(p.amount || 0) || 0), 0));
+  const balanceDue = Number(Math.max(0, subTotalActual - totalReceived)) || 0;
   
   const isPaid = balanceDue <= 0 && subTotalActual > 0;
   const partyName = booking.isManual ? booking.partyName : (booking.visitorName || booking.partyName);
@@ -7308,8 +7304,9 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
-    if (isPaid) return 'COMPLETED';
     const status = (booking.status || 'pending').toLowerCase();
+    if (isPaid || status === 'completed') return 'COMPLETED';
+    if (!globalSettings.subscriptionEnabled) return 'PAID'; // If sub disabled, show as paid if not completed
     if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
     return status.toUpperCase();
   };
@@ -7481,7 +7478,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   currentY += 10;
   
   doc.setFontSize(12);
-  doc.setTextColor(balanceDue > 0 ? [220, 38, 38] : [22, 163, 74]); // red-600 or green-600
+  if (balanceDue > 0) {
+    doc.setTextColor(220, 38, 38); // red-600
+  } else {
+    doc.setTextColor(22, 163, 74); // green-600
+  }
   doc.text("Balance Due:", 110, currentY);
   doc.text(`INR ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 15;
@@ -7489,21 +7490,6 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // Render Transaction History
   let y = currentY;
   addTransactionHistory();
-  // Footer logic
-  doc.setDrawColor(234, 88, 12);
-  doc.setLineWidth(1);
-  doc.line(20, 265, 190, 265);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(150);
-  doc.setFont("helvetica", "normal");
-  doc.text("Thank you for choosing Best Venue Option!", 105, 275, { align: 'center' });
-  doc.text("This is a computer generated invoice and does not require a physical signature.", 105, 280, { align: 'center' });
-  doc.text(`${window.location.origin}`, 105, 285, { align: 'center' });
-  
-  doc.save(`Invoice_${customInvoiceNo.replace(/\//g, '_')}.pdf`);
-  toast.success('Professional Invoice Downloaded');
-};
 
   // Amount in words
   doc.setFontSize(10);
@@ -7511,7 +7497,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFont("helvetica", "italic");
   const words = `Amount in words (Balance): ${numberToWords(Math.round(balanceDue || 0))}`;
   const splitWords = doc.splitTextToSize(words, 170);
-  doc.text(splitWords, 20, currentY);
+  doc.text(splitWords, 20, y > currentY ? y : currentY);
+  y = (y > currentY ? y : currentY) + (splitWords.length * 5) + 5;
 
   // --- Footer ---
   doc.setDrawColor(234, 88, 12);
@@ -7536,21 +7523,18 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     console.warn('Could not fetch app logo for invoice footer');
   }
 
-  // Helper to split branding name
-  const splitBrandingName = (name: string) => {
-    if (!name) return { part1: '', part2: '' };
-    const n = String(name);
+  // Branding Details
+  const nameParts = (() => {
+    const n = String(appName || 'BEST VENUE OPTION');
     if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
     const words = n.split(' ');
     if (words.length > 1) {
       const mid = Math.ceil(words.length / 2);
       return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
     }
-    return { part1: name, part2: '' };
-  };
+    return { part1: n, part2: '' };
+  })();
 
-  // Branding Details
-  const nameParts = splitBrandingName(appName);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(77, 121, 255); // Blue
@@ -7571,6 +7555,15 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFont("helvetica", "bold");
   doc.text("WWW.BESTVENUEOPTION.COM", 190, 276, { align: 'right' });
 
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.setFont("helvetica", "normal");
+  doc.text("Thank you for choosing Best Venue Option!", 105, 275, { align: 'center' }); // Centered but below branding
+  doc.text("This is a computer generated invoice and does not require a physical signature.", 105, 290, { align: 'center' });
+  
+  doc.save(`Invoice_${customInvoiceNo.replace(/\//g, '_')}.pdf`);
+  toast.success('Professional Invoice Downloaded');
+  
   return doc.output('blob');
 };
 
@@ -7644,16 +7637,19 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [105, 148] // A6 size
+      format: [76.2, 152.4] // 3 x 6 inches
     });
+
+    const pageWidth = 76.2;
+    const pageHeight = 152.4;
 
     // Design
     doc.setFillColor(255, 247, 237); // orange-50
-    doc.rect(0, 0, 105, 148, 'F');
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
     
     doc.setDrawColor(234, 88, 12); // orange-600
     doc.setLineWidth(1.5);
-    doc.rect(5, 5, 95, 138);
+    doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
 
     // Header: Business Info
     const name = selectedItem?.name || profile?.displayName || "BUSINESS NAME";
@@ -7662,35 +7658,35 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     const typeLabel = activeType === 'venue' ? (selectedItem as any)?.venueType : (selectedItem as any)?.serviceType;
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
     const finalName = (name || "BUSINESS NAME").toUpperCase();
-    doc.text(finalName, 52.5, 20, { align: 'center', maxWidth: 85 });
+    doc.text(finalName, pageWidth / 2, 20, { align: 'center', maxWidth: pageWidth - 20 });
     
     if (typeLabel) {
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(234, 88, 12);
       const finalType = String(typeLabel).toUpperCase();
-      doc.text(finalType, 52.5, 26, { align: 'center' });
+      doc.text(finalType, pageWidth / 2, 26, { align: 'center' });
     }
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-    doc.text(address, 52.5, typeLabel ? 32 : 28, { align: 'center', maxWidth: 85 });
+    doc.text(address, pageWidth / 2, typeLabel ? 32 : 28, { align: 'center', maxWidth: pageWidth - 20 });
 
     // Middle: QR Section
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(234, 88, 12);
-    doc.text("SCAN TO RATE & REVIEW", 52.5, 48, { align: 'center' });
+    doc.text("SCAN TO RATE & REVIEW", pageWidth / 2, 48, { align: 'center' });
 
     if (qrDataUrl) {
-      doc.addImage(qrDataUrl, 'PNG', 22.5, 55, 60, 60);
+      doc.addImage(qrDataUrl, 'PNG', (pageWidth - 50) / 2, 55, 50, 50);
     }
 
     // Footer: App Branding
-    const startY = 125;
+    const startY = pageHeight - 23;
     
     // Split name for colors
     const splitName = (name: string) => {
@@ -7709,17 +7705,17 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     // Logo and Name on same line
     if (appLogoUrl) {
       try {
-        doc.addImage(appLogoUrl, 'PNG', 15, startY - 6, 8, 8);
+        doc.addImage(appLogoUrl, 'PNG', pageWidth/2 - 25, startY - 6, 8, 8);
       } catch (e) {
         doc.setFillColor(77, 121, 255);
-        doc.circle(19, startY - 2, 2, 'F');
+        doc.circle(pageWidth/2 - 21, startY - 2, 2, 'F');
       }
     }
 
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     
-    const startTextX = 25;
+    const startTextX = pageWidth/2 - 15;
     doc.setTextColor(77, 121, 255); // Blue
     doc.text(nameParts.part1, startTextX, startY);
     
@@ -7733,11 +7729,11 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(154, 52, 18);
-    doc.text(appTagline, 52.5, startY + 8, { align: 'center' });
+    doc.text(appTagline, pageWidth / 2, startY + 8, { align: 'center' });
     
     doc.setFontSize(6);
     doc.setTextColor(77, 121, 255);
-    doc.text("www.bestvenueoption.com", 52.5, startY + 12, { align: 'center' });
+    doc.text("www.bestvenueoption.com", pageWidth / 2, startY + 12, { align: 'center' });
     
     doc.save(`Review_Card_${name}.pdf`);
   };
@@ -7877,7 +7873,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
   );
 };
 
-const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
+const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void, globalSettings: any }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment'>(initialTab);
@@ -7991,7 +7987,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
       if (!profile || profile.role === 'user' || profile.role === 'admin') return;
       
       // FIX: Check if subscription requirement is globally enabled
-      if (!adminProfile.subscriptionEnabled) {
+      if (!globalSettings.subscriptionEnabled) {
         setShowSubscriptionReminder(false);
         setIsSubscriptionModalOpen(false);
         return;
@@ -8534,6 +8530,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                   profile={profile} 
                   bookings={bookings} 
                   onUpdate={fetchDashboardData} 
+                  globalSettings={globalSettings}
                 />
               )}
               {activeTab === 'services' && (
@@ -8767,7 +8764,7 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
                                     <button 
                                       onClick={async () => {
                                         try {
-                                          const pdfBlob = await generateInvoice(b, 0, profile, bookings);
+                                          const pdfBlob = await generateInvoice(b, 0, profile, bookings, globalSettings);
                                           const url = URL.createObjectURL(pdfBlob);
                                           const link = document.createElement('a');
                                           link.href = url;
@@ -9143,7 +9140,7 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
   );
 };
 
-const ManagePaymentView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
+const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void, globalSettings: any }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
@@ -9291,7 +9288,7 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate }: { user: any, p
               <button 
                 onClick={async () => {
                   try {
-                    const pdfBlob = await generateInvoice(b, 0, profile, bookings);
+                    const pdfBlob = await generateInvoice(b, 0, profile, bookings, globalSettings);
                     const url = URL.createObjectURL(pdfBlob);
                     const link = document.createElement('a');
                     link.href = url;
@@ -11752,6 +11749,36 @@ const DatabaseMonitor = () => {
   );
 };
 
+const CookiesView = () => (
+  <div className="max-w-4xl mx-auto px-4 py-32">
+    <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+      <h1 className="text-4xl font-bold mb-8 text-gray-900">Cookies Policy</h1>
+      <div className="prose max-w-none space-y-6 text-gray-700">
+        <p className="text-sm font-bold text-orange-600 uppercase tracking-widest mb-4">Last updated: October 2023</p>
+        <p>This Cookies Policy explains how Best Venue Option ("we", "us", and "our") uses cookies and similar technologies to recognize you when you visit our website at <a href="https://www.bestvenueoption.com" className="text-orange-600 hover:underline">www.bestvenueoption.com</a>.</p>
+        
+        <h2 className="text-2xl font-bold text-gray-900 mt-8">What are cookies?</h2>
+        <p>Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners in order to make their websites work, or to work more efficiently, as well as to provide reporting information.</p>
+        
+        <h2 className="text-2xl font-bold text-gray-900 mt-8">Why do we use cookies?</h2>
+        <p>We use first-party and third-party cookies for several reasons. Some cookies are required for technical reasons in order for our Website to operate, and we refer to these as "essential" or "strictly necessary" cookies. Other cookies also enable us to track and target the interests of our users to enhance the experience on our Website.</p>
+        
+        <h2 className="text-2xl font-bold text-gray-900 mt-8">Types of cookies we use:</h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Essential Cookies:</strong> Necessary to provide you with services available through our Website.</li>
+          <li><strong>Analytics Cookies:</strong> Help us understand how visitors interact with our Website.</li>
+          <li><strong>Preference Cookies:</strong> Allow the Website to remember choices you make (such as your language).</li>
+        </ul>
+
+        <h2 className="text-2xl font-bold text-gray-900 mt-8">How can I control cookies?</h2>
+        <p>You have the right to decide whether to accept or reject cookies. You can set or amend your web browser controls to accept or refuse cookies. If you choose to reject cookies, you may still use our website though your access to some functionality and areas of our website may be restricted.</p>
+        
+        <p>If you have any questions about our use of cookies or other technologies, please email us at <a href="mailto:Chanchalnetzone2026@gmail.com" className="text-orange-600 hover:underline">Chanchalnetzone2026@gmail.com</a>.</p>
+      </div>
+    </div>
+  </div>
+);
+
 export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
   
@@ -11802,6 +11829,12 @@ export default function App() {
 
   const [loading, setLoading] = useState(true);
   const [isAppRatingOpen, setIsAppRatingOpen] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState({ 
+    subscriptionEnabled: true,
+    appName: 'BEST VENUE OPTION',
+    appLogoUrl: '/logo.png',
+    appTagline: 'VENUE & EVENT & SERVICE PROVIDERS'
+  });
 
   console.log('[APP] Current state:', { user: user?.uid, profile: profile?.role, loading });
 
@@ -11837,9 +11870,17 @@ export default function App() {
         const { data: settings } = await db.from('admin_settings').select('*');
         if (settings) {
           const subEnabled = settings.find(s => s.key === 'subscription_enabled');
-          if (subEnabled) {
-            setAdminProfile(prev => ({...prev, subscriptionEnabled: subEnabled.value === 'true'}));
-          }
+          const appNameSetting = settings.find(s => s.key === 'app_name');
+          const appLogoSetting = settings.find(s => s.key === 'app_logo_url');
+          const appTaglineSetting = settings.find(s => s.key === 'app_tagline');
+
+          setGlobalSettings(prev => ({
+            ...prev,
+            subscriptionEnabled: subEnabled ? subEnabled.value === 'true' : prev.subscriptionEnabled,
+            appName: appNameSetting ? appNameSetting.value : prev.appName,
+            appLogoUrl: appLogoSetting ? appLogoSetting.value : prev.appLogoUrl,
+            appTagline: appTaglineSetting ? appTaglineSetting.value : prev.appTagline
+          }));
         }
         
         // Check local storage for custom session first
@@ -12026,8 +12067,8 @@ export default function App() {
               <Route path="/services" element={<ServiceListView user={user} />} />
               <Route path="/search" element={<SearchResultsView />} />
               <Route path="/services/:id" element={<ServiceDetailView user={user} profile={profile} />} />
-              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} />} />
-              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} />} />
+              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} />} />
+              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} />} />
               <Route path="/add-venue" element={<AddVenueView user={user} profile={profile} />} />
               <Route path="/edit-venue/:id" element={<EditVenueView user={user} profile={profile} />} />
               <Route path="/edit-service/:id" element={<EditServiceView user={user} profile={profile} />} />
@@ -12046,6 +12087,7 @@ export default function App() {
               <Route path="/about" element={<AboutView />} />
               <Route path="/terms" element={<TermsView />} />
               <Route path="/privacy" element={<PrivacyView />} />
+              <Route path="/cookies" element={<CookiesView />} />
               <Route path="/pricing" element={<PricingView />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
@@ -12113,6 +12155,7 @@ export default function App() {
                     <li><a href="#" className="hover:text-orange-400 transition-colors">Help Center</a></li>
                     <li><a href="mailto:Chanchalnetzone2026@gmail.com" className="hover:text-orange-400 transition-colors">Contact Us</a></li>
                     <li><Link to="/terms" className="hover:text-orange-400 transition-colors">Terms & Conditions</Link></li>
+                    <li><Link to="/cookies" className="hover:text-orange-400 transition-colors">Cookies Policy</Link></li>
                     <li><a href="tel:8349076918" className="hover:text-orange-400 transition-colors">+91 8349076918</a></li>
                   </ul>
                 </div>
@@ -12756,7 +12799,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   );
 };
 
-const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void }) => {
+const AdminView = ({ user, profile, onUpdateProfile, globalSettings, setGlobalSettings }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void, globalSettings: any, setGlobalSettings: any }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -14132,27 +14175,27 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                           </div>
                           <button 
                             onClick={async () => {
-                              const newValue = adminProfile.subscriptionEnabled ? 'false' : 'true';
+                              const newValue = globalSettings.subscriptionEnabled ? 'false' : 'true';
                               // Use upsert for admin_settings
                               const { error } = await db.from('admin_settings').upsert({ key: 'subscription_enabled', value: newValue });
                               if (!error) {
-                                setAdminProfile({...adminProfile, subscriptionEnabled: newValue === 'true'});
+                                setGlobalSettings((prev: any) => ({...prev, subscriptionEnabled: newValue === 'true'}));
                                 toast.success(`Subscriptions ${newValue === 'true' ? 'Enabled' : 'Disabled'}`);
                               }
                             }}
                             className={cn(
                               "w-14 h-7 rounded-full relative transition-all duration-300",
-                              adminProfile.subscriptionEnabled ? "bg-orange-600" : "bg-gray-300"
+                              globalSettings.subscriptionEnabled ? "bg-orange-600" : "bg-gray-300"
                             )}
                           >
                             <div className={cn(
                               "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300",
-                              adminProfile.subscriptionEnabled ? "left-8" : "left-1"
+                              globalSettings.subscriptionEnabled ? "left-8" : "left-1"
                             )} />
                           </button>
                         </div>
                       </div>
-                      
+
                       <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 space-y-6">
                         <div className="flex items-center space-x-4 text-red-700">
                           <AlertCircle size={24} />
