@@ -43,8 +43,8 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
   };
 
   return (
-    <div className={`inline-flex items-center space-x-3 p-2 rounded-2xl bg-gradient-to-r from-orange-50 to-white border border-orange-100/50 shadow-sm ${className}`}>
-      <div className={`${sizeClasses[size]} aspect-square rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner p-1 group`}>
+    <div className={`inline-flex items-center space-x-3 ${className}`}>
+      <div className={`${sizeClasses[size]} aspect-square flex items-center justify-center group`}>
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
           alt="Best Venue Option Logo" 

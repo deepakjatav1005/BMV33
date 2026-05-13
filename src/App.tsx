@@ -3670,7 +3670,15 @@ const GalleryView = () => {
                 className="aspect-square rounded-2xl overflow-hidden shadow-lg bg-gray-100"
               >
                 {url.includes('.mp4') || url.includes('video') ? (
-                  <video src={resolveUrl(url)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                  <video 
+                    src={resolveUrl(url)} 
+                    className="w-full h-full object-cover cursor-pointer" 
+                    loop 
+                    onClick={e => {
+                      if (e.currentTarget.paused) e.currentTarget.play();
+                      else e.currentTarget.pause();
+                    }} 
+                  />
                 ) : (
                   <img src={resolveUrl(url)} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 )}
@@ -4751,7 +4759,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.owner_id),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', data.owner_id)
-          .in('status', ['completed', 'paid', 'confirmed', 'approved']),
+          .in('status', ['completed', 'paid', 'confirmed', 'approved', 'Success']),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', data.owner_id)
           .eq('status', 'pending'),
@@ -5535,21 +5543,24 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       if (userData) setProviderProfile(userData);
 
       // Fetch stats
-      const [vCount, sCount, bCount, pCount] = await Promise.all([
+      const [vCount, sCount, bCount, pCount, tCount] = await Promise.all([
         db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId),
-        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId),
+        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', ownerId),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
-          .in('status', ['completed', 'paid', 'confirmed', 'approved']),
+          .in('status', ['completed', 'paid', 'confirmed', 'approved', 'Success']),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
-          .eq('status', 'pending')
+          .eq('status', 'pending'),
+        db.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('owner_id', ownerId)
       ]);
 
       setStats({
         totalItems: (vCount.count || 0) + (sCount.count || 0),
         completed: bCount.count || 0,
-        pending: pCount.count || 0
+        pending: pCount.count || 0,
+        totalRequests: tCount.count || 0
       });
     }
     setLoading(false);
@@ -5780,9 +5791,9 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                      <CheckCircle size={10} className="mr-1" />
                      {stats.completed} Completed
                    </div>
-                   <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Pending Booking Requests">
+                   <div className="flex items-center text-[9px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase tracking-tighter" title="Total Booking Requests Received (All Statuses)">
                      <Clock size={10} className="mr-1" />
-                     {stats.pending} Requests
+                     {stats.totalRequests} Requests
                    </div>
                    <div className="flex items-center text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter" title="Total Managed Venues & Services">
                      <DbIcon size={10} className="mr-1" />
@@ -7355,54 +7366,61 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // left blank to remove platform branding from invoice header as requested
   
   // Business Name as Heading
+  // Requirement: show only venue or service type name, supplementary text in brackets
+  const headerTitle = (booking.targetName || "BUSINESS").toUpperCase();
+  const headerSubTitle = booking.targetType === 'venue' ? '(VENUE)' : '(SERVICE)';
+  
   doc.setFontSize(22);
   doc.setTextColor(234, 88, 12); // orange-600
   doc.setFont("helvetica", "bold");
-  doc.text((booking.targetName || "BUSINESS").toUpperCase(), 105, 35, { align: 'center', maxWidth: 170 });
+  doc.text(headerTitle, 105, 30, { align: 'center', maxWidth: 170 });
+  
+  doc.setFontSize(10);
+  doc.text(headerSubTitle, 105, 38, { align: 'center' });
   
   // Left side: Owner/Provider Name & Mobile
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "normal");
-  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 45);
-  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 50);
+  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 50);
+  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 55);
   
   // Right side: Business Address
   if (providerProfile) {
     const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
-    doc.text(address, 190, 45, { align: 'right', maxWidth: 80 });
+    doc.text(address, 190, 50, { align: 'right', maxWidth: 80 });
   }
   
   doc.setDrawColor(234, 88, 12);
   doc.setLineWidth(0.5);
-  doc.line(20, 55, 190, 55);
+  doc.line(20, 60, 190, 60);
   
   // --- Invoice Body ---
   doc.setFontSize(14);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("INVOICE", 20, 65);
+  doc.text("INVOICE", 20, 70);
   
   // Right side: Business Address/Inoice Meta
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100);
-  doc.text(`Invoice No: ${customInvoiceNo}`, 190, 65, { align: 'right' });
-  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 70, { align: 'right' });
-  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 75, { align: 'right' });
+  doc.text(`Invoice No: ${customInvoiceNo}`, 190, 70, { align: 'right' });
+  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 75, { align: 'right' });
+  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 80, { align: 'right' });
 
   // Customer Details (Bill To)
   doc.setFontSize(11);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("BILL TO:", 20, 85);
+  doc.text("BILL TO:", 20, 90);
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Name: ${partyName || 'N/A'}`, 20, 93);
-  doc.text(`Mobile: ${partyMobile}`, 20, 98);
+  doc.text(`Name: ${partyName || 'N/A'}`, 20, 98);
+  doc.text(`Mobile: ${partyMobile}`, 20, 103);
   
-  let currentY_BillTo = 103;
+  let currentY_BillTo = 108;
   if (booking.partyAddress) {
     const addr = `Address: ${booking.partyAddress}`;
     const splitAddr = doc.splitTextToSize(addr, 100);
@@ -7418,64 +7436,55 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
   // Booking Status
   doc.setFont("helvetica", "bold");
-  doc.text(`Booking Status:`, 140, 85);
+  doc.text(`Booking Status:`, 140, 90);
   doc.setFont("helvetica", "normal");
-  doc.text(`${getDisplayStatus()}`, 190, 85, { align: 'right' });
+  doc.text(`${getDisplayStatus()}`, 190, 90, { align: 'right' });
   
   doc.setFont("helvetica", "bold");
-  doc.text(`Payment Status:`, 140, 91);
+  doc.text(`Payment Status:`, 140, 96);
   doc.setFont("helvetica", "normal");
-  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, 91, { align: 'right' });
+  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, 96, { align: 'right' });
 
-  // Table Header
-  const tableStartY = Math.max(135, currentY_BillTo + 20);
-  doc.setFillColor(245, 245, 245);
-  doc.rect(20, tableStartY, 170, 10, 'F');
-  doc.setFontSize(10);
-  doc.setTextColor(0);
-  doc.setFont("helvetica", "bold");
-  doc.text("Description", 25, tableStartY + 7);
-  doc.text("Amount (INR)", 185, tableStartY + 7, { align: 'right' });
-
-  // Table Rows
-  let currentY = tableStartY + 15;
+  // Use autoTable for the items to prevent overlap
+  const tableRows = [];
   if (baseAmount > 0) {
-    doc.setFont("helvetica", "normal");
-    doc.text(`Base Booking Amount for ${booking.targetName}`, 25, currentY, { maxWidth: 130 });
-    doc.text(baseAmount.toLocaleString(), 185, currentY, { align: 'right' });
-    currentY += 10;
+    tableRows.push([`Base Booking Amount for ${booking.targetName}`, `INR ${baseAmount.toLocaleString()}`]);
   }
-
   if (expenditure > 0) {
-    doc.text("Additional Expenditure", 25, currentY);
-    doc.text(Math.round(expenditure).toLocaleString(), 185, currentY, { align: 'right' });
-    currentY += 10;
+    tableRows.push(['Additional Expenditure', `INR ${Math.round(expenditure).toLocaleString()}`]);
   }
-
   if (booking.extra_services && booking.extra_services.length > 0) {
-    booking.extra_services.forEach(service => {
-      doc.text(service.name, 25, currentY, { maxWidth: 130 });
-      doc.text(Math.round(service.amount || 0).toLocaleString(), 185, currentY, { align: 'right' });
-      currentY += 10;
+    booking.extra_services.forEach(s => {
+      tableRows.push([s.name, `INR ${Math.round(s.amount || 0).toLocaleString()}`]);
     });
   }
 
-  // Total Section
-  doc.setDrawColor(200);
-  doc.line(20, currentY + 5, 190, currentY + 5);
-  currentY += 15;
+  autoTable(doc, {
+    startY: Math.max(140, currentY_BillTo + 20),
+    head: [['Description', 'Amount']],
+    body: tableRows,
+    theme: 'striped',
+    headStyles: { fillColor: [234, 88, 12] },
+    margin: { left: 20, right: 20 },
+    columnStyles: {
+      0: { cellWidth: 120 },
+      1: { cellWidth: 50, halign: 'right' }
+    }
+  });
+
+  let currentY = (doc as any).lastAutoTable.finalY + 10;
   
   doc.setFontSize(11);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("Final Booking Total:", 110, currentY);
   doc.text(`INR ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 10;
+  currentY += 8;
   
   doc.setFontSize(10);
   doc.text("Total Amount Paid:", 110, currentY);
   doc.text(`INR ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 10;
+  currentY += 8;
   
   doc.setFontSize(12);
   if (balanceDue > 0) {
@@ -7485,7 +7494,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
   doc.text("Balance Due:", 110, currentY);
   doc.text(`INR ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 15;
+  currentY += 12;
 
   // Render Transaction History
   let y = currentY;
@@ -7504,20 +7513,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setDrawColor(234, 88, 12);
   doc.line(20, 265, 190, 265);
   
-  // App Logo in footer
+  // Simplified Logo Branding: No background colors or frame borders
   try {
     const logoBase64 = await imageUrlToBase64(appLogoUrl);
     if (logoBase64) {
-      // Draw a circular frame for the logo
-      doc.setDrawColor(77, 121, 255); // Blue ring
-      doc.setLineWidth(0.8);
-      doc.circle(26, 276, 7.5, 'S');
-      
-      doc.setDrawColor(255, 77, 77); // Red ring inner
-      doc.setLineWidth(0.3);
-      doc.circle(26, 276, 6.8, 'S');
-
-      doc.addImage(logoBase64, 'PNG', 20.5, 270.5, 11, 11);
+      doc.addImage(logoBase64, 'PNG', 20.5, 271, 10, 10);
     }
   } catch (err) {
     console.warn('Could not fetch app logo for invoice footer');
@@ -9549,6 +9549,8 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
               plan_name: plan.name || 'Premium Plan',
               duration: plan.duration || 'Monthly',
               validation_duration: plan.duration || 'Monthly',
+              start_date: startDate.toISOString().split('T')[0],
+              end_date: endDate.toISOString().split('T')[0],
               status: 'active',
               amount: plan.price,
               payment_id: response.razorpay_payment_id,
@@ -11852,6 +11854,32 @@ export default function App() {
     }
   };
 
+  // 5-minute Inactivity Auto Logout
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: any;
+    const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout();
+        toast('Logged out due to inactivity', { icon: 'ℹ️' });
+      }, INACTIVITY_LIMIT);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(name => document.addEventListener(name, resetTimer));
+    
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(name => document.removeEventListener(name, resetTimer));
+    };
+  }, [user]);
+
   useEffect(() => {
     let authSubscription: any = null;
 
@@ -11959,10 +11987,14 @@ export default function App() {
               localStorage.setItem('custom_profile', JSON.stringify(freshProfile));
             }
           } else {
-            setUser(null);
-            setProfile(null);
-            localStorage.removeItem('custom_user');
-            localStorage.removeItem('custom_profile');
+            // Only clear if we don't have a saved user in localStorage (prevents refresh logout)
+            const savedUser = localStorage.getItem('custom_user');
+            if (!savedUser) {
+              setUser(null);
+              setProfile(null);
+              localStorage.removeItem('custom_user');
+              localStorage.removeItem('custom_profile');
+            }
           }
         });
         authSubscription = subscription;
@@ -14043,7 +14075,15 @@ const AdminView = ({ user, profile, onUpdateProfile, globalSettings, setGlobalSe
                     {servicePhotos.map(p => (
                       <div key={p.id} className="group relative aspect-video rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
                         {p.imageUrl.includes('.mp4') || p.imageUrl.includes('video') ? (
-                          <video src={resolveUrl(p.imageUrl)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                          <video 
+                            src={resolveUrl(p.imageUrl)} 
+                            className="w-full h-full object-cover cursor-pointer" 
+                            loop 
+                            onClick={e => {
+                              if (e.currentTarget.paused) e.currentTarget.play();
+                              else e.currentTarget.pause();
+                            }} 
+                          />
                         ) : (
                           <img src={resolveUrl(p.imageUrl)} alt={p.serviceType} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         )}
@@ -14100,7 +14140,15 @@ const AdminView = ({ user, profile, onUpdateProfile, globalSettings, setGlobalSe
                     {moments.map(m => (
                       <div key={m.id} className="group relative aspect-square rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
                         {m.type === 'video' || m.media_url.includes('.mp4') ? (
-                          <video src={resolveUrl(m.media_url)} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                          <video 
+                            src={resolveUrl(m.media_url)} 
+                            className="w-full h-full object-cover cursor-pointer" 
+                            loop 
+                            onClick={e => {
+                              if (e.currentTarget.paused) e.currentTarget.play();
+                              else e.currentTarget.pause();
+                            }} 
+                          />
                         ) : (
                           <img src={resolveUrl(m.media_url)} alt="Moment" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         )}
