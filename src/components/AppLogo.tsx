@@ -47,7 +47,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
       <div className={`${sizeClasses[size]} aspect-square rounded-full overflow-hidden flex items-center justify-center bg-white shadow-inner p-1 group`}>
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
-          alt="Best Vanue Option Logo" 
+          alt="Best Venue Option Logo" 
           className="w-full h-full object-contain transition-all duration-500 group-hover:scale-110"
           referrerPolicy="no-referrer"
           onError={(e) => {
@@ -58,11 +58,11 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
       {showText && (
         <div className="flex flex-col justify-center py-1">
           <div className="flex items-center space-x-1 mb-0.5">
-            <span className="text-xl md:text-2xl font-black tracking-tighter leading-none text-blue-600">BEST VANUE</span>
+            <span className="text-xl md:text-2xl font-black tracking-tighter leading-none text-blue-600">BEST VENUE</span>
             <span className="text-xl md:text-2xl font-black tracking-tighter leading-none text-red-500">OPTION</span>
           </div>
           <p className="text-[7px] md:text-[9px] font-black tracking-widest uppercase text-gray-400 leading-none">
-            VANUE & EVENT & SERVICE PROVIDERS
+            VENUE & EVENT & SERVICE PROVIDERS
           </p>
         </div>
       )}

@@ -770,11 +770,11 @@ const translations: Record<string, any> = {
     allStates: "All States",
     allDistricts: "All Districts",
     allBlocks: "All Blocks",
-    whyPlanTitle: "Why Plan with BEST VANUE OPTION?",
+    whyPlanTitle: "Why Plan with BEST VENUE OPTION?",
     verifiedPartners: "Verified Partners",
     bestPrices: "Best Prices",
     support247: "24/7 Support",
-    footerCopyright: "© 2026 BEST VANUE OPTION India. All rights reserved.",
+    footerCopyright: "© 2026 BEST VENUE OPTION India. All rights reserved.",
     joinAsOwner: "Join Us as Venue Owner",
     joinAsProvider: "Join Us as Service Provider",
     register: "Register",
@@ -803,11 +803,11 @@ const translations: Record<string, any> = {
     allStates: "सभी राज्य",
     allDistricts: "सभी जिले",
     allBlocks: "सभी ब्लॉक",
-    whyPlanTitle: "BEST VANUE OPTION के साथ योजना क्यों बनाएं?",
+    whyPlanTitle: "BEST VENUE OPTION के साथ योजना क्यों बनाएं?",
     verifiedPartners: "सत्यापित भागीदार",
     bestPrices: "सर्वोत्तम मूल्य",
     support247: "24/7 सहायता",
-    footerCopyright: "© 2026 BEST VANUE OPTION इंडिया। सर्वाधिकार सुरक्षित।",
+    footerCopyright: "© 2026 BEST VENUE OPTION इंडिया। सर्वाधिकार सुरक्षित।",
     joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
     joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
     register: "पंजीकरण करें",
@@ -2288,6 +2288,17 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               </Link>
             ))}
 
+            <button 
+              onClick={() => {
+                setLang(lang === 'en' ? 'hi' : 'en');
+                setIsMenuOpen(false);
+              }}
+              className="flex items-center space-x-3 px-4 py-3 w-full text-blue-600 font-bold bg-blue-50 rounded-2xl transition-all mt-2"
+            >
+              <Globe size={18} />
+              <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
+            </button>
+
             {user ? (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 px-4">Account</p>
@@ -2730,7 +2741,7 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             <CheckCircle size={40} className="text-white" />
           </div>
           <h2 className="text-3xl font-bold">Registration Successful!</h2>
-          <p className="mt-2 opacity-90">Welcome to the BEST VANUE OPTION family</p>
+          <p className="mt-2 opacity-90">Welcome to the BEST VENUE OPTION family</p>
         </div>
 
         <div className="p-8 space-y-6">
@@ -3179,7 +3190,7 @@ const RegistrationView = () => {
       }
       
       // Send WhatsApp Message (Mocked)
-      const whatsappMsg = `*Welcome to BEST VANUE OPTION!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
+      const whatsappMsg = `*Welcome to BEST VENUE OPTION!*%0A%0AHello ${formData.name}, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${formData.mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
       const waUrl = `https://wa.me/91${formData.mobileNumber}?text=${whatsappMsg}`;
       
       // In a real app, you'd call a backend API to send this. 
@@ -3685,11 +3696,11 @@ const AboutView = () => {
         <span>{t('home')}</span>
       </Link>
       <AppLogo size="xl" className="justify-center mb-8" showText={false} />
-      <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VANUE OPTION</h1>
+      <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VENUE OPTION</h1>
       <p className="text-xl text-gray-600 leading-relaxed mb-12">
-        BEST VANUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
+        BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
         We bridge the gap between hosts and the finest venues and service providers in the country. 
-        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VANUE OPTION provides 
+        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VENUE OPTION provides 
         the tools and connections you need to plan with ease and celebrate with joy.
       </p>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -4027,7 +4038,7 @@ const TermsView = () => {
           <div className="prose prose-orange max-w-none text-gray-600 space-y-6">
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
-              <p>By accessing and using the BEST VANUE OPTION application, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
+              <p>By accessing and using the BEST VENUE OPTION application, you agree to be bound by these Terms and Conditions. If you do not agree, please do not use the service.</p>
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">2. User Responsibilities</h2>
@@ -4039,7 +4050,7 @@ const TermsView = () => {
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">4. Liability</h2>
-              <p>BEST VANUE OPTION acts as a facilitator between customers and providers. We are not liable for any disputes, damages, or service failures between the parties.</p>
+              <p>BEST VENUE OPTION acts as a facilitator between customers and providers. We are not liable for any disputes, damages, or service failures between the parties.</p>
             </section>
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">5. Contact Information</h2>
@@ -4613,6 +4624,11 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
         ))}
         {days.map(date => {
           const matchedBookings = bookedDates.filter(d => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const checkDate = new Date(date);
+            if (checkDate < today) return false;
+
             if (d.endDate) {
               return date >= d.date && date <= d.endDate;
             }
@@ -4621,42 +4637,20 @@ const AvailabilityCalendar = ({ targetId }: { targetId: string }) => {
           const isBooked = matchedBookings.length > 0;
           const isToday = date === format(new Date(), 'yyyy-MM-dd');
           
-          // Get the primary status for display
-          const primaryStatus = matchedBookings.length > 0 ? (matchedBookings[0].status || 'booked').toLowerCase() : null;
-          
           return (
             <div 
               key={date} 
               className={cn(
                 "aspect-square flex flex-col items-center justify-center rounded-xl text-[10px] md:text-sm font-medium transition-all relative overflow-hidden group",
-                isBooked ? (
-                  primaryStatus === 'confirmed' || primaryStatus === 'approved' 
-                    ? "bg-red-50 text-red-700 border-2 border-red-500 shadow-sm" 
-                    : "bg-orange-50 text-orange-700 border border-orange-100 shadow-inner"
-                ) : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
+                isBooked ? "bg-red-50 text-red-700 border-2 border-red-500 shadow-sm" : "bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer",
                 isToday && !isBooked && "ring-2 ring-orange-500 ring-offset-2 ring-offset-white"
               )}
             >
               <span className={cn(isBooked ? "font-black" : "")}>{date.split('-')[2]}</span>
               {isBooked && (
                 <div className="absolute inset-0 bg-transparent transition-opacity flex flex-col items-center justify-center pointer-events-none p-0.5">
-                  {(primaryStatus === 'confirmed' || primaryStatus === 'approved') && (
-                    <div className="absolute inset-0 border-2 border-red-600 rounded-xl m-0.5 pointer-events-none opacity-40 animate-pulse" />
-                  )}
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full mb-0.5 shadow-sm",
-                    (primaryStatus === 'paid' || primaryStatus === 'completed' || primaryStatus === 'paid') ? "bg-green-500" : 
-                    primaryStatus === 'pending' ? "bg-yellow-500" : 
-                    (primaryStatus === 'confirmed' || primaryStatus === 'approved') ? "bg-red-600" : "bg-orange-500"
-                  )} />
-                  <span className={cn(
-                    "text-[6px] md:text-[8px] font-black uppercase px-1 rounded-sm shadow-sm border",
-                    (primaryStatus === 'paid' || primaryStatus === 'completed') ? 'bg-green-100 text-green-900 border-green-200' : 
-                    primaryStatus === 'pending' ? 'bg-yellow-100 text-yellow-900 border-yellow-200' :
-                    (primaryStatus === 'confirmed' || primaryStatus === 'approved') ? 'bg-red-100 text-red-900 border-red-200' :
-                    'bg-orange-100 text-orange-900 border-orange-200'
-                  )}>
-                    {(primaryStatus === 'paid' || primaryStatus === 'completed') ? 'PAID' : primaryStatus === 'pending' ? 'PENDING' : 'CONFIRMED'}
+                   <span className="text-[6px] md:text-[8px] font-black uppercase px-1 rounded-sm shadow-sm border bg-red-100 text-red-900 border-red-200">
+                    BOOKED
                   </span>
                 </div>
               )}
@@ -6615,7 +6609,7 @@ const ManuallyBookingView = ({
         }]);
       }
       setIsManualModalOpen(false);
-      const whatsappMsg = `*BOOKING CONFIRMATION - BEST VANUE OPTION*%0A%0A` +
+      const whatsappMsg = `*BOOKING CONFIRMATION - BEST VENUE OPTION*%0A%0A` +
         `Hello *${manualBooking.partyName}*, your booking for *${finalTargetName}* has been confirmed!%0A%0A` +
         `*BOOKING DETAILS:*%0A` +
         `━━━━━━━━━━━━━━━%0A` +
@@ -6625,7 +6619,7 @@ const ManuallyBookingView = ({
         `*FINANCIAL SUMMARY:*%0A` +
         `*Total Amount:* ₹${finalTotalAmount.toLocaleString()}%0A` +
         `*Paid Status:* ${paymentStatus || 'Pending'}%0A%0A` +
-        `Thank you for choosing *BEST VANUE OPTION*! We are committed to making your event grand and successful.`;
+        `Thank you for choosing *BEST VENUE OPTION*! We are committed to making your event grand and successful.`;
       
       sendWhatsAppAlert(manualBooking.mobileNumber, whatsappMsg);
       toast.success('Manual booking added and locked as accepted');
@@ -7236,8 +7230,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   
   // Fetch App Branding from admin_settings
   let appLogoUrl = '/logo.png';
-  let appName = 'BEST VANUE OPTION';
-  let appTagline = 'VANUE & EVENT & SERVICE PROVIDERS';
+  let appName = 'BEST VENUE OPTION';
+  let appTagline = 'VENUE & EVENT & SERVICE PROVIDERS';
   
   try {
     const { data: settings } = await db.from('admin_settings').select('*');
@@ -7254,13 +7248,13 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
 
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const fullTotalRecord = Math.round(booking.updatedAmount || booking.totalAmount || 0);
-  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (s.amount || 0), 0));
+  const fullTotalRecord = Math.round(Number(booking.updatedAmount) || Number(booking.totalAmount) || 0);
+  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0));
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
-  const subTotalActual = Math.round(fullTotalRecord + (expenditure || 0));
+  const subTotalActual = Math.round(fullTotalRecord + (Number(expenditure) || 0));
   
   // Accurately sum all payments, fetch if empty
-  let invoicePayments = booking.payments || [];
+  let invoicePayments = (booking.payments || []).map(p => ({...p, amount: Number(p.amount) || 0}));
   if (invoicePayments.length === 0) {
     try {
       const { data } = await db.from('booking_payments').select('*').eq('booking_id', booking.id);
@@ -7268,7 +7262,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
         invoicePayments = data.map((p: any) => ({
           id: p.id,
           bookingId: p.booking_id,
-          amount: p.amount,
+          amount: Number(p.amount) || 0,
           paymentMode: p.payment_mode,
           paymentDate: p.payment_date,
           paymentType: p.payment_type,
@@ -7284,7 +7278,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const totalReceived = Math.round(invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0));
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
-  const isPaid = (balanceDue <= 0 && subTotalActual > 0) || (booking.status || '').toLowerCase() === 'paid' || (booking.status || '').toLowerCase() === 'completed' || booking.paymentStatus === 'Paid';
+  const isPaid = balanceDue <= 0 && subTotalActual > 0;
   const partyName = booking.isManual ? booking.partyName : (booking.visitorName || booking.partyName);
   const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
 
@@ -7319,6 +7313,47 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
     return status.toUpperCase();
   };
+
+  // Skip some lines...
+  
+  // New section: Transaction History
+  const addTransactionHistory = () => {
+    if (invoicePayments.length > 0) {
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.line(10, y, 200, y);
+      y += 8;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("TRANSACTION HISTORY", 10, y);
+      y += 8;
+      
+      doc.setFontSize(8);
+      const headerY = y;
+      doc.text("Date", 10, headerY);
+      doc.text("Type", 40, headerY);
+      doc.text("Mode", 80, headerY);
+      doc.text("ID", 120, headerY);
+      doc.text("Amount", 185, headerY, { align: "right" });
+      y += 2;
+      doc.line(10, y, 200, y);
+      y += 6;
+      
+      doc.setFont("helvetica", "normal");
+      invoicePayments.forEach(p => {
+        if (y > 275) { doc.addPage(); y = 20; }
+        doc.text(p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy'), 10, y);
+        doc.text((p.paymentType || 'Payment').toUpperCase(), 40, y);
+        doc.text((p.paymentMode || 'N/A').toUpperCase(), 80, y);
+        doc.text((p.transaction_id || '-').substring(0,18), 120, y);
+        doc.text(`INR ${Number(p.amount || 0).toLocaleString()}`, 185, y, { align: "right" });
+        y += 6;
+      });
+      doc.line(10, y, 200, y);
+      y += 10;
+    }
+  };
+  
+  // I need to find where to call this in the PDF generation flow.
   
   // left blank to remove platform branding from invoice header as requested
   
@@ -7437,62 +7472,38 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("Final Booking Total:", 110, currentY);
-  doc.text(`INR ${subTotalActual.toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`INR ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 10;
   
-  if (totalReceived > 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.text("Received Payment Transactions:", 25, currentY);
-    currentY += 8;
-    
-    doc.setFillColor(250, 250, 250);
-    doc.rect(20, currentY, 170, 7, 'F');
-    doc.setFontSize(8);
-    doc.text("Date", 25, currentY + 5);
-    doc.text("Type / Mode", 50, currentY + 5);
-    doc.text("Transaction ID", 100, currentY + 5);
-    doc.text("Amount (INR)", 185, currentY + 5, { align: 'right' });
-    currentY += 12;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(50);
-    
-    invoicePayments.forEach(p => {
-       const label = p.paymentType === 'Round off' ? 'Adjustment' : `${p.paymentType}`;
-       const mode = p.paymentMode ? `${p.paymentMode}` : 'N/A';
-       const tid = p.transaction_id || p.id?.substring(0, 8).toUpperCase() || 'N/A';
-       
-       doc.text(formatDateDDMMYYYY(p.paymentDate), 25, currentY);
-       doc.text(`${label} (${mode})`, 50, currentY);
-       doc.text(tid, 100, currentY);
-       doc.text(Math.round(p.amount || 0).toLocaleString(), 185, currentY, { align: 'right' });
-       
-       currentY += 8;
-       if (currentY > 260) {
-         doc.addPage();
-         currentY = 20;
-       }
-    });
-
-    currentY += 4;
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Total Amount Paid:", 110, currentY);
-    doc.setTextColor(22, 101, 52); // Dark Green
-    doc.text(`INR ${totalReceived.toLocaleString()}`, 190, currentY, { align: 'right' });
-    currentY += 12;
-  }
+  doc.setFontSize(10);
+  doc.text("Total Amount Paid:", 110, currentY);
+  doc.text(`INR ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  currentY += 10;
   
-  doc.setFontSize(14);
-  doc.setTextColor(234, 88, 12);
-  doc.setFont("helvetica", "bold");
-  doc.text("BALANCE DUE:", 110, currentY);
-  doc.text(`INR ${balanceDue.toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.setFontSize(12);
+  doc.setTextColor(balanceDue > 0 ? [220, 38, 38] : [22, 163, 74]); // red-600 or green-600
+  doc.text("Balance Due:", 110, currentY);
+  doc.text(`INR ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 15;
+
+  // Render Transaction History
+  let y = currentY;
+  addTransactionHistory();
+  // Footer logic
+  doc.setDrawColor(234, 88, 12);
+  doc.setLineWidth(1);
+  doc.line(20, 265, 190, 265);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.setFont("helvetica", "normal");
+  doc.text("Thank you for choosing Best Venue Option!", 105, 275, { align: 'center' });
+  doc.text("This is a computer generated invoice and does not require a physical signature.", 105, 280, { align: 'center' });
+  doc.text(`${window.location.origin}`, 105, 285, { align: 'center' });
+  
+  doc.save(`Invoice_${customInvoiceNo.replace(/\//g, '_')}.pdf`);
+  toast.success('Professional Invoice Downloaded');
+};
 
   // Amount in words
   doc.setFontSize(10);
@@ -7558,7 +7569,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setTextColor(234, 88, 12);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("WWW.BESTVANUEOPTION.COM", 190, 276, { align: 'right' });
+  doc.text("WWW.BESTVENUEOPTION.COM", 190, 276, { align: 'right' });
 
   return doc.output('blob');
 };
@@ -7569,8 +7580,8 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
   const [activeType, setActiveType] = useState<'venue' | 'service' | 'app'>(profile?.role === 'owner' ? 'venue' : 'service');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [appLogoUrl, setAppLogoUrl] = useState<string>('/logo.png');
-  const [appName, setAppName] = useState<string>('BEST VANUE OPTION');
-  const [appTagline, setAppTagline] = useState<string>('VANUE & EVENT & SERVICE PROVIDERS');
+  const [appName, setAppName] = useState<string>('BEST VENUE OPTION');
+  const [appTagline, setAppTagline] = useState<string>('VENUE & EVENT & SERVICE PROVIDERS');
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -7726,7 +7737,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     
     doc.setFontSize(6);
     doc.setTextColor(77, 121, 255);
-    doc.text("www.bestvanueoption.com", 52.5, startY + 12, { align: 'center' });
+    doc.text("www.bestvenueoption.com", 52.5, startY + 12, { align: 'center' });
     
     doc.save(`Review_Card_${name}.pdf`);
   };
@@ -7834,11 +7845,11 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
                  </div>
                  <h1 className="text-xl font-black tracking-tighter leading-none flex gap-1">
                    {(() => {
-                     const name = appName || 'BEST VANUE OPTION';
-                     if (name === 'BEST VANUE OPTION') {
+                     const name = appName || 'BEST VENUE OPTION';
+                     if (name === 'BEST VENUE OPTION') {
                        return (
                          <>
-                           <span className="text-[#4d79ff]">BEST VANUE</span>
+                           <span className="text-[#4d79ff]">BEST VENUE</span>
                            <span className="text-[#ff4d4d]">OPTION</span>
                          </>
                        );
@@ -7978,6 +7989,13 @@ const DashboardView = ({ user, profile, onUpdateProfile }: { user: any, profile:
   useEffect(() => {
     const checkSubscription = async () => {
       if (!profile || profile.role === 'user' || profile.role === 'admin') return;
+      
+      // FIX: Check if subscription requirement is globally enabled
+      if (!adminProfile.subscriptionEnabled) {
+        setShowSubscriptionReminder(false);
+        setIsSubscriptionModalOpen(false);
+        return;
+      }
       
       try {
         const { data: sub, error } = await db
@@ -9176,6 +9194,17 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate }: { user: any, p
     }
   };
 
+  const handleToggleLock = async (id: string, isLocked: boolean) => {
+    try {
+      const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
+      if (error) throw error;
+      toast.success(isLocked ? 'Booking Locked' : 'Booking Unlocked');
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      toast.error('Failed to update lock status');
+    }
+  };
+
   return (
     <div className="space-y-6 md:space-y-10 px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -9213,9 +9242,22 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate }: { user: any, p
                 <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-gray-100 shadow-sm"><IndianRupee size={10} className="mr-1 text-orange-600" /> Total: {subTotal.toLocaleString()}</span>
                 <span className="flex items-center bg-white px-2 py-1 md:px-3 md:py-1 rounded-lg border border-green-100 text-green-700 shadow-sm">Paid: {paymentsTotal.toLocaleString()}</span>
                 <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-lg border border-orange-100 font-bold">Pending: {pendingAmount.toLocaleString()}</span>
+                {b.isLocked && <span className="flex items-center bg-red-50 text-red-700 px-2 py-1 rounded-lg border border-red-100 font-black"><Lock size={10} className="mr-1" /> LOCKED</span>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2 w-full md:w-auto">
+              <button 
+                onClick={() => handleToggleLock(b.id, !b.isLocked)}
+                className={cn(
+                  "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all border shadow-sm",
+                  b.isLocked 
+                    ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" 
+                    : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                )}
+              >
+                {b.isLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                <span>{b.isLocked ? 'Unlock' : 'Lock'}</span>
+              </button>
               <button 
                 disabled={b.payments && b.payments.length > 0}
                 onClick={() => {
@@ -9482,7 +9524,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
-        name: "BEST VANUE OPTION",
+        name: "BEST VENUE OPTION",
         description: `Subscription for ${plan.name}`,
         image: resolveUrl(appLogoUrl),
         order_id: order.id,
@@ -11792,6 +11834,14 @@ export default function App() {
       }, 5000);
 
       try {
+        const { data: settings } = await db.from('admin_settings').select('*');
+        if (settings) {
+          const subEnabled = settings.find(s => s.key === 'subscription_enabled');
+          if (subEnabled) {
+            setAdminProfile(prev => ({...prev, subscriptionEnabled: subEnabled.value === 'true'}));
+          }
+        }
+        
         // Check local storage for custom session first
         const savedUser = localStorage.getItem('custom_user');
         const savedProfile = localStorage.getItem('custom_profile');
@@ -12080,7 +12130,7 @@ export default function App() {
                   <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
                     <MessageCircle size={24} />
                   </a>
-                  <a href="https://www.youtube.com/@BestVanueOption" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
+                  <a href="https://www.youtube.com/@BestVenueOption" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
                     <Play size={24} />
                   </a>
                 </div>
@@ -12090,6 +12140,9 @@ export default function App() {
               </div>
             </div>
           </footer>
+          
+          <CookiePolicyBanner />
+          <BVOAssistant />
         </div>
       </Router>
     </LanguageContext.Provider>
@@ -12104,8 +12157,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   const [selectedItemId, setSelectedItemId] = useState('');
   const [selectedSize, setSelectedSize] = useState('4x6');
   const [selectedInchSize, setSelectedInchSize] = useState('3x6');
-  const [appName, setAppName] = useState('BEST VANUE OPTION');
-  const [appTagline, setAppTagline] = useState('VANUE & EVENT & SERVICE PROVIDERS');
+  const [appName, setAppName] = useState('BEST VENUE OPTION');
+  const [appTagline, setAppTagline] = useState('VENUE & EVENT & SERVICE PROVIDERS');
   const [appLogoUrl, setAppLogoUrl] = useState('/logo.png');
 
   const flexSizes = [
@@ -12238,7 +12291,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.setFontSize(labelFontSize);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      const label1 = selectedType === 1 ? "(VANUE AVAILABLE FOR-)" : "(SERVICE AVAILABLE FOR-)";
+      const label1 = selectedType === 1 ? "(VENUE AVAILABLE FOR-)" : "(SERVICE AVAILABLE FOR-)";
       doc.text(label1, margin, middleY);
       
       doc.setFontSize(contentFontSize);
@@ -12249,7 +12302,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       const amenitiesY = middleY + (pageHeight * 0.22);
       doc.setFontSize(labelFontSize);
       doc.setFont("helvetica", "bold");
-      const label2 = selectedType === 1 ? "(VANUE AMENITIES-)" : "(SERVICE AMENITIES-)";
+      const label2 = selectedType === 1 ? "(VENUE AMENITIES-)" : "(SERVICE AMENITIES-)";
       doc.text(label2, margin, amenitiesY);
       
       doc.setFontSize(contentFontSize);
@@ -12387,8 +12440,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.setFontSize(pageHeight * 0.12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(59, 130, 246); // blue-500
-      doc.text("BEST VANUE", hTextX, headerY);
-      const bvw = doc.getTextWidth("BEST VANUE ");
+      doc.text("BEST VENUE", hTextX, headerY);
+      const bvw = doc.getTextWidth("BEST VENUE ");
       doc.setTextColor(239, 68, 68); // red-500
       doc.text("OPTION", hTextX + bvw, headerY);
       
@@ -12455,7 +12508,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       doc.setFontSize(pageHeight * 0.04);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
-      doc.text("FOR ONLINE BOOKING: WWW.BESTVANUEOPTION.COM", pageWidth / 2, footerY3, { align: 'center' });
+      doc.text("FOR ONLINE BOOKING: WWW.BESTVENUEOPTION.COM", pageWidth / 2, footerY3, { align: 'center' });
       
       if (appLogoUrl) {
         try {
@@ -12652,10 +12705,10 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                  </div>
                  <div className="mt-auto pt-4 border-t w-full flex justify-between px-4 items-end">
                     <div className="text-left leading-none">
-                       <span className="block text-[10px] font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-[10px] font-black text-blue-600">BEST VENUE</span>
                        <span className="block text-[10px] font-black text-red-600">OPTION</span>
                     </div>
-                    <span className="text-[6px] font-bold text-gray-400">www.bestvanueoption.com</span>
+                    <span className="text-[6px] font-bold text-gray-400">www.bestvenueoption.com</span>
                  </div>
                </>
              ) : selectedType === 3 ? (
@@ -12663,7 +12716,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                   <div className="flex items-center gap-2 mb-4">
                      <AppLogo showText={false} size="xs" />
                      <div className="text-left leading-none">
-                       <span className="block text-2xl font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-2xl font-black text-blue-600">BEST VENUE</span>
                        <span className="block text-2xl font-black text-red-600">OPTION</span>
                      </div>
                   </div>
@@ -12672,7 +12725,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                     GARDEN | HOTEL | DJ | TENT | PHOTO | CATERING | BAND
                   </div>
                   <div className="mt-auto flex items-center justify-between w-full">
-                     <span className="text-[10px] font-bold text-blue-600">bestvanueoption.com</span>
+                     <span className="text-[10px] font-bold text-blue-600">bestvenueoption.com</span>
                      <div className="flex flex-col items-center gap-1">
                         <QrCode size={24} className="text-orange-500" />
                         <span className="text-[6px] font-bold text-gray-400 uppercase">Register Business</span>
@@ -12683,7 +12736,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                 <div className="flex flex-col items-center justify-center h-full w-full bg-white p-8">
                   <div className="w-full flex justify-between items-center mb-12">
                      <div className="text-left leading-none">
-                       <span className="block text-[12px] font-black text-blue-600">BEST VANUE</span>
+                       <span className="block text-[12px] font-black text-blue-600">BEST VENUE</span>
                        <span className="block text-[12px] font-black text-red-600">OPTION</span>
                      </div>
                      <AppLogo showText={false} size="xs" />
@@ -12693,7 +12746,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
                     <QrCode size={64} className="text-orange-600" />
                   </div>
                   <p className="text-xs font-black text-gray-400">SCAN & REVIEW NOW</p>
-                  <div className="mt-auto text-blue-600 font-black text-[10px] tracking-widest">WWW.BESTVANUEOPTION.COM</div>
+                  <div className="mt-auto text-blue-600 font-black text-[10px] tracking-widest">WWW.BESTVENUEOPTION.COM</div>
                 </div>
              )}
           </div>
@@ -13468,7 +13521,7 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                       <div className="space-y-4">
                         <div className="flex items-start space-x-3">
                           <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
-                          <p className="text-sm opacity-90">Verify <span className="font-bold underline">bookmyvanue.in</span> is added to Supabase Authentication &gt; URL Configuration &gt; Redirect URIs.</p>
+                          <p className="text-sm opacity-90">Verify <span className="font-bold underline">bookmyvenue.in</span> is added to Supabase Authentication &gt; URL Configuration &gt; Redirect URIs.</p>
                         </div>
                         <div className="flex items-start space-x-3">
                           <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
@@ -14070,6 +14123,35 @@ const AdminView = ({ user, profile, onUpdateProfile }: { user: any, profile: Use
                     <div className="space-y-6">
                       <h3 className="text-2xl font-bold text-gray-900">Maintenance & Security</h3>
                       <p className="text-gray-500">Global system controls and security configurations.</p>
+
+                      <div className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 flex flex-col space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-orange-900">Subscription Requirement</h4>
+                            <p className="text-sm text-orange-700">Toggle if users need a paid plan to receive bookings.</p>
+                          </div>
+                          <button 
+                            onClick={async () => {
+                              const newValue = adminProfile.subscriptionEnabled ? 'false' : 'true';
+                              // Use upsert for admin_settings
+                              const { error } = await db.from('admin_settings').upsert({ key: 'subscription_enabled', value: newValue });
+                              if (!error) {
+                                setAdminProfile({...adminProfile, subscriptionEnabled: newValue === 'true'});
+                                toast.success(`Subscriptions ${newValue === 'true' ? 'Enabled' : 'Disabled'}`);
+                              }
+                            }}
+                            className={cn(
+                              "w-14 h-7 rounded-full relative transition-all duration-300",
+                              adminProfile.subscriptionEnabled ? "bg-orange-600" : "bg-gray-300"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300",
+                              adminProfile.subscriptionEnabled ? "left-8" : "left-1"
+                            )} />
+                          </button>
+                        </div>
+                      </div>
                       
                       <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 space-y-6">
                         <div className="flex items-center space-x-4 text-red-700">
@@ -14761,6 +14843,121 @@ const ServiceListView = ({ user }: { user: any }) => {
           services.map(s => <ServiceCard key={s.id} service={s} />)
         )}
       </div>
+    </div>
+  );
+};
+
+const CookiePolicyBanner = () => {
+  const [show, setShow] = useState(!localStorage.getItem('cookieConsent'));
+  
+  if (!show) return null;
+
+  return (
+    <motion.div 
+      initial={{ y: 100 }}
+      animate={{ y: 0 }}
+      className="fixed bottom-6 left-6 right-6 z-[100] md:max-w-md"
+    >
+      <div className="bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 flex flex-col space-y-4">
+        <div className="flex items-center space-x-3 text-orange-600">
+          <Shield size={24} />
+          <h4 className="font-black uppercase tracking-tight">Cookie Policy</h4>
+        </div>
+        <p className="text-gray-600 text-sm font-medium">
+          We use cookies to enhance your event booking experience. By continuing to use BVO, you agree to our data policy.
+        </p>
+        <div className="flex space-x-2">
+          <button 
+            onClick={() => {
+              localStorage.setItem('cookieConsent', 'true');
+              setShow(false);
+            }}
+            className="flex-1 bg-gray-900 text-white py-3 rounded-2xl font-bold hover:bg-black transition-all"
+          >
+            Accept
+          </button>
+          <Link 
+            to="/privacy" 
+            className="px-6 py-3 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-600 hover:bg-gray-100 transition-all text-sm flex items-center justify-center"
+          >
+            Read More
+          </Link>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const BVOAssistant = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [step, setStep] = useState(0);
+  const navigate = useNavigate();
+
+  const helpOptions = [
+    { label: "How to Register?", action: () => { setStep(1); } },
+    { label: "Login Issues", action: () => { setStep(2); } },
+    { label: "Book a Venue", action: () => { navigate('/search?type=marriage+garden'); setIsOpen(false); } },
+  ];
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[101]">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="mb-4 w-72 md:w-80 bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col"
+          >
+            <div className="bg-orange-600 p-6 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Bot size={24} />
+                <h4 className="font-bold">BVO Assistant</h4>
+              </div>
+              <button onClick={() => setIsOpen(false)}><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
+              {step === 0 && (
+                <>
+                  <p className="text-gray-600 font-medium">Hi! How can I help you today with Best Venue Option?</p>
+                  <div className="space-y-2">
+                    {helpOptions.map(opt => (
+                      <button 
+                        key={opt.label}
+                        onClick={opt.action}
+                        className="w-full text-left p-3 rounded-xl bg-orange-50 text-orange-700 font-bold text-sm border border-orange-100 hover:bg-orange-100 transition-all"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {step === 1 && (
+                <div className="space-y-4 text-sm">
+                  <p className="text-gray-700">Registration is simple! Click the **Register** button in the header, choose your role (Owner, Provider, or User), and fill in your details.</p>
+                  <button onClick={() => setStep(0)} className="text-orange-600 font-bold">← Back</button>
+                </div>
+              )}
+              {step === 2 && (
+                <div className="space-y-4 text-sm">
+                  <p className="text-gray-700">If you're having trouble logging in, ensure your mobile number is registered and you're using the correct password. You can also contact support.</p>
+                  <button onClick={() => setStep(0)} className="text-orange-600 font-bold">← Back</button>
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+              <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Powered by BVO Support</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-16 h-16 bg-orange-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-orange-700 transition-all hover:rotate-12 transform"
+      >
+        <MessageCircle size={32} />
+      </button>
     </div>
   );
 };
