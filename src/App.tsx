@@ -451,17 +451,17 @@ const ManagePaymentModal = ({
     }
 
     // Verify overpayment
-    const targetAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
-    const currentTotal = Math.round(payments.reduce((sum, p) => sum + (p.amount || 0), 0));
-    const inputAmount = Math.round(parseFloat(newPayment.amount.toString()) || 0);
+    const targetAmount = Number(booking.updatedAmount || booking.totalAmount || 0);
+    const currentTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const inputAmount = parseFloat(newPayment.amount.toString()) || 0;
 
     const pending = targetAmount - currentTotal;
-    if (pending <= 0 && targetAmount > 0) {
+    if (pending <= 0.01 && targetAmount > 0) {
       toast.error('Payment already completed. Cannot add more transactions.');
       return;
     }
 
-    if (currentTotal + inputAmount > targetAmount + 0.5) {
+    if (currentTotal + inputAmount > targetAmount + 0.9) {
       toast.error(`Overpayment not allowed. Due amount is ₹${Math.max(0, targetAmount - currentTotal).toLocaleString()}`);
       return;
     }
@@ -485,10 +485,10 @@ const ManagePaymentModal = ({
       
       if (fetchErr) throw fetchErr;
 
-      const totalCredited = Math.round((latestPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0));
-      const finalTargetAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
+      const totalCredited = (latestPayments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const finalTargetAmount = Number(booking.updatedAmount || booking.totalAmount || 0);
       
-      const isNowPaid = totalCredited >= finalTargetAmount && finalTargetAmount > 0;
+      const isNowPaid = totalCredited >= (finalTargetAmount - 0.1) && finalTargetAmount > 0;
       const updateData: any = {
         advance_amount: totalCredited,
         payment_status: isNowPaid ? 'Paid' : 'Pending',
@@ -523,15 +523,15 @@ const ManagePaymentModal = ({
 
   if (!isOpen || !booking) return null;
 
-  const totalAmount = Math.round(booking.updatedAmount || booking.totalAmount || 0);
-  const totalRegular = Math.round((payments || []).filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + (p.amount || 0), 0));
-  const totalAdvance = Math.round((payments || []).filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + (p.amount || 0), 0));
-  const totalDiscount = Math.round((payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (p.amount || 0), 0));
+  const totalAmount = Number(booking.updatedAmount || booking.totalAmount || 0);
+  const totalRegular = (payments || []).filter(p => p.paymentType === 'Regular').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalAdvance = (payments || []).filter(p => p.paymentType === 'Advance').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalDiscount = (payments || []).filter(p => p.paymentType === 'Discount').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   
   const totalPaid = totalRegular + totalAdvance;
   const bookingReceived = totalPaid + totalDiscount;
   const pendingAmount = Math.max(0, totalAmount - bookingReceived);
-  const isFullyPaid = pendingAmount <= 0 && totalAmount > 0;
+  const isFullyPaid = pendingAmount <= 0.1 && totalAmount > 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -607,7 +607,7 @@ const ManagePaymentModal = ({
                       type="number"
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 font-bold"
                       value={newPayment.amount || ''}
-                      onChange={(e) => setNewPayment({...newPayment, amount: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setNewPayment({...newPayment, amount: parseFloat(e.target.value) || 0})}
                       max={pendingAmount}
                     />
                   </div>
@@ -4753,26 +4753,27 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         .single();
       if (userData) setOwnerProfile(userData);
 
-      // Fetch owner stats
-      const [vCount, sCount, bCount, pCount, tCount] = await Promise.all([
-        db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
-        db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.owner_id),
-        db.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('owner_id', data.owner_id)
-          .in('status', ['completed', 'paid', 'confirmed', 'approved', 'Success']),
-        db.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('owner_id', data.owner_id)
-          .eq('status', 'pending'),
-        db.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('owner_id', data.owner_id)
-      ]);
+    // Fetch owner stats
+    const [vCount, sCount, bCount, pCount, tCount] = await Promise.all([
+      db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
+      db.from('service_providers').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
+      db.from('bookings').select('id', { count: 'exact', head: true })
+        .eq('owner_id', data.owner_id)
+        .in('status', ['completed', 'Success', 'paid', 'Paid']),
+      db.from('bookings').select('id', { count: 'exact', head: true })
+        .eq('owner_id', data.owner_id)
+        .eq('status', 'pending'),
+      db.from('bookings').select('id', { count: 'exact', head: true })
+        .eq('owner_id', data.owner_id)
+        .neq('status', 'cancelled')
+    ]);
 
-      setStats({
-        totalItems: (vCount.count || 0) + (sCount.count || 0),
-        completed: bCount.count || 0,
-        pending: pCount.count || 0,
-        totalRequests: tCount.count || 0
-      });
+    setStats({
+      totalItems: (Number(vCount?.count) || 0) + (Number(sCount?.count) || 0),
+      completed: (Number(bCount?.count) || 0),
+      pending: (Number(pCount?.count) || 0),
+      totalRequests: (Number(tCount?.count) || 0)
+    });
     }
     setLoading(false);
   };
@@ -4900,7 +4901,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        total_amount: Math.round(totalAmount),
+        total_amount: Number(totalAmount),
         message: message || '',
         party_address: visitorAddress,
         transaction_id: tid,
@@ -5548,12 +5549,13 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', ownerId),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
-          .in('status', ['completed', 'paid', 'confirmed', 'approved', 'Success']),
+          .in('status', ['completed', 'Success']),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
           .eq('status', 'pending'),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
+          .neq('status', 'cancelled')
       ]);
 
       setStats({
@@ -6417,16 +6419,30 @@ const ManuallyBookingView = ({
       } as any)));
       
       const sQuery = db.from('service_providers').select('*');
-      if (profile?.role !== 'admin') sQuery.eq('owner_id', user?.uid);
-      const { data: sData } = await sQuery;
-      if (sData) setServices(sData.map(d => ({ 
-        id: d.id, 
-        ...d,
-        reviewCount: d.review_count,
-        ownerId: d.owner_id,
-        serviceType: d.service_type || d.type,
-        priceRange: d.price_range
-      } as any)));
+      if (profile?.role !== 'admin') {
+        const { data: sp1 } = await db.from('service_providers').select('*').eq('provider_id', user?.uid);
+        const { data: sp2 } = await db.from('service_providers').select('*').eq('owner_id', user?.uid);
+        const sCombined = [...(sp1 || []), ...(sp2 || [])];
+        const sDataFiltered = sCombined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+        setServices(sDataFiltered.map(d => ({ 
+          id: d.id, 
+          ...d,
+          reviewCount: d.review_count,
+          ownerId: d.owner_id || d.provider_id,
+          serviceType: d.service_type || d.type,
+          priceRange: d.price_range
+        } as any)));
+      } else {
+        const { data: sData } = await sQuery;
+        if (sData) setServices(sData.map(d => ({ 
+          id: d.id, 
+          ...d,
+          reviewCount: d.review_count,
+          ownerId: d.owner_id || d.provider_id,
+          serviceType: d.service_type || d.type,
+          priceRange: d.price_range
+        } as any)));
+      }
     };
 
     fetchMyItems();
@@ -6593,22 +6609,22 @@ const ManuallyBookingView = ({
         party_name: manualBooking.partyName,
         party_address: manualBooking.partyAddress,
         visitor_mobile: manualBooking.mobileNumber,
-        status: (Math.round(finalTotalAmount) > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
+        status: (Number(finalTotalAmount) > 0 && paymentStatus === 'Paid') ? 'completed' : 'confirmed',
         is_manual: true,
         payment_mode: 'Cash',
         payment_status: paymentStatus || 'Pending',
-        total_amount: Math.round(finalTotalAmount) || 0,
-        updated_amount: Math.round(finalTotalAmount) || 0,
+        total_amount: Number(finalTotalAmount) || 0,
+        updated_amount: Number(finalTotalAmount) || 0,
         transaction_id: tid,
         extra_services: extraServices
       }]);
       if (error) throw error;
 
       // Register payment record if Paid
-      if (paymentStatus === 'Paid' && Math.round(finalTotalAmount) > 0) {
+      if (paymentStatus === 'Paid' && Number(finalTotalAmount) > 0) {
         await db.from('booking_payments').insert([{
           booking_id: bookingId,
-          amount: Math.round(finalTotalAmount),
+          amount: Number(finalTotalAmount),
           payment_mode: 'Cash',
           payment_date: manualBooking.eventDate,
           payment_type: 'Regular',
@@ -7255,10 +7271,10 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
 
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const fullTotalRecord = Math.round(Number(booking.updatedAmount || 0) || Number(booking.totalAmount || 0) || 0);
-  const extraServicesTotal = Math.round((booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount || 0) || 0), 0));
+  const fullTotalRecord = Number(booking.updatedAmount || 0) || Number(booking.totalAmount || 0) || 0;
+  const extraServicesTotal = (booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount || 0) || 0), 0);
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
-  const subTotalActual = Math.round(fullTotalRecord + (Number(expenditure || 0) || 0));
+  const subTotalActual = Number(fullTotalRecord + (Number(expenditure || 0) || 0));
   
   // Accurately sum all payments, fetch if empty
   let invoicePayments = (booking.payments || []).map(p => ({...p, amount: Number(p.amount || 0) || 0}));
@@ -7282,8 +7298,9 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
   }
 
-  const totalReceived = Math.round(invoicePayments.reduce((sum, p) => sum + (Number(p.amount || 0) || 0), 0));
-  const balanceDue = Number(Math.max(0, subTotalActual - totalReceived)) || 0;
+  // Ensure amount is exactly what was recorded, no automatic deductions
+  const totalReceived = invoicePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
   const isPaid = balanceDue <= 0 && subTotalActual > 0;
   const partyName = booking.isManual ? booking.partyName : (booking.visitorName || booking.partyName);
@@ -7325,40 +7342,52 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // Skip some lines...
   
   // New section: Transaction History
-  const addTransactionHistory = () => {
+  const addTransactionHistory = (startY: number) => {
+    let localY = startY;
     if (invoicePayments.length > 0) {
-      if (y > 230) { doc.addPage(); y = 20; }
-      doc.line(10, y, 200, y);
-      y += 8;
+      if (localY > 210) { doc.addPage(); localY = 30; }
+      doc.setDrawColor(200);
+      doc.line(10, localY, 200, localY);
+      localY += 10;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text("TRANSACTION HISTORY", 10, y);
-      y += 8;
+      doc.setTextColor(234, 88, 12);
+      doc.text("TRANSACTION HISTORY", 10, localY);
+      localY += 8;
       
       doc.setFontSize(8);
-      const headerY = y;
+      doc.setTextColor(100);
+      const headerY = localY;
       doc.text("Date", 10, headerY);
       doc.text("Type", 40, headerY);
       doc.text("Mode", 80, headerY);
       doc.text("ID", 120, headerY);
       doc.text("Amount", 185, headerY, { align: "right" });
-      y += 2;
-      doc.line(10, y, 200, y);
-      y += 6;
+      localY += 3;
+      doc.line(10, localY, 200, localY);
+      localY += 8;
       
       doc.setFont("helvetica", "normal");
+      doc.setTextColor(0);
       invoicePayments.forEach(p => {
-        if (y > 275) { doc.addPage(); y = 20; }
-        doc.text(p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy'), 10, y);
-        doc.text((p.paymentType || 'Payment').toUpperCase(), 40, y);
-        doc.text((p.paymentMode || 'N/A').toUpperCase(), 80, y);
-        doc.text((p.transaction_id || '-').substring(0,18), 120, y);
-        doc.text(`INR ${Number(p.amount || 0).toLocaleString()}`, 185, y, { align: "right" });
-        y += 6;
+        if (localY > 260) { 
+          doc.addPage(); 
+          localY = 30; 
+          doc.setFont("helvetica", "bold");
+          doc.text("TRANSACTION HISTORY (CONT.)", 10, localY);
+          localY += 10;
+        }
+        doc.text(p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy'), 10, localY);
+        doc.text((p.paymentType || 'Payment').toUpperCase(), 40, localY);
+        doc.text((p.paymentMode || 'N/A').toUpperCase(), 80, localY);
+        doc.text((p.transaction_id || '-').substring(0,18), 120, localY);
+        doc.text(`₹ ${Number(p.amount || 0).toLocaleString()}`, 185, localY, { align: "right" });
+        localY += 8;
       });
-      doc.line(10, y, 200, y);
-      y += 10;
+      doc.line(10, localY, 200, localY);
+      localY += 12;
     }
+    return localY;
   };
   
   // I need to find where to call this in the PDF generation flow.
@@ -7497,8 +7526,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   currentY += 12;
 
   // Render Transaction History
-  let y = currentY;
-  addTransactionHistory();
+  const finalY = addTransactionHistory(currentY);
 
   // Amount in words
   doc.setFontSize(10);
@@ -7506,12 +7534,20 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFont("helvetica", "italic");
   const words = `Amount in words (Balance): ${numberToWords(Math.round(balanceDue || 0))}`;
   const splitWords = doc.splitTextToSize(words, 170);
-  doc.text(splitWords, 20, y > currentY ? y : currentY);
-  y = (y > currentY ? y : currentY) + (splitWords.length * 5) + 5;
+  
+  let wordsY = Math.max(finalY, currentY);
+  if (wordsY > 240) { doc.addPage(); wordsY = 30; }
+  
+  doc.text(splitWords, 20, wordsY);
+  
+  if (wordsY + (splitWords.length * 5) > 260) {
+    doc.addPage();
+  }
+  const footerBaseline = 265;
 
   // --- Footer ---
   doc.setDrawColor(234, 88, 12);
-  doc.line(20, 265, 190, 265);
+  doc.line(20, footerBaseline, 190, footerBaseline);
   
   // Simplified Logo Branding: No background colors or frame borders
   try {
@@ -7904,23 +7940,23 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
 
     if (type === 'excel') {
       const data = filteredBookings.map((b, index) => {
-        const total = Math.round(b.updatedAmount || b.totalAmount || 0);
-        const totalReceived = Math.round((b.payments || []).reduce((acc, p) => acc + (p.amount || 0), 0));
-        const discTotal = Math.round((b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (p.amount || 0), 0));
+        const total = Number(b.updatedAmount || b.totalAmount || 0);
+        const totalReceived = (b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const discTotal = (b.payments || []).filter(p => p.paymentType === 'Discount').reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
         const cashPaid = totalReceived - discTotal;
         const pending = Math.max(0, total - totalReceived);
         
         return {
           'S.No': index + 1,
-          'Status': (pending <= 1 && total > 0) ? 'Completed' : (b.status === 'cancelled' ? 'Cancelled' : b.status ? b.status.toUpperCase() : 'PENDING'),
+          'Status': (pending <= 0.1 && total > 0) ? 'Completed' : (b.status === 'cancelled' ? 'Cancelled' : b.status ? b.status.toUpperCase() : 'PENDING'),
           'Party Name': b.partyName || b.visitorName || 'N/A',
           'Mobile': b.visitorMobile || 'N/A',
           'Date': formatDateDDMMYYYY(b.eventDate),
           'Invoice No': b.transaction_id || `INV-${(b.id || '').substring(0, 8).toUpperCase()}`,
-          'Actual Amount': total,
-          'Cash Paid': cashPaid,
-          'Discount': discTotal,
-          'Pending Amount': pending,
+          'Actual Amount': total.toLocaleString(),
+          'Cash Paid': cashPaid.toLocaleString(),
+          'Discount': discTotal.toLocaleString(),
+          'Pending Amount': pending.toLocaleString(),
           'Type': b.isManual ? 'Manual' : 'Order'
         };
       });
@@ -8138,14 +8174,16 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
 
       const sQuery = db.from('service_providers').select('*');
       if (profile?.role !== 'admin') {
-        sQuery.eq('owner_id', user?.uid);
-      }
-      const { data: sData } = await sQuery;
-      
-      if (sData) {
-        setServices(sData.map(d => ({
+        // Handle both provider_id and owner_id for service_providers
+        const { data: sp1 } = await db.from('service_providers').select('*').eq('provider_id', user?.uid);
+        const { data: sp2 } = await db.from('service_providers').select('*').eq('owner_id', user?.uid);
+        const sCombined = [...(sp1 || []), ...(sp2 || [])];
+        const sDataFiltered = sCombined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+        
+        setServices(sDataFiltered.map(d => ({
           ...d,
-          ownerId: d.owner_id,
+          ownerId: d.owner_id || d.provider_id,
+          providerId: d.provider_id || d.owner_id,
           serviceType: d.service_type || d.type,
           priceRange: d.price_range,
           priceLevel: d.price_level,
@@ -8154,6 +8192,22 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
           reviewCount: d.review_count,
           createdAt: d.created_at
         }) as ServiceProvider));
+      } else {
+        const { data: sData } = await sQuery;
+        if (sData) {
+          setServices(sData.map(d => ({
+            ...d,
+            ownerId: d.owner_id || d.provider_id,
+            providerId: d.provider_id || d.owner_id,
+            serviceType: d.service_type || d.type,
+            priceRange: d.price_range,
+            priceLevel: d.price_level,
+            availableFor: d.available_for || [],
+            catalogue: d.catalogue || [],
+            reviewCount: d.review_count,
+            createdAt: d.created_at
+          }) as ServiceProvider));
+        }
       }
     } catch (err) {
       console.error('Dashboard data error:', err);
@@ -8232,9 +8286,9 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
 
   const stats = useMemo(() => {
     const isPaidFunc = (b: Booking) => {
-      const base = Math.round(Number(b.updatedAmount) || Number(b.totalAmount) || 0);
-      const paymentsTotal = Math.round((b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
-      return (paymentsTotal >= base && base > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
+      const base = Number(b.updatedAmount) || Number(b.totalAmount) || 0;
+      const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      return (paymentsTotal >= (base - 0.1) && base > 0) || (b.status || '').toLowerCase() === 'paid' || (b.status || '').toLowerCase() === 'completed' || b.paymentStatus === 'Paid';
     };
 
     const countCompleted = bookings.filter(b => isPaidFunc(b)).length;
@@ -8936,21 +8990,30 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
   const [dateFilter, setDateFilter] = useState<string>('');
 
   const filteredBookings = useMemo(() => bookings.filter(b => {
-    // Show only public bookings without payments in Public Booking for owners
-    // But show ALL public bookings for regular users
+    // 1. Separate Sent vs Received
+    if (profile?.role === 'user') {
+      // Regular users only see their own sent bookings
+      if (b.userId !== user?.uid) return false;
+    } else if (profile?.role !== 'admin') {
+      // Providers/Owners see their received public bookings
+      // We explicitly check ownerId to avoid showing bookings they placed themselves as customers here
+      if (b.ownerId !== user?.uid) return false;
+    }
+
+    // 2. Hide manual bookings from this view (they have their own tab)
     if (b.isManual) return false;
     
-    // Hide if payment exists (moves to Manage Payment) - only for owners/providers/admins who have Manage Payment tab
-    if (profile?.role !== 'user' && b.payments && b.payments.length > 0) return false;
+    // 3. Optional: Hide if completed (or leave visible for history)
+    if (b.status === 'completed') return false;
 
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
-                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'approved')) ||
+                         (statusFilter === 'confirmed' && (b.status === 'confirmed' || b.status === 'approved' || b.status === 'paid')) ||
                          (statusFilter === 'cancelled' && b.status === 'cancelled');
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     
     return matchesStatus && matchesDate;
-  }), [bookings, statusFilter, dateFilter]);
+  }), [bookings, statusFilter, dateFilter, profile?.role, user?.uid]);
 
   const sortedBookings = useMemo(() => [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [filteredBookings]);
   
@@ -9151,19 +9214,15 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
   const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
 
   const filteredBookings = useMemo(() => bookings.filter(b => {
-    // Show only locked bookings
-    if (!b.isLocked) return false;
-
-    const subTotal = (b.updatedAmount || b.totalAmount || 0);
-    const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
-    const pendingAmount = Math.max(0, subTotal - paymentsTotal);
-
-    // Hide if fully paid
-    if (pendingAmount < 1 && subTotal > 0) return false;
+    // Show confirmed/paid bookings that are not completed
+    if (b.status === 'cancelled' || b.status === 'completed') return false;
+    
+    // Only show if user is owner/admin or it belongs to them
+    if (profile?.role !== 'admin' && b.ownerId !== user?.uid) return false;
 
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesDate;
-  }), [bookings, dateFilter]);
+  }), [bookings, dateFilter, user?.uid, profile?.role]);
 
   const sortedBookings = useMemo(() => [...filteredBookings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [filteredBookings]);
 
@@ -9224,10 +9283,10 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
         {sortedBookings.map(b => {
            const subTotal = (b.updatedAmount || b.totalAmount || 0);
            const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
-           const pendingAmount = Math.round(subTotal - paymentsTotal);
+           const pendingAmount = Number(subTotal - paymentsTotal);
 
            return (
-          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
             <div className="w-full">
               <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
                 <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.targetName}</span>
@@ -13647,7 +13706,11 @@ const AdminView = ({ user, profile, onUpdateProfile, globalSettings, setGlobalSe
                         <ResponsiveContainer width="100%" height={300} debounce={50}>
                           <BarChart data={[
                             { name: 'Total', count: bookings.length },
-                            { name: 'Completed', count: bookings.filter(b => (b.paymentStatus === 'Paid' || b.status === 'paid' || b.status === 'completed' || ((b.payments?.reduce((sum, p) => sum + p.amount, 0) || 0) >= (b.updatedAmount || b.totalAmount || 0) && (b.updatedAmount || b.totalAmount || 0) > 0))).length },
+                            { name: 'Completed', count: bookings.filter(b => {
+                              const bTotal = Number(b.updatedAmount || b.totalAmount || 0);
+                              const bPaid = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                              return (bPaid >= (bTotal - 0.1) && bTotal > 0) || b.status === 'completed' || b.status === 'paid' || b.paymentStatus === 'Paid';
+                            }).length },
                             { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
                             { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
                           ]}>

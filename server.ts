@@ -103,9 +103,10 @@ async function startServer() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    connectTimeout: 10000,   // Wait up to 10s for connection
+    connectTimeout: 30000,   // Wait up to 30s for connection
     enableKeepAlive: true,    // Prevent idle disconnects
     keepAliveInitialDelay: 10000,
+    decimalNumbers: true,    // Support decimal as numbers
     ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined
   });
 
@@ -276,8 +277,17 @@ async function startServer() {
       };
 
       if (method === 'SELECT') {
-        const { limit, order } = req.body;
-        let sql = `SELECT ${select || '*'} FROM \`${table}\``;
+        const { limit, order, count, head } = req.body;
+        const isHead = !!head;
+        const countQuery = !!count;
+        
+        let sql = "SELECT ";
+        if (countQuery || isHead) {
+          sql += "COUNT(*) as aggregate_count FROM ";
+        } else {
+          sql += (select || "*") + " FROM ";
+        }
+        sql += `\`${table}\``;
         const params: any[] = [];
         
         if (filters && filters.length > 0) {
@@ -347,6 +357,18 @@ async function startServer() {
           sql += ` LIMIT ${Number(limit)}`;
         }
 
+        if (countQuery || isHead) {
+          console.log(`>>> [SQL] COUNT on ${table}`);
+          const [rows]: any = await pool.query(sql, params);
+          const countValue = rows[0]?.aggregate_count || 0;
+          
+          return res.json({ 
+            data: isHead ? null : [], 
+            count: countValue, 
+            error: null 
+          });
+        }
+
         console.log(`>>> [SQL] SELECT on ${table}`);
         const [rows]: any = await pool.query(sql, params);
         
@@ -364,7 +386,7 @@ async function startServer() {
           return parsed;
         });
 
-        return res.json({ data: parsedRows, error: null });
+        return res.json({ data: parsedRows, count: parsedRows.length, error: null });
       }
 
       if (method === 'INSERT') {

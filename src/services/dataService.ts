@@ -235,6 +235,7 @@ const mysqlDataService = {
   from: (table: string) => {
     const filters: any[] = [];
     let selectVal = '*';
+    let optionsVal: any = {};
     let limitVal: number | null = null;
     let orderVal: any = null;
 
@@ -249,7 +250,9 @@ const mysqlDataService = {
             data, 
             select: selectVal,
             limit: limitVal,
-            order: orderVal
+            order: orderVal,
+            count: optionsVal?.count,
+            head: optionsVal?.head
           })
         });
 
@@ -346,8 +349,9 @@ const mysqlDataService = {
     };
 
     const builder: any = {
-      select: (cols: string = '*') => {
+      select: (cols: string = '*', options: any = {}) => {
         selectVal = cols;
+        optionsVal = options;
         return builder;
       },
       order: (col: string, { ascending }: any = { ascending: true }) => {
