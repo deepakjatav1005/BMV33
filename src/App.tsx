@@ -4756,7 +4756,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
     // Fetch owner stats
     const [vCount, sCount, bCount, pCount, tCount] = await Promise.all([
       db.from('venues').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
-      db.from('service_providers').select('id', { count: 'exact', head: true }).eq('owner_id', data.owner_id),
+      db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', data.owner_id),
       db.from('bookings').select('id', { count: 'exact', head: true })
         .eq('owner_id', data.owner_id)
         .in('status', ['completed', 'Success', 'paid', 'Paid']),
@@ -5549,7 +5549,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         db.from('service_providers').select('id', { count: 'exact', head: true }).eq('provider_id', ownerId),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
-          .in('status', ['completed', 'Success']),
+          .in('status', ['completed', 'Success', 'paid', 'Paid']),
         db.from('bookings').select('id', { count: 'exact', head: true })
           .eq('owner_id', ownerId)
           .eq('status', 'pending'),
@@ -5559,10 +5559,10 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       ]);
 
       setStats({
-        totalItems: (vCount.count || 0) + (sCount.count || 0),
-        completed: bCount.count || 0,
-        pending: pCount.count || 0,
-        totalRequests: tCount.count || 0
+        totalItems: (Number(vCount?.count) || 0) + (Number(sCount?.count) || 0),
+        completed: (Number(bCount?.count) || 0),
+        pending: (Number(pCount?.count) || 0),
+        totalRequests: (Number(tCount?.count) || 0)
       });
     }
     setLoading(false);
@@ -7307,7 +7307,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
 
   // CUSTOM INVOICE NUMBER LOGIC
-  // BVO/user numerical id/PB or MB/000+1 serial
+  // BVO/PB or MB/000+1 serial
   const bookingTypePrefix = booking.isManual ? 'MB' : 'PB';
   
   // Calculate Serial Number (starts from 1 every year)
@@ -7323,12 +7323,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const bookingIndex = providerBookingsThisYear.findIndex(b => b.id === booking.id);
   const serialNo = (bookingIndex !== -1 ? bookingIndex + 1 : providerBookingsThisYear.length + 1).toString().padStart(4, '0');
   
-  // Refined numerical ID extraction: take the last numeric part from registrationId
-  const regIdStr = providerProfile?.registrationId || '000000';
-  const regParts = regIdStr.split('-');
-  const userNumericId = regParts.length > 1 ? regParts[regParts.length - 1].replace(/\D/g, '') : regIdStr.replace(/\D/g, '');
-  
-  const customInvoiceNo = `BVO/${userNumericId}/${bookingTypePrefix}/${serialNo}`;
+  const customInvoiceNo = `BVO/${bookingTypePrefix}/${serialNo}`;
   
   // Helper for display status on invoice
   const getDisplayStatus = () => {
@@ -7359,9 +7354,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
       doc.setTextColor(100);
       const headerY = localY;
       doc.text("Date", 10, headerY);
-      doc.text("Type", 40, headerY);
-      doc.text("Mode", 80, headerY);
-      doc.text("ID", 120, headerY);
+      doc.text("Type", 50, headerY);
+      doc.text("Mode", 100, headerY);
       doc.text("Amount", 185, headerY, { align: "right" });
       localY += 3;
       doc.line(10, localY, 200, localY);
@@ -7377,10 +7371,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
           doc.text("TRANSACTION HISTORY (CONT.)", 10, localY);
           localY += 10;
         }
-        doc.text(p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy'), 10, localY);
-        doc.text((p.paymentType || 'Payment').toUpperCase(), 40, localY);
-        doc.text((p.paymentMode || 'N/A').toUpperCase(), 80, localY);
-        doc.text((p.transaction_id || '-').substring(0,18), 120, localY);
+        // Force Date only (remove time)
+        const dateStr = p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy');
+        const justDate = dateStr.includes(' ') ? dateStr.split(' ')[0] : dateStr;
+        doc.text(justDate, 10, localY);
+        doc.text((p.paymentType || 'Payment').toUpperCase(), 50, localY);
+        doc.text((p.paymentMode || 'N/A').toUpperCase(), 100, localY);
         doc.text(`₹ ${Number(p.amount || 0).toLocaleString()}`, 185, localY, { align: "right" });
         localY += 8;
       });
@@ -7395,17 +7391,13 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // left blank to remove platform branding from invoice header as requested
   
   // Business Name as Heading
-  // Requirement: show only venue or service type name, supplementary text in brackets
-  const headerTitle = (booking.targetName || "BUSINESS").toUpperCase();
-  const headerSubTitle = booking.targetType === 'venue' ? '(VENUE)' : '(SERVICE)';
+  // Requirement: show only business name, no supplementary text in brackets
+  const headerTitle = (booking.targetName || "BUSINESS").split('(')[0].trim().toUpperCase();
   
   doc.setFontSize(22);
   doc.setTextColor(234, 88, 12); // orange-600
   doc.setFont("helvetica", "bold");
   doc.text(headerTitle, 105, 30, { align: 'center', maxWidth: 170 });
-  
-  doc.setFontSize(10);
-  doc.text(headerSubTitle, 105, 38, { align: 'center' });
   
   // Left side: Owner/Provider Name & Mobile
   doc.setFontSize(10);
@@ -7477,14 +7469,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // Use autoTable for the items to prevent overlap
   const tableRows = [];
   if (baseAmount > 0) {
-    tableRows.push([`Base Booking Amount for ${booking.targetName}`, `INR ${baseAmount.toLocaleString()}`]);
+    tableRows.push([`Base Booking Amount for ${booking.targetName.split('(')[0].trim()}`, `₹ ${baseAmount.toLocaleString()}`]);
   }
   if (expenditure > 0) {
-    tableRows.push(['Additional Expenditure', `INR ${Math.round(expenditure).toLocaleString()}`]);
+    tableRows.push(['Additional Expenditure', `₹ ${Math.round(expenditure).toLocaleString()}`]);
   }
   if (booking.extra_services && booking.extra_services.length > 0) {
     booking.extra_services.forEach(s => {
-      tableRows.push([s.name, `INR ${Math.round(s.amount || 0).toLocaleString()}`]);
+      tableRows.push([s.name, `₹ ${Math.round(s.amount || 0).toLocaleString()}`]);
     });
   }
 
@@ -7507,12 +7499,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("Final Booking Total:", 110, currentY);
-  doc.text(`INR ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`₹ ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 8;
   
   doc.setFontSize(10);
   doc.text("Total Amount Paid:", 110, currentY);
-  doc.text(`INR ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`₹ ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 8;
   
   doc.setFontSize(12);
@@ -7522,7 +7514,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     doc.setTextColor(22, 163, 74); // green-600
   }
   doc.text("Balance Due:", 110, currentY);
-  doc.text(`INR ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`₹ ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 12;
 
   // Render Transaction History
@@ -8995,9 +8987,8 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
       // Regular users only see their own sent bookings
       if (b.userId !== user?.uid) return false;
     } else if (profile?.role !== 'admin') {
-      // Providers/Owners see their received public bookings
-      // We explicitly check ownerId to avoid showing bookings they placed themselves as customers here
-      if (b.ownerId !== user?.uid) return false;
+      // Providers/Owners see their received public bookings AND sent public bookings
+      if (b.ownerId !== user?.uid && b.userId !== user?.uid) return false;
     }
 
     // 2. Hide manual bookings from this view (they have their own tab)
@@ -9336,14 +9327,20 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
                 <span>Update Amount</span>
               </button>
               <button 
+                disabled={pendingAmount <= 0}
                 onClick={() => {
                   setSelectedBooking(b);
                   setIsPaymentRecordModalOpen(true);
                 }}
-                className="flex-1 md:flex-none justify-center px-4 py-2 bg-green-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 hover:bg-green-700 shadow-lg shadow-green-100"
+                className={cn(
+                  "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all shadow-lg",
+                  pendingAmount <= 0 
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed shadow-none" 
+                    : "bg-green-600 text-white hover:bg-green-700 shadow-green-100"
+                )}
               >
-                <Plus size={16} />
-                <span>Add Payment</span>
+                {pendingAmount <= 0 ? <CheckCircle size={16} /> : <Plus size={16} />}
+                <span>{pendingAmount <= 0 ? 'Fully Paid' : 'Add Payment'}</span>
               </button>
               <button 
                 onClick={async () => {
