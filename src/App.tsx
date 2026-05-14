@@ -5486,7 +5486,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [isCallSatisfied, setIsCallSatisfied] = useState(false);
   const [providerProfile, setProviderProfile] = useState<any>(null);
-  const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0 });
+  const [stats, setStats] = useState({ completed: 0, totalItems: 0, pending: 0, totalRequests: 0 });
 
   // Update form when profile loads
   useEffect(() => {
@@ -8208,7 +8208,7 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <BarChart2 size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'manually-booking', label: 'Manually Booking', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
-    { id: 'public-booking', label: 'Public Booking', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'public-booking', label: profile?.role === 'user' ? 'My Bookings' : 'Public Booking', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'manage-payment', label: 'Manage Payment', icon: <IndianRupee size={20} />, roles: ['owner', 'provider'] },
     { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
     { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} /> },
@@ -8427,7 +8427,7 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
                           </div>
                         )}
                         <button 
-                          onClick={() => handleTabChange('orders')}
+                          onClick={() => handleTabChange('public-booking')}
                           className="ml-4 bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-orange-700 transition shadow-lg"
                         >
                           View All
@@ -8936,11 +8936,12 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
   const [dateFilter, setDateFilter] = useState<string>('');
 
   const filteredBookings = useMemo(() => bookings.filter(b => {
-    // Show only public bookings without payments in Public Booking
+    // Show only public bookings without payments in Public Booking for owners
+    // But show ALL public bookings for regular users
     if (b.isManual) return false;
     
-    // Hide if payment exists (moves to Manage Payment)
-    if (b.payments && b.payments.length > 0) return false;
+    // Hide if payment exists (moves to Manage Payment) - only for owners/providers/admins who have Manage Payment tab
+    if (profile?.role !== 'user' && b.payments && b.payments.length > 0) return false;
 
     const matchesStatus = statusFilter === 'all' || 
                          (statusFilter === 'pending' && b.status === 'pending') ||
@@ -8994,8 +8995,8 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
     <div className="space-y-6 md:space-y-10 px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="w-full">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 truncate">Public Booking</h2>
-          <p className="text-sm text-gray-500 mt-1">Accept and manage public booking requests</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 truncate">{profile?.role === 'user' ? 'My Bookings' : 'Public Booking'}</h2>
+          <p className="text-sm text-gray-500 mt-1">{profile?.role === 'user' ? 'View and track your booking requests' : 'Accept and manage public booking requests'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <select 
