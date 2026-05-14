@@ -170,6 +170,7 @@ export type ServiceType =
 export interface ServiceProvider {
   id: string;
   providerId: string;
+  ownerId?: string; // Optional for compatibility
   name: string;
   serviceType: ServiceType;
   description: string;

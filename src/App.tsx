@@ -5653,7 +5653,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
       const { count, error: countError } = await db.from('bookings')
         .select('*', { count: 'exact', head: true })
-        .eq('owner_id', service?.providerId)
+        .eq('owner_id', service?.ownerId)
         .gte('created_at', yearStart);
       
       if (countError) console.error('Count query error:', countError);
@@ -5690,7 +5690,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
         target_id: service?.id,
         target_type: 'service',
         target_name: service?.name + (bookingMode === 'partial' ? ' (Selected Amenities)' : ''),
-        owner_id: service?.providerId,
+        owner_id: service?.ownerId,
         event_date: date,
         end_date: endDate || date,
         start_time: startTime,
@@ -5713,7 +5713,7 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
 
       // Send WhatsApp Alert to Provider
       try {
-        const { data: providerProfile } = await db.from('users').select('mobile_number').eq('uid', service?.providerId).single();
+        const { data: providerProfile } = await db.from('users').select('mobile_number').eq('uid', service?.ownerId).single();
         if (providerProfile?.mobile_number) {
           const alertMsg = `New Service Query for ${service?.name}!\nVisitor: ${visitorName}\nMobile: ${visitorMobile}\nAddress: ${visitorAddress}\nDate: ${date}\nMessage: ${message || 'No message'}`;
           sendWhatsAppAlert(providerProfile.mobile_number, alertMsg);
@@ -9272,9 +9272,9 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
 
       <div className="space-y-4">
         {sortedBookings.map(b => {
-           const subTotal = (b.updatedAmount || b.totalAmount || 0);
-           const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + p.amount, 0);
-           const pendingAmount = Number(subTotal - paymentsTotal);
+           const subTotal = Number(b.updatedAmount || b.totalAmount || 0);
+           const paymentsTotal = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+           const pendingAmount = Math.max(0, subTotal - paymentsTotal);
 
            return (
           <div key={b.id} className="bg-gray-50 rounded-2xl md:rounded-3xl p-3 md:p-6 border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
@@ -9327,20 +9327,20 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
                 <span>Update Amount</span>
               </button>
               <button 
-                disabled={pendingAmount <= 0}
+                disabled={pendingAmount < 1}
                 onClick={() => {
                   setSelectedBooking(b);
                   setIsPaymentRecordModalOpen(true);
                 }}
                 className={cn(
                   "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all shadow-lg",
-                  pendingAmount <= 0 
+                  pendingAmount < 1 
                     ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed shadow-none" 
                     : "bg-green-600 text-white hover:bg-green-700 shadow-green-100"
                 )}
               >
-                {pendingAmount <= 0 ? <CheckCircle size={16} /> : <Plus size={16} />}
-                <span>{pendingAmount <= 0 ? 'Fully Paid' : 'Add Payment'}</span>
+                {pendingAmount < 1 ? <CheckCircle size={16} /> : <Plus size={16} />}
+                <span>{pendingAmount < 1 ? 'Fully Paid' : 'Add Payment'}</span>
               </button>
               <button 
                 onClick={async () => {
