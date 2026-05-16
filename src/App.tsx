@@ -324,6 +324,41 @@ import { calculateDistance as calculateGeoDistance } from './lib/utils';
 import LocationPicker from './components/LocationPicker';
 import LocationDisplay from './components/LocationDisplay';
 
+const SubscriptionUpgradeModal = ({ isOpen, onClose, onUpgrade }: { isOpen: boolean, onClose: () => void, onUpgrade: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center"
+      >
+        <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
+          <ShieldCheck size={40} />
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">Subscription Required</h3>
+        <p className="text-gray-600 mb-8 font-medium">
+          This feature requires a valid subscription plan. Please upgrade your plan to continue using all premium features of the platform.
+        </p>
+        <div className="flex flex-col gap-3">
+          <button 
+            onClick={onUpgrade}
+            className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black hover:bg-orange-700 transition-all shadow-lg shadow-orange-100 text-lg"
+          >
+            Take Valid Subscription
+          </button>
+          <button 
+            onClick={onClose}
+            className="w-full py-4 bg-gray-50 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all"
+          >
+            Maybe Later
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Components ---
 const ConfirmModal = ({ 
   isOpen, 
@@ -6290,14 +6325,20 @@ const ManuallyBookingView = ({
   bookings: parentBookings, 
   venues: parentVenues, 
   services: parentServices, 
-  onUpdate 
+  onUpdate,
+  globalSettings,
+  activeSubscription,
+  onUpgrade
 }: { 
   user: any, 
   profile: UserProfile | null, 
   bookings?: Booking[], 
   venues?: Venue[], 
   services?: ServiceProvider[], 
-  onUpdate?: () => void 
+  onUpdate?: () => void,
+  globalSettings?: any,
+  activeSubscription?: UserSubscription | null,
+  onUpgrade?: () => void
 }) => {
   const [bookings, setBookings] = useState<Booking[]>(parentBookings || []);
   const [loading, setLoading] = useState(!parentBookings);
@@ -6471,6 +6512,11 @@ const ManuallyBookingView = ({
   const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
+    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+      if (onUpgrade) onUpgrade();
+      else toast.error('Premium feature: Please get a valid subscription');
+      return;
+    }
     try {
       const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
       if (error) throw error;
@@ -7901,7 +7947,19 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
   );
 };
 
-const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void, globalSettings: any }) => {
+const DashboardView = ({ 
+  user, 
+  profile, 
+  onUpdateProfile, 
+  globalSettings,
+  activeSubscription
+}: { 
+  user: any, 
+  profile: UserProfile | null, 
+  onUpdateProfile: (p: UserProfile) => void, 
+  globalSettings: any,
+  activeSubscription: UserSubscription | null
+}) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment'>(initialTab);
@@ -8558,7 +8616,15 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
                 <VenueManageView user={user} venues={venues} />
               )}
               {activeTab === 'public-booking' && (
-                <PublicBookingView user={user} profile={profile} bookings={bookings} onUpdate={fetchDashboardData} />
+                <PublicBookingView 
+                  user={user} 
+                  profile={profile} 
+                  bookings={bookings} 
+                  onUpdate={fetchDashboardData} 
+                  globalSettings={globalSettings}
+                  activeSubscription={activeSubscription}
+                  onUpgrade={() => setActiveTab('subscription')}
+                />
               )}
               {activeTab === 'manually-booking' && (
                 <ManuallyBookingView 
@@ -8567,7 +8633,10 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
                   bookings={bookings} 
                   venues={venues} 
                   services={services} 
-                  onUpdate={fetchDashboardData} 
+                  onUpdate={fetchDashboardData}
+                  globalSettings={globalSettings}
+                  activeSubscription={activeSubscription}
+                  onUpgrade={() => setActiveTab('subscription')}
                 />
               )}
               {activeTab === 'manage-payment' && (
@@ -8583,7 +8652,13 @@ const DashboardView = ({ user, profile, onUpdateProfile, globalSettings }: { use
                 <ServicesManageView user={user} services={services} />
               )}
               {activeTab === 'catalogue' && (
-                <CatalogueManageView venues={venues} services={services} />
+                <CatalogueManageView 
+                  venues={venues} 
+                  services={services} 
+                  globalSettings={globalSettings}
+                  activeSubscription={activeSubscription}
+                  onUpgrade={() => setActiveTab('subscription')}
+                />
               )}
               {activeTab === 'reports' && (
                 <div className="space-y-8">
@@ -8977,7 +9052,23 @@ const VenueManageView = ({ user, venues }: { user: any, venues: Venue[] }) => {
   );
 };
 
-const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void }) => {
+const PublicBookingView = ({ 
+  user, 
+  profile, 
+  bookings, 
+  onUpdate,
+  globalSettings,
+  activeSubscription,
+  onUpgrade
+}: { 
+  user: any, 
+  profile: UserProfile | null, 
+  bookings: Booking[], 
+  onUpdate?: () => void,
+  globalSettings?: any,
+  activeSubscription?: UserSubscription | null,
+  onUpgrade?: () => void
+}) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
 
@@ -9035,6 +9126,11 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
   };
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
+    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+      if (onUpgrade) onUpgrade();
+      else toast.error('Premium feature: Please get a valid subscription');
+      return;
+    }
     try {
       const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
       if (error) throw error;
@@ -9093,7 +9189,13 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
               </div>
               <div className="flex flex-wrap items-center text-[9px] md:text-sm text-gray-500 gap-1.5 md:gap-x-4 md:gap-y-2 mt-2">
                 <span className="flex items-center"><Calendar size={12} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
-                <span className="flex items-center"><User size={12} className="mr-1 text-orange-600" /> {b.visitorMobile}</span>
+                <span className="flex items-center">
+                  <User size={12} className="mr-1 text-orange-600" /> 
+                  {globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active') 
+                    ? (b.visitorMobile ? `******${b.visitorMobile.slice(-4)}` : 'Hidden')
+                    : b.visitorMobile
+                  }
+                </span>
                 <span className="flex items-center bg-orange-50 text-orange-700 px-2 py-1 rounded-lg border border-orange-100 font-bold"><IndianRupee size={12} className="mr-1" /> {Number(b.updatedAmount || b.totalAmount || 0).toLocaleString()}</span>
                 {b.eventType && <span className="flex items-center px-2 py-1 bg-white border border-gray-100 rounded-lg"><Music size={12} className="mr-1 text-orange-600" /> {b.eventType}</span>}
               </div>
@@ -9103,6 +9205,11 @@ const PublicBookingView = ({ user, profile, bookings, onUpdate }: { user: any, p
               {b.status === 'pending' && (
                 <button 
                   onClick={() => {
+                    if (globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+                      if (onUpgrade) onUpgrade();
+                      else toast.error('Premium feature: Please get a valid subscription');
+                      return;
+                    }
                     setSelectedBooking(b);
                     setIsAcceptModalOpen(true);
                   }}
@@ -9872,7 +9979,19 @@ const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityI
   );
 };
 
-const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: ServiceProvider[] }) => {
+const CatalogueManageView = ({ 
+  venues, 
+  services,
+  globalSettings,
+  activeSubscription,
+  onUpgrade
+}: { 
+  venues: Venue[], 
+  services: ServiceProvider[],
+  globalSettings?: any,
+  activeSubscription?: UserSubscription | null,
+  onUpgrade?: () => void
+}) => {
   const [activeType, setActiveType] = useState<'venue' | 'service'>(venues.length > 0 ? 'venue' : 'service');
   const [selectedId, setSelectedId] = useState<string>(
     activeType === 'venue' ? (venues[0]?.id || '') : (services[0]?.id || '')
@@ -10065,6 +10184,16 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                   onUpload={(url) => {
                     if (url) {
                       const urls = Array.isArray(url) ? url : [url];
+                      const currentImages = newItem.images || [];
+                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const hasSub = activeSubscription && activeSubscription.status === 'active';
+                      const maxPhotos = (subEnabled && !hasSub) ? 2 : 10;
+
+                      if (currentImages.length + urls.length > maxPhotos) {
+                        toast.error(`Subscription required for more than ${maxPhotos} photos`);
+                        if (subEnabled && !hasSub && onUpgrade) onUpgrade();
+                        return;
+                      }
                       setNewItem(prev => ({...prev, images: [...(prev.images || []), ...urls]}));
                     }
                   }}
@@ -10088,7 +10217,21 @@ const CatalogueManageView = ({ venues, services }: { venues: Venue[], services: 
                 <VideoUpload 
                   label="Upload Videos (Max 60 seconds)" 
                   multiple={true}
-                  onUpload={(url) => setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}))}
+                  onUpload={(url) => {
+                    if (url) {
+                      const currentVideos = newItem.videos || [];
+                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const hasSub = activeSubscription && activeSubscription.status === 'active';
+                      const maxVideos = (subEnabled && !hasSub) ? 0 : 5;
+
+                      if (currentVideos.length + 1 > maxVideos) {
+                        toast.error(maxVideos === 0 ? "Subscription required to upload videos" : `Subscription required for more than ${maxVideos} videos`);
+                        if (subEnabled && !hasSub && onUpgrade) onUpgrade();
+                        return;
+                      }
+                      setNewItem(prev => ({...prev, videos: [...(prev.videos || []), url]}));
+                    }
+                  }}
                 />
                 <div className="grid grid-cols-4 gap-2 mt-2">
                   {newItem.videos?.map((vid, i) => (
@@ -11887,6 +12030,8 @@ export default function App() {
   }, []);
 
   const [loading, setLoading] = useState(true);
+  const [activeSubscription, setActiveSubscription] = useState<UserSubscription | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isAppRatingOpen, setIsAppRatingOpen] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({ 
     subscriptionEnabled: true,
@@ -11966,6 +12111,32 @@ export default function App() {
             appLogoUrl: appLogoSetting ? appLogoSetting.value : prev.appLogoUrl,
             appTagline: appTaglineSetting ? appTaglineSetting.value : prev.appTagline
           }));
+        }
+
+        // Fetch user's active subscription if logged in
+        if (user?.uid) {
+          const { data: subData } = await db.from('user_subscriptions')
+            .select('*')
+            .eq('user_id', user.uid)
+            .eq('status', 'active')
+            .order('end_date', { ascending: false })
+            .limit(1);
+          
+          if (subData && subData.length > 0) {
+            const d = subData[0];
+            setActiveSubscription({
+              id: d.id,
+              userId: d.user_id,
+              planId: d.plan_id,
+              startDate: d.start_date,
+              endDate: d.end_date,
+              status: d.status,
+              amount: d.amount,
+              createdAt: d.created_at
+            });
+          } else {
+            setActiveSubscription(null);
+          }
         }
         
         // Check local storage for custom session first
@@ -12140,6 +12311,17 @@ export default function App() {
             onLogout={handleLogout} 
             onRateApp={() => setIsAppRatingOpen(true)} 
           />
+          
+          <SubscriptionUpgradeModal 
+            isOpen={isUpgradeModalOpen}
+            onClose={() => setIsUpgradeModalOpen(false)}
+            onUpgrade={() => {
+              setIsUpgradeModalOpen(false);
+              // Navigate to my-subscription tab in profile or similar
+              // For now we'll just redirect to pricing
+              window.location.href = "/#/pricing";
+            }}
+          />
 
           <AppRatingModal 
             isOpen={isAppRatingOpen} 
@@ -12156,8 +12338,8 @@ export default function App() {
               <Route path="/services" element={<ServiceListView user={user} />} />
               <Route path="/search" element={<SearchResultsView />} />
               <Route path="/services/:id" element={<ServiceDetailView user={user} profile={profile} />} />
-              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} />} />
-              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} />} />
+              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} activeSubscription={activeSubscription} />} />
+              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} activeSubscription={activeSubscription} />} />
               <Route path="/add-venue" element={<AddVenueView user={user} profile={profile} />} />
               <Route path="/edit-venue/:id" element={<EditVenueView user={user} profile={profile} />} />
               <Route path="/edit-service/:id" element={<EditServiceView user={user} profile={profile} />} />
@@ -12888,7 +13070,21 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   );
 };
 
-const AdminView = ({ user, profile, onUpdateProfile, globalSettings, setGlobalSettings }: { user: any, profile: UserProfile | null, onUpdateProfile: (p: UserProfile) => void, globalSettings: any, setGlobalSettings: any }) => {
+const AdminView = ({ 
+  user, 
+  profile, 
+  onUpdateProfile, 
+  globalSettings, 
+  setGlobalSettings,
+  activeSubscription
+}: { 
+  user: any, 
+  profile: UserProfile | null, 
+  onUpdateProfile: (p: UserProfile) => void, 
+  globalSettings: any, 
+  setGlobalSettings: any,
+  activeSubscription: UserSubscription | null
+}) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
