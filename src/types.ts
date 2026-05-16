@@ -103,6 +103,7 @@ export interface CatalogueItem {
   level: CatalogueLevel;
   capacity: number;
   priceRate?: number;
+  unit?: string;
   images: string[];
   videos?: string[];
   description: string;

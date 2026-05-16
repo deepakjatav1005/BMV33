@@ -96,6 +96,7 @@ import {
   Users2,
   Globe,
   MessageCircle,
+  Share2,
   ArrowLeft,
   QrCode,
   Bot
@@ -3047,20 +3048,20 @@ const RegistrationView = () => {
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] md:max-h-[90vh]"
             >
-              <div className="bg-orange-600 p-10 text-white text-center flex-shrink-0">
-                <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle size={48} className="text-white" />
+              <div className="bg-orange-600 p-8 md:p-10 text-white text-center flex-shrink-0">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4 md:mb-6">
+                  <CheckCircle size={40} className="text-white" />
                 </div>
-                <h2 className="text-3xl font-black uppercase tracking-tighter">Registration Successful!</h2>
-                <p className="opacity-90 mt-2 font-medium">Welcome to the BVO Professional Network</p>
+                <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Registration Successful!</h2>
+                <p className="opacity-90 mt-2 text-sm md:text-base font-medium">Welcome to the BVO Professional Network</p>
               </div>
               
-              <div className="p-6 md:p-10 overflow-y-auto space-y-6 md:space-y-8 flex-grow custom-scrollbar" style={{ scrollbarWidth: 'thin' }}>
+              <div className="p-6 md:p-10 overflow-y-auto space-y-6 md:space-y-8 flex-grow custom-scrollbar overscroll-contain">
                 <div className="bg-orange-50 p-6 rounded-[2rem] border border-orange-100 text-center shadow-inner">
                   <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">Your Unique Business ID</p>
-                  <p className="text-3xl md:text-4xl font-black text-gray-900 font-mono tracking-wider">{successData.regId}</p>
+                  <p className="text-2xl md:text-4xl font-black text-gray-900 font-mono tracking-wider">{successData.regId}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:gap-6">
@@ -3070,13 +3071,13 @@ const RegistrationView = () => {
                     </div>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Temporary Password</p>
                     <div className="flex items-center justify-between">
-                      <p className="text-2xl font-black text-gray-900 tracking-tight">{successData.mobileNumber}</p>
+                      <p className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">{successData.mobileNumber}</p>
                       <button 
                         onClick={() => {
                           navigator.clipboard.writeText(successData.mobileNumber);
                           toast.success('Password copied');
                         }}
-                        className="bg-white px-4 py-2 rounded-xl text-orange-600 font-black text-[10px] uppercase tracking-widest border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
+                        className="bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-orange-600 font-black text-[9px] md:text-[10px] uppercase tracking-widest border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
                       >
                         COPY
                       </button>
@@ -3084,9 +3085,9 @@ const RegistrationView = () => {
                     <p className="text-[10px] text-gray-400 mt-3 font-bold italic border-t border-gray-200 pt-3">Default: Mobile number as initial password.</p>
                   </div>
 
-                  <div className="p-6 border-2 border-dashed border-gray-200 rounded-3xl text-sm text-gray-500 leading-relaxed">
-                    <p className="font-bold text-gray-700 mb-2">Next Steps:</p>
-                    <ul className="space-y-2 list-disc list-inside">
+                  <div className="p-6 border-2 border-dashed border-gray-200 rounded-3xl text-sm text-gray-500 leading-relaxed bg-gray-50/30">
+                    <p className="font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest">Next Steps:</p>
+                    <ul className="space-y-2 list-disc list-inside font-bold text-xs">
                       <li>Use your ID and Mobile to Login</li>
                       <li>Complete your business profile</li>
                       <li>Add photos and services to your catalogue</li>
@@ -3097,7 +3098,7 @@ const RegistrationView = () => {
 
                 <button 
                   onClick={() => navigate('/login')}
-                  className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-100 active:scale-95"
+                  className="w-full bg-gray-900 text-white py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-100 active:scale-95 text-sm md:text-base"
                 >
                   Proceed to Login
                 </button>
@@ -4640,8 +4641,11 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       if (bookingMode === 'complete') {
         totalAmount = (venue?.pricePerDay || 0) * diffDays;
       } else {
-        const selectedAmenities = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
-        totalAmount = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
+        const selCats = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+        const selFacs = venue?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+        const catTotal = selCats.reduce((sum, item) => sum + (item.priceRate || 0), 0);
+        const facTotal = selFacs.reduce((sum, item) => sum + (item.rate || 0), 0);
+        totalAmount = (catTotal + facTotal) * diffDays;
       }
 
       // Check for existing pending booking from this visitor for this venue
@@ -4699,11 +4703,12 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
       const ownerRegId = ownerProfile?.registration_id || ownerProfile?.registrationId || 'BVO';
       const tid = generateTransactionId(ownerRegId, count || 0);
 
-      const selectedAmenities = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
-      const extraServices = selectedAmenities.map(item => ({ 
-        name: item.level, 
-        amount: Math.round((item.priceRate || 0) * diffDays)
-      }));
+      const selCats = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+      const selFacs = venue?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+      const extraServices = [
+        ...selCats.map(item => ({ name: item.level, amount: Math.round((item.priceRate || 0) * diffDays) })),
+        ...selFacs.map(item => ({ name: item.name, amount: Math.round((item.rate || 0) * diffDays) }))
+      ];
 
       const bookingData = {
         id: generateUUID(),
@@ -4902,17 +4907,7 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
               </div>
             </div>
 
-            <div className="mt-10">
-              <h3 className="text-sm font-black text-blue-600 uppercase tracking-widest mb-4">Facilities Offered Level</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {venue.facilities?.length ? venue.facilities.map((item, idx) => (
-                  <div key={idx} className="flex items-center space-x-3 text-gray-700 bg-gray-50/50 p-2 rounded-lg border border-gray-100">
-                    <CheckCircle size={14} className="text-green-500 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-tight">{item}</span>
-                  </div>
-                )) : <p className="text-gray-400 italic text-xs col-span-full">No facilities listed</p>}
-              </div>
-            </div>
+            {/* Removed Facilities Offered Level as requested */}
 
             {venue.catalogue && venue.catalogue.length > 0 && (
               <div className="mt-16">
@@ -5075,7 +5070,13 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                 <span className="text-3xl font-bold text-gray-900">
                   {bookingMode === 'complete' 
                     ? `₹${(venue.pricePerDay || 0).toLocaleString()}`
-                    : `₹${(venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')).reduce((sum, item) => sum + (item.priceRate || 0), 0) || 0).toLocaleString()}`
+                    : `₹${(() => {
+                        const selCats = venue?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+                        const selFacs = venue?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+                        const catTotal = selCats.reduce((sum, item) => sum + (item.priceRate || 0), 0);
+                        const facTotal = selFacs.reduce((sum, item) => sum + (item.rate || 0), 0);
+                        return catTotal + facTotal;
+                      })().toLocaleString()}`
                   }
                 </span>
                 <span className="text-gray-500">/ day</span>
@@ -5198,10 +5199,13 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                             {bookingMode === 'partial' && <Plus size={18} />}
                           </button>
 
-                          {bookingMode === 'partial' && venue.catalogue && (
+                          {bookingMode === 'partial' && (venue.catalogue || venue.facilityDetails) && (
                             <div className="p-2 space-y-2 mt-2">
                               <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                                {venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                                {[
+                                  ...(venue.catalogue || []).filter(c => c.level && (Number(c.priceRate) > 0)).map(c => ({ id: c.id, name: c.level, price: Number(c.priceRate), unit: c.unit || 'unit' })),
+                                  ...(venue.facilityDetails || []).filter(f => f.name && (Number(f.rate) > 0)).map(f => ({ id: f.id, name: f.name, price: Number(f.rate), unit: f.unit || 'unit' }))
+                                ].map(item => (
                                   <label key={item.id} className={cn(
                                     "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:shadow-md",
                                     selectedItems.includes(item.id || '') 
@@ -5224,15 +5228,15 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
                                           }}
                                         />
                                       </div>
-                                      <span className="text-xs font-bold text-gray-700 uppercase tracking-tight">{item.level}</span>
+                                      <span className="text-xs font-bold text-gray-700 uppercase tracking-tight">{item.name}</span>
                                     </div>
                                     <div className="text-right">
-                                      <span className="text-xs font-black text-orange-600 block">₹{item.priceRate?.toLocaleString()}</span>
-                                      <span className="text-[8px] text-gray-400 uppercase font-black tracking-widest">{item.unit || 'unit'}</span>
+                                      <span className="text-xs font-black text-orange-600 block">₹{item.price?.toLocaleString()}</span>
+                                      <span className="text-[8px] text-gray-400 uppercase font-black tracking-widest">{item.unit}</span>
                                     </div>
                                   </label>
                                 ))}
-                                {(!venue.catalogue || venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                                {(!venue.catalogue || venue.catalogue.filter(c => Number(c.priceRate) > 0).length === 0) && (venue.facilityDetails?.filter(f => Number(f.rate) > 0).length === 0) && (
                                   <div className="text-center py-8">
                                     <p className="text-xs text-gray-400 italic">No priced amenities available for this venue.</p>
                                   </div>
@@ -5533,15 +5537,19 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
       if (bookingMode === 'complete') {
         totalAmount = basePrice * diffDays;
       } else {
-        const selectedAmenities = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
-        totalAmount = selectedAmenities.reduce((sum, item) => sum + (item.priceRate || 0), 0) * diffDays;
+        const selCats = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+        const selFacs = service?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+        const catTotal = selCats.reduce((sum, item) => sum + (item.priceRate || 0), 0);
+        const facTotal = selFacs.reduce((sum, item) => sum + (item.rate || 0), 0);
+        totalAmount = (catTotal + facTotal) * diffDays;
       }
 
-      const selectedAmenitiesList = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
-      const extraServices = selectedAmenitiesList.map(item => ({ 
-        name: item.level, 
-        amount: (item.priceRate || 0) * diffDays 
-      }));
+      const selCatsList = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+      const selFacsList = service?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+      const extraServices = [
+        ...selCatsList.map(item => ({ name: item.level, amount: Math.round((item.priceRate || 0) * diffDays) })),
+        ...selFacsList.map(item => ({ name: item.name, amount: Math.round((item.rate || 0) * diffDays) }))
+      ];
 
       const bookingData = {
         id: generateUUID(),
@@ -5928,7 +5936,13 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                 <span className="text-3xl font-bold text-gray-900">
                   {bookingMode === 'complete' 
                     ? service.priceRange
-                    : `₹${(service?.catalogue?.filter(c => selectedItems.includes(c.id || '')).reduce((sum, item) => sum + (item.priceRate || 0), 0) || 0).toLocaleString()}`
+                    : `₹${(() => {
+                        const selCats = service?.catalogue?.filter(c => selectedItems.includes(c.id || '')) || [];
+                        const selFacs = service?.facilityDetails?.filter(f => selectedItems.includes(f.id || '')) || [];
+                        const catTotal = selCats.reduce((sum, item) => sum + (item.priceRate || 0), 0);
+                        const facTotal = selFacs.reduce((sum, item) => sum + (item.rate || 0), 0);
+                        return (catTotal + facTotal).toLocaleString();
+                      })()}`
                   }
                 </span>
                 <span className="text-gray-500">/ package</span>
@@ -6035,11 +6049,14 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                       </button>
                     </div>
 
-                    {bookingMode === 'partial' && service.catalogue && (
+                    {bookingMode === 'partial' && (service.catalogue || service.facilityDetails) && (
                       <div className="space-y-2 mt-4 pt-4 border-t border-purple-100">
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
                         <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
-                          {service.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                          {[
+                            ...(service.catalogue || []).filter(c => c.level && (Number(c.priceRate) > 0)).map(c => ({ id: c.id, name: c.level, price: Number(c.priceRate), unit: c.unit || 'unit' })),
+                            ...(service.facilityDetails || []).filter(f => f.name && (Number(f.rate) > 0)).map(f => ({ id: f.id, name: f.name, price: Number(f.rate), unit: f.unit || 'unit' }))
+                          ].map(item => (
                             <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-300 transition-colors">
                               <div className="flex items-center space-x-2">
                                 <input 
@@ -6051,12 +6068,15 @@ const ServiceDetailView = ({ user, profile }: { user: any, profile: UserProfile 
                                     else setSelectedItems(selectedItems.filter(id => id !== item.id));
                                   }}
                                 />
-                                <span className="text-xs font-bold text-gray-700 uppercase">{item.level}</span>
+                                <span className="text-xs font-bold text-gray-700 uppercase">{item.name}</span>
                               </div>
-                              <span className="text-xs font-black text-purple-600">₹{item.priceRate?.toLocaleString()}</span>
+                              <div className="text-right">
+                                <span className="text-xs font-black text-purple-600 block">₹{item.price?.toLocaleString()}</span>
+                                <span className="text-[8px] text-gray-400 uppercase font-black tracking-widest">{item.unit}</span>
+                              </div>
                             </label>
                           ))}
-                          {(!service.catalogue || service.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                          {(!service.catalogue || service.catalogue.filter(c => Number(c.priceRate) > 0).length === 0) && (service.facilityDetails?.filter(f => Number(f.rate) > 0).length === 0) && (
                             <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
                           )}
                         </div>
@@ -6394,8 +6414,11 @@ const ManuallyBookingView = ({
       const basePrice = 'pricePerDay' in item ? (item.pricePerDay || 0) : (parseInt(item.priceRange?.match(/\d+/)?.[0] || '0'));
       total = basePrice * diffDays;
     } else {
-      const selectedAmenities = item.catalogue?.filter(c => manualBooking.selectedItems.includes(c.id || '')) || [];
-      total = selectedAmenities.reduce((sum, i) => sum + (i.priceRate || 0), 0) * diffDays;
+      const selCats = (item as any).catalogue?.filter((c: any) => manualBooking.selectedItems.includes(c.id || '')) || [];
+      const selFacs = (item as any).facilityDetails?.filter((f: any) => manualBooking.selectedItems.includes(f.id || '')) || [];
+      const catTotal = selCats.reduce((sum: number, i: any) => sum + (i.priceRate || 0), 0);
+      const facTotal = selFacs.reduce((sum: number, i: any) => sum + (i.rate || 0), 0);
+      total = (catTotal + facTotal) * diffDays;
     }
 
     if (total !== manualBooking.totalAmount) {
@@ -6445,18 +6468,20 @@ const ManuallyBookingView = ({
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      if (manualBooking.bookingMode === 'partial' && targetVenue?.catalogue) {
-        const selectedAmenities = targetVenue.catalogue.filter(c => manualBooking.selectedItems.includes(c.id || ''));
-        extraServices = selectedAmenities.map(item => ({
-          name: item.level,
-          amount: Math.round((item.priceRate || 0) * diffDays)
-        }));
+      if (manualBooking.bookingMode === 'partial' && (targetVenue?.catalogue || (targetVenue as any)?.facilityDetails)) {
+        const selCats = targetVenue?.catalogue?.filter(c => manualBooking.selectedItems.includes(c.id || '')) || [];
+        const selFacs = (targetVenue as any)?.facilityDetails?.filter((f: any) => manualBooking.selectedItems.includes(f.id || '')) || [];
+        
+        extraServices = [
+          ...selCats.map(item => ({ name: item.level, amount: Math.round((item.priceRate || 0) * diffDays) })),
+          ...selFacs.map(item => ({ name: item.name, amount: Math.round((item.rate || 0) * diffDays) }))
+        ];
         finalTargetName = manualBooking.targetName + ' (Amenities)';
         
         // If the user didn't override the amount (i.e. it's still default or 0), 
         // set it to the sum of amenities.
         const amenitiesTotal = extraServices.reduce((sum, s) => sum + s.amount, 0);
-        if (finalTotalAmount === 0 || finalTotalAmount === (targetVenue.pricePerDay || 0)) {
+        if (finalTotalAmount === 0 || finalTotalAmount === (targetVenue?.pricePerDay || 0)) {
            finalTotalAmount = amenitiesTotal;
         }
       } else if (!isService) {
@@ -6876,24 +6901,30 @@ const ManuallyBookingView = ({
                             <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
                               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
-                                {item.catalogue?.filter(c => c.priceRate && c.priceRate > 0).map(catItem => (
-                                  <label key={catItem.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
+                                {[
+                                  ...((item as any).catalogue || []).filter((c: any) => c.priceRate && c.priceRate > 0).map((c: any) => ({ id: c.id, name: c.level, price: c.priceRate, unit: c.unit || 'unit' })),
+                                  ...((item as any).facilityDetails || []).filter((f: any) => f.rate && f.rate > 0).map((f: any) => ({ id: f.id, name: f.name, price: f.rate, unit: f.unit || 'unit' }))
+                                ].map(amenityItem => (
+                                  <label key={amenityItem.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
                                     <div className="flex items-center space-x-2">
                                       <input 
                                         type="checkbox"
                                         className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                                        checked={manualBooking.selectedItems.includes(catItem.id || '')}
+                                        checked={manualBooking.selectedItems.includes(amenityItem.id || '')}
                                         onChange={(e) => {
-                                          if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, catItem.id || '']});
-                                          else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== catItem.id)});
+                                          if (e.target.checked) setManualBooking({...manualBooking, selectedItems: [...manualBooking.selectedItems, amenityItem.id || '']});
+                                          else setManualBooking({...manualBooking, selectedItems: manualBooking.selectedItems.filter(id => id !== amenityItem.id)});
                                         }}
                                       />
-                                      <span className="text-[10px] font-bold text-gray-700 uppercase">{catItem.level}</span>
+                                      <span className="text-[10px] font-bold text-gray-700 uppercase">{amenityItem.name}</span>
                                     </div>
-                                    <span className="text-[10px] font-black text-orange-600">₹{catItem.priceRate?.toLocaleString()}</span>
+                                    <div className="text-right">
+                                      <span className="text-[10px] font-black text-orange-600 block">₹{amenityItem.price?.toLocaleString()}</span>
+                                      <span className="text-[8px] text-gray-400 uppercase font-black tracking-widest">{amenityItem.unit}</span>
+                                    </div>
                                   </label>
                                 ))}
-                                {(!item.catalogue || item.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                                {(!item.catalogue && !(item as any).facilityDetails) && (
                                   <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
                                 )}
                               </div>
@@ -8484,6 +8515,7 @@ const DashboardView = ({
               )}
               {activeTab === 'catalogue' && (
                 <CatalogueManageView 
+                  user={user}
                   venues={venues} 
                   services={services} 
                   globalSettings={globalSettings}
@@ -9832,12 +9864,14 @@ const FacilityDetailsEditor = ({ facilities, onChange }: { facilities: FacilityI
 };
 
 const CatalogueManageView = ({ 
+  user,
   venues, 
   services,
   globalSettings,
   activeSubscription,
   onUpgrade
 }: { 
+  user: any,
   venues: Venue[], 
   services: ServiceProvider[],
   globalSettings?: any,
@@ -9854,6 +9888,7 @@ const CatalogueManageView = ({
     level: activeType === 'venue' ? 'rooms(ac)' : 'work sample',
     capacity: 0,
     priceRate: 0,
+    unit: 'person',
     images: [],
     videos: [],
     description: ''
@@ -9903,6 +9938,7 @@ const CatalogueManageView = ({
         level: activeType === 'venue' ? 'rooms(ac)' : 'work sample', 
         capacity: 0, 
         priceRate: 0,
+        unit: 'person',
         images: [], 
         videos: [], 
         description: '' 
@@ -10015,6 +10051,22 @@ const CatalogueManageView = ({
                     value={newItem.priceRate}
                     onChange={(e) => setNewItem({...newItem, priceRate: parseFloat(e.target.value) || 0})}
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Unit</label>
+                  <select 
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    value={newItem.unit}
+                    onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
+                  >
+                    <option value="Complete Item">Complete Item</option>
+                    <option value="complete">Complete</option>
+                    <option value="per day">Per Day</option>
+                    <option value="per hour">Per Hour</option>
+                    <option value="per plate">Per Plate</option>
+                    <option value="per unit">Per Unit</option>
+                    <option value="person">Per Guest</option>
+                  </select>
                 </div>
               </div>
 
@@ -12281,18 +12333,42 @@ export default function App() {
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
                 <AppLogo size="lg" showText={false} />
                 <PoweredByCNZ />
-                <div className="flex items-center space-x-6">
-                  <a href="https://www.facebook.com/profile.php?id=61589249672289" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Globe size={24} />
+                <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 bg-gray-800/30 p-8 rounded-[3rem] border border-gray-800/50 backdrop-blur-sm">
+                  <a 
+                    href="https://www.facebook.com/profile.php?id=61588995675011" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#1877F2]/20 group"
+                    title="Follow us on Facebook"
+                  >
+                    <Share2 size={28} className="group-hover:rotate-12" />
                   </a>
-                  <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Camera size={24} />
+                  <a 
+                    href="https://www.youtube.com/@BestVanueOption" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#FF0000]/10 text-[#FF0000] hover:bg-[#FF0000] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#FF0000]/20 group"
+                    title="Subscribe to our YouTube Channel"
+                  >
+                    <Play size={28} className="group-hover:rotate-12 fill-current" />
                   </a>
-                  <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <MessageCircle size={24} />
+                  <a 
+                    href="https://chat.whatsapp.com/HdawgS9kChJ3JY4vui3YMi?mode=gi_t" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#25D366]/20 group"
+                    title="Join our WhatsApp Group"
+                  >
+                    <MessageCircle size={28} className="group-hover:rotate-12" />
                   </a>
-                  <a href="https://www.youtube.com/@BestVenueOption" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-500 transition-colors transform hover:scale-110">
-                    <Play size={24} />
+                  <a 
+                    href="https://www.bestvenueoption.com" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-orange-600/10 text-orange-600 hover:bg-orange-600 hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-orange-600/20 group"
+                    title="Visit Website"
+                  >
+                    <Globe size={28} className="group-hover:rotate-12" />
                   </a>
                 </div>
                 <div className="text-gray-500 text-sm">
