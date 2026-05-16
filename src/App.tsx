@@ -1,228 +1,12 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-/*
-  =============================================================================
-  MASTER SQL SCRIPT FOR MYSQL (Execute in PHPMyAdmin or MySQL Query Editor):
-  =============================================================================
+  /**
+   * @license
+   * SPDX-License-Identifier: Apache-2.0
+   */
   
-  -- 1. Users Table
-  CREATE TABLE IF NOT EXISTS users (
-      uid VARCHAR(255) PRIMARY KEY,
-      registration_id VARCHAR(255) UNIQUE,
-      display_name VARCHAR(255),
-      father_name VARCHAR(255),
-      mobile_number VARCHAR(20) UNIQUE,
-      email VARCHAR(255),
-      photo_url TEXT,
-      role VARCHAR(50),
-      state VARCHAR(100),
-      district VARCHAR(100),
-      block VARCHAR(100),
-      pincode VARCHAR(10),
-      venue_type VARCHAR(100),
-      status VARCHAR(50) DEFAULT 'active',
-      password VARCHAR(255),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 2. Venues Table
-  CREATE TABLE IF NOT EXISTS venues (
-      id CHAR(36) PRIMARY KEY,
-      owner_id VARCHAR(255),
-      name VARCHAR(255),
-      venue_type VARCHAR(100),
-      description TEXT,
-      address TEXT,
-      state VARCHAR(100),
-      district VARCHAR(100),
-      block VARCHAR(100),
-      pincode VARCHAR(10),
-      capacity INT,
-      price_per_day DECIMAL(10,2),
-      images JSON,
-      video_url TEXT,
-      facilities JSON,
-      available_for JSON,
-      rating DECIMAL(3,1) DEFAULT 0,
-      review_count INT DEFAULT 0,
-      catalogue JSON,
-      facility_details JSON,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 3. Service Providers Table
-  CREATE TABLE IF NOT EXISTS service_providers (
-      id CHAR(36) PRIMARY KEY,
-      provider_id VARCHAR(255),
-      name VARCHAR(255),
-      service_type VARCHAR(100),
-      description TEXT,
-      price_range VARCHAR(100),
-      price_level VARCHAR(50),
-      images JSON,
-      video_url TEXT,
-      facilities JSON,
-      available_for JSON,
-      state VARCHAR(100),
-      district VARCHAR(100),
-      block VARCHAR(100),
-      pincode VARCHAR(10),
-      rating DECIMAL(3,1) DEFAULT 0,
-      review_count INT DEFAULT 0,
-      catalogue JSON,
-      facility_details JSON,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- NOTE: If you receive "Duplicate column name", it means the column already exists.
-  -- You can safely ignore that specific error.
-  
-  -- 4. Bookings Table
-  CREATE TABLE IF NOT EXISTS bookings (
-      id CHAR(36) PRIMARY KEY,
-      user_id VARCHAR(255),
-      owner_id VARCHAR(255),
-      target_id CHAR(36),
-      target_type VARCHAR(50),
-      target_name VARCHAR(255),
-      visitor_name VARCHAR(255),
-      visitor_mobile VARCHAR(20),
-      event_date DATE,
-      end_date DATE,
-      start_time TIME,
-      end_time TIME,
-      event_type VARCHAR(100),
-      party_name VARCHAR(255),
-      party_address TEXT,
-      message TEXT,
-      status VARCHAR(50) DEFAULT 'pending',
-      total_amount DECIMAL(10,2) DEFAULT 0,
-      updated_amount DECIMAL(10,2),
-      payment_mode VARCHAR(50) DEFAULT 'Cash',
-      payment_status VARCHAR(50) DEFAULT 'Unpaid',
-      transaction_id VARCHAR(255),
-      is_invoice_generated BOOLEAN DEFAULT FALSE,
-      invoice_url TEXT,
-      is_manual BOOLEAN DEFAULT FALSE,
-      is_locked TINYINT(1) DEFAULT 0,
-      extra_services JSON,
-      advance_amount DECIMAL(10,2) DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 4.1 Booking Payments Table
-  CREATE TABLE IF NOT EXISTS booking_payments (
-      id VARCHAR(36) PRIMARY KEY,
-      booking_id VARCHAR(36) NOT NULL,
-      amount DECIMAL(15, 2) NOT NULL,
-      payment_mode VARCHAR(50),
-      transaction_id VARCHAR(100),
-      payment_date DATE,
-      payment_type VARCHAR(50) DEFAULT 'Regular',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_booking_id (booking_id)
-  );
-
-  -- 5. App Feedback Table
-  CREATE TABLE IF NOT EXISTS app_feedback (
-      id CHAR(36) PRIMARY KEY,
-      user_id VARCHAR(255),
-      user_name VARCHAR(255),
-      visitor_mobile VARCHAR(20),
-      rating INT,
-      comment TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 6. Reviews Table
-  CREATE TABLE IF NOT EXISTS reviews (
-      id CHAR(36) PRIMARY KEY,
-      target_id CHAR(36) NOT NULL,
-      user_id VARCHAR(255),
-      visitor_name VARCHAR(255),
-      visitor_mobile VARCHAR(20),
-      rating INT,
-      comment TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 7. Subscription Plans
-  CREATE TABLE IF NOT EXISTS subscription_plans (
-      id CHAR(36) PRIMARY KEY,
-      role VARCHAR(50),
-      name VARCHAR(255),
-      price DECIMAL(10,2),
-      duration VARCHAR(50),
-      is_active BOOLEAN DEFAULT TRUE,
-      benefits JSON,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 8. User Subscriptions
-  CREATE TABLE IF NOT EXISTS user_subscriptions (
-      id CHAR(36) PRIMARY KEY,
-      user_id VARCHAR(255),
-      plan_id CHAR(36),
-      start_date DATE,
-      end_date DATE,
-      status VARCHAR(50) DEFAULT 'active',
-      amount DECIMAL(10,2),
-      payment_id VARCHAR(255),
-      order_id VARCHAR(255),
-      signature TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  -- 9. App Meta Tables
-  CREATE TABLE IF NOT EXISTS notifications (
-      id CHAR(36) PRIMARY KEY,
-      title VARCHAR(255),
-      message TEXT,
-      target_role VARCHAR(50) DEFAULT 'all',
-      is_active BOOLEAN DEFAULT TRUE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS banners (
-      id CHAR(36) PRIMARY KEY,
-      title VARCHAR(255),
-      image_url TEXT,
-      link TEXT,
-      is_active BOOLEAN DEFAULT TRUE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS service_type_photos (
-      id CHAR(36) PRIMARY KEY,
-      service_type VARCHAR(100),
-      image_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS moments (
-      id CHAR(36) PRIMARY KEY,
-      media_url TEXT,
-      type VARCHAR(50) DEFAULT 'image',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS admin_settings (
-      `key` VARCHAR(255) PRIMARY KEY,
-      `value` TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  );
-
-  -- NOTE: MySQL does not have RLS. Use application-level security via the provided server.ts.
-  -- To secure data, ensure you are using the provided Generic MySQL Query Proxy in server.ts.
-*/
-
-import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
-// import * as XLSX from 'xlsx';
-// import { jsPDF } from 'jspdf';
-// import autoTable from 'jspdf-autotable';
+  import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   HashRouter as Router, 
   Routes, 
@@ -323,18 +107,6 @@ import { format } from 'date-fns';
 import { calculateDistance as calculateGeoDistance } from './lib/utils';
 import LocationPicker from './components/LocationPicker';
 import LocationDisplay from './components/LocationDisplay';
-
-const AdminCharts = React.lazy(() => import('./components/AdminCharts'));
-const UserDistributionChart = ({ users }: { users: any[] }) => (
-  <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-2xl animate-pulse">Loading Chart...</div>}>
-    <AdminCharts.UserDistributionChart users={users} />
-  </React.Suspense>
-);
-const BookingStatusChart = ({ bookings }: { bookings: any[] }) => (
-  <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-2xl animate-pulse">Loading Chart...</div>}>
-    <AdminCharts.BookingStatusChart bookings={bookings} />
-  </React.Suspense>
-);
 
 const SubscriptionUpgradeModal = ({ isOpen, onClose, onUpgrade }: { isOpen: boolean, onClose: () => void, onUpgrade: () => void }) => {
   if (!isOpen) return null;
@@ -794,10 +566,77 @@ const LOCATION_DATA = locations;
 import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
 import { Database as DbIcon } from 'lucide-react';
 
-import { cn, formatDateDDMMYYYY, formatDateTime12h, formatTime12h, generateTransactionId, imageUrlToBase64 } from './lib/utils';
+import { cn } from './lib/utils';
 
 // --- Translation Data ---
-import { translations } from './data/translations';
+const translations: Record<string, any> = {
+  en: {
+    home: "Home",
+    gallery: "Gallery",
+    search: "Search",
+    about: "About",
+    rateUs: "Rate Us",
+    registration: "Registration",
+    login: "Login",
+    logout: "Logout",
+    adminPanel: "Admin Panel",
+    dashboard: "Dashboard",
+    bookingManager: "Booking Manager",
+    changePassword: "Change Password",
+    heroTitle: "Plan Your Perfect Event with Confidence",
+    heroTagline: "ALL IN ONE BOOKING PLAT FORM FOR YOUR SPECIAL TIME",
+    searchPlaceholder: "Search venues, caterers, DJs...",
+    searchNow: "Search Now",
+    allStates: "All States",
+    allDistricts: "All Districts",
+    allBlocks: "All Blocks",
+    whyPlanTitle: "Why Plan with BEST VENUE OPTION?",
+    verifiedPartners: "Verified Partners",
+    bestPrices: "Best Prices",
+    support247: "24/7 Support",
+    footerCopyright: "© 2026 BEST VENUE OPTION India. All rights reserved.",
+    joinAsOwner: "Join Us as Venue Owner",
+    joinAsProvider: "Join Us as Service Provider",
+    register: "Register",
+    termsAndConditions: "Terms & Conditions",
+    helpCenter: "Help Center",
+    contactUs: "Contact Us",
+    loginNow: "Login Now"
+  },
+  hi: {
+    home: "होम",
+    gallery: "गैलरी",
+    search: "खोजें",
+    about: "हमारे बारे में",
+    rateUs: "हमें रेट करें",
+    registration: "पंजीकरण",
+    login: "लॉगिन",
+    logout: "लॉगआउट",
+    adminPanel: "एडमिन पैनल",
+    dashboard: "डैशबोर्ड",
+    bookingManager: "बुकिंग मैनेजर",
+    changePassword: "पासवर्ड बदलें",
+    heroTitle: "आत्मविश्वास के साथ अपने सही कार्यक्रम की योजना बनाएं",
+    heroTagline: "आपके विशेष समय के लिए ऑल इन वन बुकिंग प्लेटफॉर्म",
+    searchPlaceholder: "स्थान, कैटरर्स, डीजे खोजें...",
+    searchNow: "अभी खोजें",
+    allStates: "सभी राज्य",
+    allDistricts: "सभी जिले",
+    allBlocks: "सभी ब्लॉक",
+    whyPlanTitle: "BEST VENUE OPTION के साथ योजना क्यों बनाएं?",
+    verifiedPartners: "सत्यापित भागीदार",
+    bestPrices: "सर्वोत्तम मूल्य",
+    support247: "24/7 सहायता",
+    footerCopyright: "© 2026 BEST VENUE OPTION इंडिया। सर्वाधिकार सुरक्षित।",
+    joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
+    joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
+    register: "पंजीकरण करें",
+    termsAndConditions: "नियम और शर्तें",
+    helpCenter: "सहायता केंद्र",
+    contactUs: "संपर्क करें",
+    loginNow: "अभी लॉगिन करें"
+  }
+};
 
 const LanguageContext = React.createContext({
   lang: 'en',
@@ -885,7 +724,65 @@ const getCurrentYear = () => {
   return new Date().getFullYear();
 };
 
+const formatTime12h = (timeStr: string | null | undefined) => {
+  if (!timeStr) return '';
+  try {
+    // Handle timestamp strings that might be passed here
+    if (timeStr.includes('T') || timeStr.includes('-')) {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return format(d, 'hh:mm a');
+      }
+    }
 
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    
+    const hours = parts[0];
+    const minutes = parts[1].split(' ')[0]; // Remove any trailing info like ' AM' or ' PM'
+    
+    const h = parseInt(hours);
+    if (isNaN(h)) return timeStr;
+    
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const m = minutes.padStart(2, '0');
+    return `${h12.toString().padStart(2, '0')}:${m} ${ampm}`;
+  } catch (err) {
+    return timeStr;
+  }
+};
+
+const formatDateTime12h = (date: Date | string | null | undefined) => {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+    return format(d, 'dd/MM/yyyy hh:mm a');
+  } catch {
+    return typeof date === 'string' ? date : '';
+  }
+};
+
+const formatDateDDMMYYYY = (date: Date | string | null | undefined) => {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+    return format(d, 'dd/MM/yyyy');
+  } catch {
+    return typeof date === 'string' ? date : '';
+  }
+};
+
+const generateTransactionId = (ownerRegId: string, count: number, isManual: boolean = false) => {
+  // Extract only the numeric part from the registration ID (e.g., BVOVO900001 -> 900001)
+  const idNumber = ownerRegId.replace(/\D/g, '') || '000000';
+  const type = isManual ? 'MB' : 'PB';
+  // Serial number resets annually, passed as a count of bookings for the user in the current year
+  const serial = (count + 1).toString().padStart(4, '0');
+  return `BVO/${idNumber}/${type}/${serial}`;
+};
 
 const MultiSelect = ({ 
   label, 
@@ -971,7 +868,7 @@ const MultiSelect = ({
   );
 };
 
-// import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 export enum OperationType {
   CREATE = 'create',
@@ -2311,13 +2208,11 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }} // Reduced duration for faster perceived load
+            transition={{ duration: 2 }}
             src={resolveUrl(banners[currentBanner]?.imageUrl) || defaultBanner} 
             alt="Wedding Venue" 
             className="w-full h-full object-cover brightness-50"
             referrerPolicy="no-referrer"
-            loading="eager"
-            fetchPriority="high"
           />
         </AnimatePresence>
       </div>
@@ -2551,7 +2446,7 @@ const CategoryDisplay = () => {
 // --- Utilities ---
 
 
-const VenueCard = React.memo(({ venue }: { venue: Venue, key?: any }) => (
+const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
   <motion.div 
     whileHover={{ y: -5 }}
     className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100"
@@ -2562,7 +2457,6 @@ const VenueCard = React.memo(({ venue }: { venue: Venue, key?: any }) => (
           src={resolveUrl(venue.images?.[0]) || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
           alt={venue.name} 
           className="w-full h-full object-cover"
-          loading="lazy"
           referrerPolicy="no-referrer"
         />
       </div>
@@ -2597,9 +2491,9 @@ const VenueCard = React.memo(({ venue }: { venue: Venue, key?: any }) => (
       </div>
     </Link>
   </motion.div>
-));
+);
 
-const ServiceCard = React.memo(({ service }: { service: ServiceProvider, key?: any }) => {
+const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
   return (
     <motion.div 
       whileHover={{ y: -5 }}
@@ -2611,7 +2505,6 @@ const ServiceCard = React.memo(({ service }: { service: ServiceProvider, key?: a
             src={resolveUrl(service.images?.[0]) || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
             alt={service.name} 
             className="w-full h-full object-cover"
-            loading="lazy"
             referrerPolicy="no-referrer"
           />
         </div>
@@ -2642,7 +2535,7 @@ const ServiceCard = React.memo(({ service }: { service: ServiceProvider, key?: a
       </Link>
     </motion.div>
   );
-});
+};
 
 // --- Pages ---
 
@@ -2657,26 +2550,26 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl border border-orange-100 max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-orange-100 max-h-[90vh] overflow-y-auto custom-scrollbar"
       >
-        <div className="bg-orange-600 p-8 text-white text-center relative sticky top-0 z-10">
+        <div className="bg-orange-600 p-8 text-white text-center relative">
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
             <CheckCircle size={40} className="text-white" />
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold">Registration Successful!</h2>
-          <p className="mt-2 opacity-90 text-sm md:text-base">Welcome to the BEST VENUE OPTION family</p>
+          <h2 className="text-3xl font-bold">Registration Successful!</h2>
+          <p className="mt-2 opacity-90">Welcome to the BEST VENUE OPTION family</p>
         </div>
 
-        <div className="p-6 md:p-8 space-y-6">
+        <div className="p-8 space-y-6">
           <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Your Registration ID</p>
-                <p className="text-xl md:text-2xl font-black text-gray-900 font-mono">{regId}</p>
+                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Your Registration ID</p>
+                <p className="text-2xl font-black text-gray-900 font-mono">{regId}</p>
               </div>
               <button onClick={() => handleCopy(regId)} className="p-2 bg-white text-orange-600 rounded-xl shadow-sm hover:bg-orange-100 transition-colors">
                 <Plus size={20} className="rotate-45" />
@@ -2685,8 +2578,8 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             <div className="h-px bg-orange-200" />
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Your Initial Password</p>
-                <p className="text-xl md:text-2xl font-black text-gray-900 font-mono">{mobileNumber}</p>
+                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Your Initial Password</p>
+                <p className="text-2xl font-black text-gray-900 font-mono">{mobileNumber}</p>
               </div>
               <button onClick={() => handleCopy(mobileNumber)} className="p-2 bg-white text-orange-600 rounded-xl shadow-sm hover:bg-orange-100 transition-colors">
                 <Plus size={20} className="rotate-45" />
@@ -2695,23 +2588,23 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
           </div>
 
           <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-start space-x-3">
-            <AlertCircle className="text-blue-600 mt-0.5 flex-shrink-0" size={20} />
-            <p className="text-[11px] md:text-sm text-blue-800">
+            <AlertCircle className="text-blue-600 mt-0.5" size={20} />
+            <p className="text-sm text-blue-800">
               Please note down these credentials. You can also send a welcome message to your WhatsApp number <strong>{mobileNumber}</strong>.
             </p>
           </div>
 
           <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-100 space-y-3">
-            <h4 className="font-bold text-yellow-800 flex items-center text-sm md:text-base">
+            <h4 className="font-bold text-yellow-800 flex items-center">
               <Star size={18} className="mr-2 fill-yellow-500 text-yellow-500" />
               Unlock Premium Features
             </h4>
-            <p className="text-[11px] md:text-sm text-yellow-700">
+            <p className="text-sm text-yellow-700">
               Get full access to the booking manager, unlimited venue listings, and smart analytics by subscribing to a professional plan.
             </p>
             <Link 
               to="/pricing" 
-              className="inline-block bg-yellow-600 text-white px-6 py-2 rounded-xl font-bold text-xs md:text-sm hover:bg-yellow-700 transition-colors shadow-lg shadow-yellow-200"
+              className="inline-block bg-yellow-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-yellow-700 transition-colors shadow-lg shadow-yellow-200"
               onClick={onClose}
             >
               View Subscription Plans
@@ -2724,14 +2617,14 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
                 const whatsappMsg = `*Welcome to Event Manager!*%0A%0AHello, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
                 window.open(`https://wa.me/91${mobileNumber}?text=${whatsappMsg}`, '_blank');
               }}
-              className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-base md:text-lg hover:bg-green-700 shadow-xl shadow-green-200 transition-all flex items-center justify-center space-x-2"
+              className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-700 shadow-xl shadow-green-200 transition-all flex items-center justify-center space-x-2"
             >
               <span>Send WhatsApp Welcome</span>
             </button>
 
             <button 
               onClick={onClose}
-              className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold text-base md:text-lg hover:bg-gray-200 transition-all"
+              className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all"
             >
               Skip, Proceed to Login
             </button>
@@ -5254,61 +5147,101 @@ const VenueDetailView = ({ user, profile }: { user: any, profile: UserProfile | 
 
                     <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 space-y-3">
                       <div className="flex justify-between items-center">
-                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Booking Mode</label>
+                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">Select Plan/Amenities Category</label>
                         <div className="bg-white px-3 py-1 rounded-full border border-orange-200">
-                          <span className="text-[10px] font-bold text-gray-500 uppercase">Available Amenities Category</span>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Available Categories</span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2">
                         <button 
                           type="button"
-                          onClick={() => setBookingMode('complete')}
+                          onClick={() => {
+                            setBookingMode('complete');
+                            setSelectedItems([]);
+                          }}
                           className={cn(
-                            "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
-                            bookingMode === 'complete' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
+                            "w-full py-4 rounded-xl font-bold transition-all border flex items-center justify-between px-6 shadow-sm",
+                            bookingMode === 'complete' 
+                              ? "bg-orange-600 text-white border-orange-600 scale-[1.02]" 
+                              : "bg-white text-gray-700 border-gray-200 hover:border-orange-200"
                           )}
                         >
-                          Complete Venue
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setBookingMode('partial')}
-                          className={cn(
-                            "flex-1 py-2 rounded-xl text-xs font-bold transition-all border",
-                            bookingMode === 'partial' ? "bg-orange-600 text-white border-orange-600 shadow-md" : "bg-white text-gray-600 border-gray-200"
-                          )}
-                        >
-                          Select Amenities
-                        </button>
-                      </div>
-
-                      {bookingMode === 'partial' && venue.catalogue && (
-                        <div className="space-y-2 mt-4 pt-4 border-t border-orange-100">
-                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Amenities Category</label>
-                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
-                            {venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
-                              <label key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-orange-100 cursor-pointer hover:border-orange-300 transition-colors">
-                                <div className="flex items-center space-x-2">
-                                  <input 
-                                    type="checkbox"
-                                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                                    checked={selectedItems.includes(item.id || '')}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setSelectedItems([...selectedItems, item.id || '']);
-                                      else setSelectedItems(selectedItems.filter(id => id !== item.id));
-                                    }}
-                                  />
-                                  <span className="text-xs font-bold text-gray-700 uppercase">{item.level}</span>
-                                </div>
-                                <span className="text-xs font-black text-orange-600">₹{item.priceRate?.toLocaleString()}</span>
-                              </label>
-                            ))}
-                            {(!venue.catalogue || venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
-                              <p className="text-[10px] text-gray-400 italic">No priced amenities available.</p>
-                            )}
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center", bookingMode === 'complete' ? "border-white" : "border-gray-300")}>
+                              {bookingMode === 'complete' && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
+                            </div>
+                            <span className="text-sm uppercase tracking-wide">Complete Venue / Service</span>
                           </div>
+                          {bookingMode === 'complete' && <CheckCircle size={18} />}
+                        </button>
+
+                        <div className={cn(
+                          "w-full p-1 rounded-2xl border transition-all",
+                          bookingMode === 'partial' ? "bg-orange-50 border-orange-200" : "bg-gray-50 border-gray-100"
+                        )}>
+                          <button 
+                            type="button"
+                            onClick={() => setBookingMode('partial')}
+                            className={cn(
+                              "w-full py-4 rounded-xl font-bold transition-all flex items-center justify-between px-6 shadow-sm",
+                              bookingMode === 'partial' 
+                                ? "bg-orange-600 text-white border-orange-600" 
+                                : "bg-white text-gray-500 border-gray-100"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center", bookingMode === 'partial' ? "border-white" : "border-gray-300")}>
+                                {bookingMode === 'partial' && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
+                              </div>
+                              <span className="text-sm uppercase tracking-wide">Select Multiple Amenities</span>
+                            </div>
+                            {bookingMode === 'partial' && <Plus size={18} />}
+                          </button>
+
+                          {bookingMode === 'partial' && venue.catalogue && (
+                            <div className="p-2 space-y-2 mt-2">
+                              <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                {venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).map(item => (
+                                  <label key={item.id} className={cn(
+                                    "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:shadow-md",
+                                    selectedItems.includes(item.id || '') 
+                                      ? "bg-white border-orange-400 shadow-orange-50" 
+                                      : "bg-white/50 border-orange-100"
+                                  )}>
+                                    <div className="flex items-center space-x-3">
+                                      <div className={cn(
+                                        "w-5 h-5 rounded flex items-center justify-center border transition-colors",
+                                        selectedItems.includes(item.id || '') ? "bg-orange-600 border-orange-600" : "bg-white border-gray-300"
+                                      )}>
+                                        {selectedItems.includes(item.id || '') && <Check size={14} className="text-white" />}
+                                        <input 
+                                          type="checkbox"
+                                          className="hidden"
+                                          checked={selectedItems.includes(item.id || '')}
+                                          onChange={(e) => {
+                                            if (e.target.checked) setSelectedItems([...selectedItems, item.id || '']);
+                                            else setSelectedItems(selectedItems.filter(id => id !== item.id));
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-bold text-gray-700 uppercase tracking-tight">{item.level}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-xs font-black text-orange-600 block">₹{item.priceRate?.toLocaleString()}</span>
+                                      <span className="text-[8px] text-gray-400 uppercase font-black tracking-widest">{item.unit || 'unit'}</span>
+                                    </div>
+                                  </label>
+                                ))}
+                                {(!venue.catalogue || venue.catalogue.filter(c => c.priceRate && c.priceRate > 0).length === 0) && (
+                                  <div className="text-center py-8">
+                                    <p className="text-xs text-gray-400 italic">No priced amenities available for this venue.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -6403,7 +6336,7 @@ const ManuallyBookingView = ({
   const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
-    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
+    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
       if (onUpgrade) onUpgrade();
       else toast.error('Premium feature: Please get a valid subscription');
       return;
@@ -7168,11 +7101,24 @@ const numberToWords = (num: number): string => {
   return convert(num) + ' Rupees Only';
 };
 
-
+const imageUrlToBase64 = async (url: string): Promise<string | null> => {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error('Error fetching image for invoice:', e);
+    return null;
+  }
+};
 
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
-  const { jsPDF } = await import('jspdf');
-  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF();
   
   // Fetch App Branding from admin_settings
@@ -7585,8 +7531,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     }
   }, [selectedId, activeType]);
 
-  const downloadCard = async () => {
-    const { jsPDF } = await import('jspdf');
+  const downloadCard = () => {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -7854,7 +7799,7 @@ const DashboardView = ({
     year: new Date().getFullYear().toString()
   });
 
-  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
     const filteredBookings = bookings.filter(b => {
       const bName = (b.visitorName || b.partyName || '').toLowerCase();
       const bMobile = b.visitorMobile || '';
@@ -7870,7 +7815,6 @@ const DashboardView = ({
     });
 
     if (type === 'excel') {
-      const XLSX = await import('xlsx');
       const data = filteredBookings.map((b, index) => {
         const total = Number(b.updatedAmount || b.totalAmount || 0);
         const totalReceived = (b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
@@ -7897,8 +7841,6 @@ const DashboardView = ({
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
       XLSX.writeFile(workbook, `Booking_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     } else {
-      const { jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
@@ -7957,11 +7899,14 @@ const DashboardView = ({
       if (!profile || profile.role === 'user' || profile.role === 'admin') return;
       
       // FIX: Check if subscription requirement is globally enabled
-      if (!globalSettings.subscriptionEnabled) {
+      if (!globalSettings || !globalSettings.subscriptionEnabled) {
         setShowSubscriptionReminder(false);
         setIsSubscriptionModalOpen(false);
         return;
       }
+      
+      // If admin, bypass
+      if (user?.email === 'deepakjatav1005@gmail.com') return;
       
       try {
         const { data: sub, error } = await db
@@ -9012,7 +8957,7 @@ const PublicBookingView = ({
   };
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
-    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
+    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
       if (onUpgrade) onUpgrade();
       else toast.error('Premium feature: Please get a valid subscription');
       return;
@@ -9077,7 +9022,7 @@ const PublicBookingView = ({
                 <span className="flex items-center"><Calendar size={12} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
                 <span className="flex items-center">
                   <User size={12} className="mr-1 text-orange-600" /> 
-                  {globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active') 
+                  {globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active') 
                     ? (b.visitorMobile ? `******${b.visitorMobile.slice(-4)}` : 'Hidden')
                     : b.visitorMobile
                   }
@@ -9091,7 +9036,7 @@ const PublicBookingView = ({
               {b.status === 'pending' && (
                 <button 
                   onClick={() => {
-                    if (globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
+                    if (globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
                       if (onUpgrade) onUpgrade();
                       else toast.error('Premium feature: Please get a valid subscription');
                       return;
@@ -9252,7 +9197,7 @@ const ManagePaymentView = ({
   };
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
-    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
+    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
       if (onUpgrade) onUpgrade();
       else toast.error('Premium feature: Please get a valid subscription');
       return;
@@ -10092,8 +10037,9 @@ const CatalogueManageView = ({
                     if (url) {
                       const urls = Array.isArray(url) ? url : [url];
                       const currentImages = newItem.images || [];
-                      const subEnabled = globalSettings?.subscriptionEnabled === true;
-                      const hasSub = activeSubscription && activeSubscription.status === 'active';
+                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const isAdmin = user?.email === 'deepakjatav1005@gmail.com';
+                      const hasSub = (activeSubscription && activeSubscription.status === 'active') || isAdmin;
                       const maxPhotos = (subEnabled && !hasSub) ? 2 : 10;
 
                       if (currentImages.length + urls.length > maxPhotos) {
@@ -10127,8 +10073,9 @@ const CatalogueManageView = ({
                   onUpload={(url) => {
                     if (url) {
                       const currentVideos = newItem.videos || [];
-                      const subEnabled = globalSettings?.subscriptionEnabled === true;
-                      const hasSub = activeSubscription && activeSubscription.status === 'active';
+                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const isAdmin = user?.email === 'deepakjatav1005@gmail.com';
+                      const hasSub = (activeSubscription && activeSubscription.status === 'active') || isAdmin;
                       const maxVideos = (subEnabled && !hasSub) ? 0 : 5;
 
                       if (currentVideos.length + 1 > maxVideos) {
@@ -10934,27 +10881,10 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Facilities Offered Level (Select All Applicable)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {VENUE_FACILITIES.map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.facilities?.includes(option)}
-                    onChange={(e) => {
-                      const current = formData.facilities || [];
-                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
-                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
-                    }}
-                  />
-                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
-                </label>
-              ))}
-            </div>
+            {/* Removed Facilities Offered Level as per request */}
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">4. Detailed Facility Listing (Rates & Units)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Detailed Facility Listing (Rates & Units)</label>
             <FacilityDetailsEditor 
               facilities={formData.facilityDetails}
               onChange={(details) => setFormData({...formData, facilityDetails: details})}
@@ -11396,27 +11326,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Facilities Offered Level (Select All Applicable)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              {VENUE_FACILITIES.map(option => (
-                <label key={option} className="flex items-center space-x-2 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:bg-orange-50 transition-colors shadow-sm">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                    checked={formData.facilities?.includes(option)}
-                    onChange={(e) => {
-                      const current = formData.facilities || [];
-                      if (e.target.checked) setFormData({...formData, facilities: [...current, option]});
-                      else setFormData({...formData, facilities: current.filter(o => o !== option)});
-                    }}
-                  />
-                  <span className="text-[10px] font-black text-gray-700 uppercase">{option}</span>
-                </label>
-              ))}
-            </div>
+            {/* Removed Facilities Offered Level as per request */}
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">4. Detailed Facility Listing (Rates & Units)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2 font-black uppercase text-xs tracking-widest text-orange-600 border-b pb-2">3. Detailed Facility Listing (Rates & Units)</label>
             <FacilityDetailsEditor 
               facilities={formData.facilityDetails}
               onChange={(details) => setFormData({...formData, facilityDetails: details})}
@@ -11963,31 +11876,33 @@ export default function App() {
     }
   };
 
-  // 5-minute Inactivity Auto Logout
+  // 5-minute Inactivity Logout Logic
   useEffect(() => {
     if (!user) return;
 
-    let timeoutId: any;
-    const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
+    let timeout: NodeJS.Timeout;
 
     const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
+      if (timeout) clearTimeout(timeout);
+      // Only auto-logout if NOT the admin
+      if (user.email === 'deepakjatav1005@gmail.com') return;
+      
+      timeout = setTimeout(() => {
         handleLogout();
-        toast('Logged out due to inactivity', { icon: 'ℹ️' });
-      }, INACTIVITY_LIMIT);
+        toast.error('Session expired due to 5 minutes of inactivity', { id: 'session-expired' });
+      }, 5 * 60 * 1000); // 5 minutes
     };
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(name => document.addEventListener(name, resetTimer));
+    events.forEach(event => window.addEventListener(event, resetTimer));
     
-    resetTimer();
+    resetTimer(); // Initialize
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(name => document.removeEventListener(name, resetTimer));
+      if (timeout) clearTimeout(timeout);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
     };
-  }, [user]);
+  }, [user, handleLogout]);
 
   useEffect(() => {
     let authSubscription: any = null;
@@ -12217,18 +12132,18 @@ export default function App() {
     return () => window.removeEventListener('open-app-rating', handleOpenRating);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-orange-50">
-        <motion.div 
-          animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-        >
-          <AppLogo size="xl" />
-        </motion.div>
-      </div>
-    );
-  }
+    if (loading) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-orange-50">
+          <motion.div 
+            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+          >
+            <AppLogo size="xl" />
+          </motion.div>
+        </div>
+      );
+    }
 
   return (
     <LanguageContext.Provider value={contextValue}>
@@ -12452,7 +12367,6 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
   const generateFlex = async () => {
-    const { jsPDF } = await import('jspdf');
     const sizeObj = selectedType === 4 
       ? cardSizes.find(s => s.value === selectedInchSize) 
       : flexSizes.find(s => s.value === selectedSize);
@@ -13386,7 +13300,7 @@ const AdminView = ({
     }
   };
 
-  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
     if (activeTab === 'users') {
       const data = users.map(u => ({
         'Registration ID': u.registrationId,
@@ -13399,15 +13313,12 @@ const AdminView = ({
       }));
       
       if (type === 'excel') {
-        const XLSX = await import('xlsx');
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
         XLSX.writeFile(workbook, "registered_users_report.xlsx");
         toast.success('User report downloaded');
       } else {
-        const { jsPDF } = await import('jspdf');
-        const { default: autoTable } = await import('jspdf-autotable');
         const doc = new jsPDF();
         doc.text("Registered Users Report", 14, 15);
         autoTable(doc, {
@@ -13809,13 +13720,47 @@ const AdminView = ({
                       <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
                       <div className="h-[300px] w-full">
-                        <UserDistributionChart users={users} />
+                        <ResponsiveContainer width="100%" height={300} debounce={50}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Owners', value: users.filter(u => u.role === 'owner').length },
+                                { name: 'Providers', value: users.filter(u => u.role === 'provider').length }
+                              ]}
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              <Cell fill="#f97316" />
+                              <Cell fill="#0ea5e9" />
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">Booking Status</h4>
                       <div className="h-[300px] w-full">
-                        <BookingStatusChart bookings={bookings} />
+                        <ResponsiveContainer width="100%" height={300} debounce={50}>
+                          <BarChart data={[
+                            { name: 'Total', count: bookings.length },
+                            { name: 'Completed', count: bookings.filter(b => {
+                              const bTotal = Number(b.updatedAmount || b.totalAmount || 0);
+                              const bPaid = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                              return (bPaid >= (bTotal - 0.1) && bTotal > 0) || b.status === 'completed' || b.status === 'paid' || b.paymentStatus === 'Paid';
+                            }).length },
+                            { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
+                            { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
+                          ]}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   </div>
