@@ -6512,7 +6512,7 @@ const ManuallyBookingView = ({
   const totalPages = Math.ceil(sortedBookings.length / bookingsPerPage);
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
-    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
       if (onUpgrade) onUpgrade();
       else toast.error('Premium feature: Please get a valid subscription');
       return;
@@ -7952,13 +7952,15 @@ const DashboardView = ({
   profile, 
   onUpdateProfile, 
   globalSettings,
-  activeSubscription
+  activeSubscription,
+  onUpgradeNeeded
 }: { 
   user: any, 
   profile: UserProfile | null, 
   onUpdateProfile: (p: UserProfile) => void, 
   globalSettings: any,
-  activeSubscription: UserSubscription | null
+  activeSubscription: UserSubscription | null,
+  onUpgradeNeeded: () => void
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
@@ -8108,7 +8110,7 @@ const DashboardView = ({
       }
     };
     if (profile && user) checkSubscription();
-  }, [profile, user?.uid]);
+  }, [profile, user?.uid, globalSettings.subscriptionEnabled]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -8623,7 +8625,7 @@ const DashboardView = ({
                   onUpdate={fetchDashboardData} 
                   globalSettings={globalSettings}
                   activeSubscription={activeSubscription}
-                  onUpgrade={() => setActiveTab('subscription')}
+                  onUpgrade={onUpgradeNeeded}
                 />
               )}
               {activeTab === 'manually-booking' && (
@@ -8636,7 +8638,7 @@ const DashboardView = ({
                   onUpdate={fetchDashboardData}
                   globalSettings={globalSettings}
                   activeSubscription={activeSubscription}
-                  onUpgrade={() => setActiveTab('subscription')}
+                  onUpgrade={onUpgradeNeeded}
                 />
               )}
               {activeTab === 'manage-payment' && (
@@ -8646,6 +8648,8 @@ const DashboardView = ({
                   bookings={bookings} 
                   onUpdate={fetchDashboardData} 
                   globalSettings={globalSettings}
+                  activeSubscription={activeSubscription}
+                  onUpgrade={onUpgradeNeeded}
                 />
               )}
               {activeTab === 'services' && (
@@ -8657,7 +8661,7 @@ const DashboardView = ({
                   services={services} 
                   globalSettings={globalSettings}
                   activeSubscription={activeSubscription}
-                  onUpgrade={() => setActiveTab('subscription')}
+                  onUpgrade={onUpgradeNeeded}
                 />
               )}
               {activeTab === 'reports' && (
@@ -9126,7 +9130,7 @@ const PublicBookingView = ({
   };
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
-    if (isLocked && globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
       if (onUpgrade) onUpgrade();
       else toast.error('Premium feature: Please get a valid subscription');
       return;
@@ -9191,7 +9195,7 @@ const PublicBookingView = ({
                 <span className="flex items-center"><Calendar size={12} className="mr-1 text-orange-600" /> {formatDateDDMMYYYY(b.eventDate)}</span>
                 <span className="flex items-center">
                   <User size={12} className="mr-1 text-orange-600" /> 
-                  {globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active') 
+                  {globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active') 
                     ? (b.visitorMobile ? `******${b.visitorMobile.slice(-4)}` : 'Hidden')
                     : b.visitorMobile
                   }
@@ -9205,7 +9209,7 @@ const PublicBookingView = ({
               {b.status === 'pending' && (
                 <button 
                   onClick={() => {
-                    if (globalSettings?.subscriptionEnabled && (!activeSubscription || activeSubscription.status !== 'active')) {
+                    if (globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
                       if (onUpgrade) onUpgrade();
                       else toast.error('Premium feature: Please get a valid subscription');
                       return;
@@ -9302,7 +9306,23 @@ const PublicBookingView = ({
   );
 };
 
-const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }: { user: any, profile: UserProfile | null, bookings: Booking[], onUpdate?: () => void, globalSettings: any }) => {
+const ManagePaymentView = ({ 
+  user, 
+  profile, 
+  bookings, 
+  onUpdate, 
+  globalSettings,
+  activeSubscription,
+  onUpgrade
+}: { 
+  user: any, 
+  profile: UserProfile | null, 
+  bookings: Booking[], 
+  onUpdate?: () => void, 
+  globalSettings: any,
+  activeSubscription?: UserSubscription | null,
+  onUpgrade?: () => void
+}) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
@@ -9350,6 +9370,11 @@ const ManagePaymentView = ({ user, profile, bookings, onUpdate, globalSettings }
   };
 
   const handleToggleLock = async (id: string, isLocked: boolean) => {
+    if (isLocked && globalSettings?.subscriptionEnabled === true && (!activeSubscription || activeSubscription.status !== 'active')) {
+      if (onUpgrade) onUpgrade();
+      else toast.error('Premium feature: Please get a valid subscription');
+      return;
+    }
     try {
       const { error } = await db.from('bookings').update({ is_locked: isLocked ? 1 : 0 }).eq('id', id);
       if (error) throw error;
@@ -10185,7 +10210,7 @@ const CatalogueManageView = ({
                     if (url) {
                       const urls = Array.isArray(url) ? url : [url];
                       const currentImages = newItem.images || [];
-                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const subEnabled = globalSettings?.subscriptionEnabled === true;
                       const hasSub = activeSubscription && activeSubscription.status === 'active';
                       const maxPhotos = (subEnabled && !hasSub) ? 2 : 10;
 
@@ -10220,7 +10245,7 @@ const CatalogueManageView = ({
                   onUpload={(url) => {
                     if (url) {
                       const currentVideos = newItem.videos || [];
-                      const subEnabled = globalSettings?.subscriptionEnabled;
+                      const subEnabled = globalSettings?.subscriptionEnabled === true;
                       const hasSub = activeSubscription && activeSubscription.status === 'active';
                       const maxVideos = (subEnabled && !hasSub) ? 0 : 5;
 
@@ -12106,7 +12131,7 @@ export default function App() {
 
           setGlobalSettings(prev => ({
             ...prev,
-            subscriptionEnabled: subEnabled ? subEnabled.value === 'true' : prev.subscriptionEnabled,
+            subscriptionEnabled: subEnabled ? (subEnabled.value === 'true' || subEnabled.value === true) : prev.subscriptionEnabled,
             appName: appNameSetting ? appNameSetting.value : prev.appName,
             appLogoUrl: appLogoSetting ? appLogoSetting.value : prev.appLogoUrl,
             appTagline: appTaglineSetting ? appTaglineSetting.value : prev.appTagline
@@ -12213,6 +12238,30 @@ export default function App() {
               setProfile(freshProfile);
               localStorage.setItem('custom_user', JSON.stringify(session.user));
               localStorage.setItem('custom_profile', JSON.stringify(freshProfile));
+
+              // Fetch User Subscription on Auth Change
+              const { data: subData } = await db.from('user_subscriptions')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .eq('status', 'active')
+                .order('end_date', { ascending: false })
+                .limit(1);
+              
+              if (subData && subData.length > 0) {
+                const d = subData[0];
+                setActiveSubscription({
+                  id: d.id,
+                  userId: d.user_id,
+                  planId: d.plan_id,
+                  startDate: d.start_date,
+                  endDate: d.end_date,
+                  status: d.status,
+                  amount: d.amount,
+                  createdAt: d.created_at
+                });
+              } else {
+                setActiveSubscription(null);
+              }
             }
           } else {
             // Only clear if we don't have a saved user in localStorage (prevents refresh logout)
@@ -12220,6 +12269,7 @@ export default function App() {
             if (!savedUser) {
               setUser(null);
               setProfile(null);
+              setActiveSubscription(null);
               localStorage.removeItem('custom_user');
               localStorage.removeItem('custom_profile');
             }
@@ -12338,7 +12388,7 @@ export default function App() {
               <Route path="/services" element={<ServiceListView user={user} />} />
               <Route path="/search" element={<SearchResultsView />} />
               <Route path="/services/:id" element={<ServiceDetailView user={user} profile={profile} />} />
-              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} activeSubscription={activeSubscription} />} />
+              <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} activeSubscription={activeSubscription} onUpgradeNeeded={() => setIsUpgradeModalOpen(true)} />} />
               <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} activeSubscription={activeSubscription} />} />
               <Route path="/add-venue" element={<AddVenueView user={user} profile={profile} />} />
               <Route path="/edit-venue/:id" element={<EditVenueView user={user} profile={profile} />} />
