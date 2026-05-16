@@ -7199,6 +7199,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
   }
 
+  // Fetch logo base64 once for all pages
+  let logoBase64: string | null = null;
+  try {
+    logoBase64 = await imageUrlToBase64(appLogoUrl);
+  } catch (err) {
+    console.warn('Could not fetch app logo for invoice');
+  }
+
   // Ensure amount is exactly what was recorded, no automatic deductions
   const totalReceived = invoicePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
@@ -7208,16 +7216,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
 
   // CUSTOM INVOICE NUMBER LOGIC
-  // BVO/PB or MB/000+1 serial
   const bookingTypePrefix = booking.isManual ? 'MB' : 'PB';
   
-  // Calculate Serial Number (starts from 1 every year)
+  // Calculate Serial Number
   const currentYear = new Date().getFullYear();
   const providerBookingsThisYear = allBookings
     .filter(b => {
       const bYear = new Date(b.createdAt || new Date()).getFullYear();
-      const bOwnerId = b.ownerId;
-      return bOwnerId === booking.ownerId && bYear === currentYear;
+      return b.ownerId === booking.ownerId && bYear === currentYear;
     })
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   
@@ -7226,269 +7232,251 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   
   const customInvoiceNo = `BVO/${bookingTypePrefix}/${serialNo}`;
   
-  // Helper for display status on invoice
   const getDisplayStatus = () => {
     const status = (booking.status || 'pending').toLowerCase();
     if (isPaid || status === 'completed') return 'COMPLETED';
-    if (!globalSettings.subscriptionEnabled) return 'PAID'; // If sub disabled, show as paid if not completed
+    if (!globalSettings.subscriptionEnabled) return 'PAID';
     if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
     return status.toUpperCase();
   };
 
-  // Skip some lines...
-  
-  // New section: Transaction History
+  // --- MODULAR DRAWERS ---
+  const drawHeader = (d: jsPDF) => {
+    const headerTitle = (booking.targetName || "BUSINESS").split('(')[0].trim().toUpperCase();
+    d.setFontSize(20);
+    d.setTextColor(234, 88, 12); 
+    d.setFont("helvetica", "bold");
+    d.text(headerTitle, 105, 12, { align: 'center', maxWidth: 170 });
+    
+    d.setFontSize(9);
+    d.setTextColor(0);
+    d.setFont("helvetica", "normal");
+    d.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 20);
+    d.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 24);
+    
+    if (providerProfile) {
+      const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
+      d.text(address, 190, 20, { align: 'right', maxWidth: 80 });
+    }
+    
+    d.setDrawColor(234, 88, 12);
+    d.setLineWidth(0.4);
+    d.line(20, 28, 190, 28);
+
+    d.setFontSize(12);
+    d.setTextColor(0);
+    d.setFont("helvetica", "bold");
+    d.text("INVOICE", 20, 36);
+    
+    d.setFontSize(8);
+    d.setFont("helvetica", "normal");
+    d.setTextColor(100);
+    d.text(`Invoice No: ${customInvoiceNo}`, 190, 34, { align: 'right' });
+    d.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 37, { align: 'right' });
+    d.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 40, { align: 'right' });
+    
+    return 45; 
+  };
+
+  const drawFooter = (d: jsPDF) => {
+    const footerBaseline = 282;
+    d.setDrawColor(234, 88, 12);
+    d.setLineWidth(0.3);
+    d.line(20, footerBaseline, 190, footerBaseline);
+    
+    if (logoBase64) {
+      d.addImage(logoBase64, 'PNG', 20.5, 283, 8, 8);
+    }
+
+    const nameParts = (() => {
+      const n = String(appName || 'BEST VENUE OPTION');
+      if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
+      const words = n.split(' ');
+      if (words.length > 1) {
+        const mid = Math.ceil(words.length / 2);
+        return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
+      }
+      return { part1: n, part2: '' };
+    })();
+
+    d.setFontSize(11);
+    d.setFont("helvetica", "bold");
+    d.setTextColor(77, 121, 255); 
+    d.text(nameParts.part1, 32, 288);
+    if (nameParts.part2) {
+      const part1Width = d.getTextWidth(nameParts.part1 + ' ');
+      d.setTextColor(255, 77, 77); 
+      d.text(nameParts.part2, 32 + part1Width, 288);
+    }
+    
+    d.setFontSize(7);
+    d.setTextColor(100);
+    d.setFont("helvetica", "normal");
+    d.text(appTagline.toUpperCase(), 32, 292);
+    
+    d.setTextColor(234, 88, 12);
+    d.setFontSize(9);
+    d.setFont("helvetica", "bold");
+    d.text("WWW.BESTVENUEOPTION.COM", 190, 288, { align: 'right' });
+
+    d.setFontSize(8);
+    d.setTextColor(150);
+    d.setFont("helvetica", "normal");
+    d.text("Thank you for choosing Best Venue Option!", 105, 274, { align: 'center' }); 
+    d.setFontSize(7);
+    d.text("This is a computer generated invoice and does not require a physical signature.", 105, 278, { align: 'center' });
+  };
+
+  const sanitizeName = (n: string) => {
+    if (!n) return 'Service';
+    let cleaned = n.trim();
+    // More aggressive sanitization to remove "Level 1", "L1", "1. ", etc.
+    cleaned = cleaned.replace(/^(Level|L|Item)?\s*\d+\s*[.:-]*\s*/i, '');
+    // Also remove any leading digit followed by space or dot
+    cleaned = cleaned.replace(/^\d+[\s.]+\s*/, '');
+    return cleaned || 'Facility Service';
+  };
+
   const addTransactionHistory = (startY: number) => {
     let localY = startY;
     if (invoicePayments.length > 0) {
-      if (localY > 210) { doc.addPage(); localY = 30; }
+      if (localY > 220) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
       doc.setDrawColor(200);
-      doc.line(10, localY, 200, localY);
-      localY += 10;
+      doc.line(20, localY, 190, localY);
+      localY += 6;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(234, 88, 12);
-      doc.text("TRANSACTION HISTORY", 10, localY);
-      localY += 8;
+      doc.text("TRANSACTION HISTORY", 20, localY);
+      localY += 6;
       
       doc.setFontSize(8);
       doc.setTextColor(100);
-      const headerY = localY;
-      doc.text("Date", 10, headerY);
-      doc.text("Type", 50, headerY);
-      doc.text("Mode", 100, headerY);
-      doc.text("Amount", 185, headerY, { align: "right" });
-      localY += 3;
-      doc.line(10, localY, 200, localY);
-      localY += 8;
-      
       doc.setFont("helvetica", "normal");
+      doc.text("Date", 20, localY);
+      doc.text("Type", 60, localY);
+      doc.text("Mode", 100, localY);
+      doc.text("Amount", 190, localY, { align: "right" });
+      localY += 2;
+      doc.line(20, localY, 190, localY);
+      localY += 6;
+      
       doc.setTextColor(0);
       invoicePayments.forEach(p => {
-        if (localY > 260) { 
-          doc.addPage(); 
-          localY = 30; 
-          doc.setFont("helvetica", "bold");
-          doc.text("TRANSACTION HISTORY (CONT.)", 10, localY);
-          localY += 10;
-        }
-        // Force Date only (remove time)
-        const dateStr = p.paymentDate || format(new Date(p.createdAt), 'dd/MM/yyyy');
-        const justDate = dateStr.includes(' ') ? dateStr.split(' ')[0] : dateStr;
-        doc.text(justDate, 10, localY);
-        doc.text((p.paymentType || 'Payment').toUpperCase(), 50, localY);
+        if (localY > 260) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
+        const dateRaw = p.paymentDate || p.createdAt;
+        const justDate = format(new Date(dateRaw), 'dd/MM/yyyy');
+        doc.text(justDate, 20, localY);
+        doc.text((p.paymentType || 'Payment').toUpperCase(), 60, localY);
         doc.text((p.paymentMode || 'N/A').toUpperCase(), 100, localY);
-        doc.text(`₹ ${Number(p.amount || 0).toLocaleString()}`, 185, localY, { align: "right" });
-        localY += 8;
+        doc.text(`₹ ${Number(p.amount || 0).toLocaleString()}`, 190, localY, { align: "right" });
+        localY += 6;
       });
-      doc.line(10, localY, 200, localY);
-      localY += 12;
+      doc.line(20, localY, 190, localY);
+      localY += 8;
     }
     return localY;
   };
-  
-  // I need to find where to call this in the PDF generation flow.
-  
-  // left blank to remove platform branding from invoice header as requested
-  
-  // Business Name as Heading
-  // Requirement: show only business name, no supplementary text in brackets
-  const headerTitle = (booking.targetName || "BUSINESS").split('(')[0].trim().toUpperCase();
-  
-  doc.setFontSize(22);
-  doc.setTextColor(234, 88, 12); // orange-600
-  doc.setFont("helvetica", "bold");
-  doc.text(headerTitle, 105, 30, { align: 'center', maxWidth: 170 });
-  
-  // Left side: Owner/Provider Name & Mobile
-  doc.setFontSize(10);
-  doc.setTextColor(0);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 50);
-  doc.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 55);
-  
-  // Right side: Business Address
-  if (providerProfile) {
-    const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
-    doc.text(address, 190, 50, { align: 'right', maxWidth: 80 });
-  }
-  
-  doc.setDrawColor(234, 88, 12);
-  doc.setLineWidth(0.5);
-  doc.line(20, 60, 190, 60);
-  
-  // --- Invoice Body ---
-  doc.setFontSize(14);
-  doc.setTextColor(0);
-  doc.setFont("helvetica", "bold");
-  doc.text("INVOICE", 20, 70);
-  
-  // Right side: Business Address/Inoice Meta
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100);
-  doc.text(`Invoice No: ${customInvoiceNo}`, 190, 70, { align: 'right' });
-  doc.text(`Date: ${formatDateDDMMYYYY(new Date())}`, 190, 75, { align: 'right' });
-  doc.text(`Time: ${formatTime12h(new Date().toLocaleTimeString())}`, 190, 80, { align: 'right' });
+
+  let currentY = drawHeader(doc);
 
   // Customer Details (Bill To)
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text("BILL TO:", 20, 90);
+  doc.text("BILL TO:", 20, currentY);
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text(`Name: ${partyName || 'N/A'}`, 20, 98);
-  doc.text(`Mobile: ${partyMobile}`, 20, 103);
+  doc.text(`Name: ${partyName || 'N/A'}`, 20, currentY + 6);
+  doc.text(`Mobile: ${partyMobile}`, 20, currentY + 10);
   
-  let currentY_BillTo = 108;
+  let billToY = currentY + 14;
   if (booking.partyAddress) {
     const addr = `Address: ${booking.partyAddress}`;
-    const splitAddr = doc.splitTextToSize(addr, 100);
-    doc.text(splitAddr, 20, currentY_BillTo);
-    currentY_BillTo += (splitAddr.length * 5);
+    const splitAddr = doc.splitTextToSize(addr, 90);
+    doc.text(splitAddr, 20, billToY);
+    billToY += (splitAddr.length * 4);
   }
   
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, currentY_BillTo + 2);
-  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, currentY_BillTo + 7);
+  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, billToY);
+  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, billToY + 4);
   if (booking.startTime) {
-    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, currentY_BillTo + 12);
+    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, billToY + 8);
   }
 
-  // Booking Status
   doc.setFont("helvetica", "bold");
-  doc.text(`Booking Status:`, 140, 90);
+  doc.text(`Booking Status:`, 140, currentY + 6);
   doc.setFont("helvetica", "normal");
-  doc.text(`${getDisplayStatus()}`, 190, 90, { align: 'right' });
+  doc.text(`${getDisplayStatus()}`, 190, currentY + 6, { align: 'right' });
   
   doc.setFont("helvetica", "bold");
-  doc.text(`Payment Status:`, 140, 96);
+  doc.text(`Payment Status:`, 140, currentY + 10);
   doc.setFont("helvetica", "normal");
-  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, 96, { align: 'right' });
+  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, currentY + 10, { align: 'right' });
 
-  // Use autoTable for the items to prevent overlap
+  // Items Table
   const tableRows = [];
   if (baseAmount > 0) {
-    tableRows.push([`Base Booking Amount for ${booking.targetName.split('(')[0].trim()}`, `₹ ${baseAmount.toLocaleString()}`]);
+    tableRows.push([`Base Booking Amount for ${sanitizeName(booking.targetName.split('(')[0].trim())}`, `₹ ${baseAmount.toLocaleString()}`]);
   }
   if (expenditure > 0) {
     tableRows.push(['Additional Expenditure', `₹ ${Math.round(expenditure).toLocaleString()}`]);
   }
   if (booking.extra_services && booking.extra_services.length > 0) {
     booking.extra_services.forEach(s => {
-      tableRows.push([s.name, `₹ ${Math.round(s.amount || 0).toLocaleString()}`]);
+      tableRows.push([sanitizeName(s.name), `₹ ${Math.round(s.amount || 0).toLocaleString()}`]);
     });
   }
 
   autoTable(doc, {
-    startY: Math.max(140, currentY_BillTo + 20),
+    startY: Math.max(currentY + 25, billToY + 12),
     head: [['Description', 'Amount']],
     body: tableRows,
     theme: 'striped',
     headStyles: { fillColor: [234, 88, 12] },
     margin: { left: 20, right: 20 },
-    columnStyles: {
-      0: { cellWidth: 120 },
-      1: { cellWidth: 50, halign: 'right' }
+    columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 50, halign: 'right' } },
+    didDrawPage: (data) => {
+      // Unconditionally draw header and footer on every page
+      // page 1 header was drawn manually but re-drawing is harmless if coordinates match
+      drawHeader(doc);
+      drawFooter(doc);
     }
   });
 
-  let currentY = (doc as any).lastAutoTable.finalY + 10;
-  
-  doc.setFontSize(11);
+  currentY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFontSize(10);
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("Final Booking Total:", 110, currentY);
   doc.text(`₹ ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 8;
-  
-  doc.setFontSize(10);
+  currentY += 5;
+  doc.setFontSize(9);
   doc.text("Total Amount Paid:", 110, currentY);
   doc.text(`₹ ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 8;
-  
-  doc.setFontSize(12);
-  if (balanceDue > 0) {
-    doc.setTextColor(220, 38, 38); // red-600
-  } else {
-    doc.setTextColor(22, 163, 74); // green-600
-  }
+  currentY += 5;
+  doc.setFontSize(10);
+  doc.setTextColor(balanceDue > 0 ? [220, 38, 38] : [22, 163, 74]);
   doc.text("Balance Due:", 110, currentY);
   doc.text(`₹ ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
-  currentY += 12;
+  currentY += 10;
 
-  // Render Transaction History
   const finalY = addTransactionHistory(currentY);
 
-  // Amount in words
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(0);
   doc.setFont("helvetica", "italic");
   const words = `Amount in words (Balance): ${numberToWords(Math.round(balanceDue || 0))}`;
   const splitWords = doc.splitTextToSize(words, 170);
-  
-  let wordsY = Math.max(finalY, currentY);
-  if (wordsY > 240) { doc.addPage(); wordsY = 30; }
-  
+  let wordsY = finalY;
+  if (wordsY > 260) { drawFooter(doc); doc.addPage(); drawHeader(doc); wordsY = 45; }
   doc.text(splitWords, 20, wordsY);
   
-  if (wordsY + (splitWords.length * 5) > 260) {
-    doc.addPage();
-  }
-  const footerBaseline = 265;
-
-  // --- Footer ---
-  doc.setDrawColor(234, 88, 12);
-  doc.line(20, footerBaseline, 190, footerBaseline);
-  
-  // Simplified Logo Branding: No background colors or frame borders
-  try {
-    const logoBase64 = await imageUrlToBase64(appLogoUrl);
-    if (logoBase64) {
-      doc.addImage(logoBase64, 'PNG', 20.5, 271, 10, 10);
-    }
-  } catch (err) {
-    console.warn('Could not fetch app logo for invoice footer');
-  }
-
-  // Branding Details
-  const nameParts = (() => {
-    const n = String(appName || 'BEST VENUE OPTION');
-    if (n.toUpperCase() === 'BEST VANUE OPTION') return { part1: 'BEST VANUE', part2: 'OPTION' };
-    const words = n.split(' ');
-    if (words.length > 1) {
-      const mid = Math.ceil(words.length / 2);
-      return { part1: words.slice(0, mid).join(' '), part2: words.slice(mid).join(' ') };
-    }
-    return { part1: n, part2: '' };
-  })();
-
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(77, 121, 255); // Blue
-  doc.text(nameParts.part1, 35, 276);
-  if (nameParts.part2) {
-    const part1Width = doc.getTextWidth(nameParts.part1 + ' ');
-    doc.setTextColor(255, 77, 77); // Red
-    doc.text(nameParts.part2, 35 + part1Width, 276);
-  }
-  
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  doc.setFont("helvetica", "normal");
-  doc.text(appTagline.toUpperCase(), 35, 281);
-  
-  doc.setTextColor(234, 88, 12);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("WWW.BESTVENUEOPTION.COM", 190, 276, { align: 'right' });
-
-  doc.setFontSize(8);
-  doc.setTextColor(150);
-  doc.setFont("helvetica", "normal");
-  doc.text("Thank you for choosing Best Venue Option!", 105, 275, { align: 'center' }); // Centered but below branding
-  doc.text("This is a computer generated invoice and does not require a physical signature.", 105, 290, { align: 'center' });
+  // No need to call drawFooter manually at the end if we used didDrawPage for the last component?
+  // Actually, didDrawPage only calls on page finish. Transaction history is the last part.
+  // We should call drawFooter one last time for the current page.
+  drawFooter(doc);
   
   doc.save(`Invoice_${customInvoiceNo.replace(/\//g, '_')}.pdf`);
   toast.success('Professional Invoice Downloaded');
