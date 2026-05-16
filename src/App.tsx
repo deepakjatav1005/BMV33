@@ -97,6 +97,7 @@ import {
   Globe,
   MessageCircle,
   Share2,
+  Play,
   ArrowLeft,
   QrCode,
   Bot
@@ -7199,7 +7200,10 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
   }
 
-  // Fetch logo base64 once for all pages
+  // Filter payments to ONLY include those strictly related to this booking ID
+  const relatedPayments = invoicePayments.filter(p => p.booking_id === booking.id || p.id === booking.id);
+  
+  // Fetch logo base64 once
   let logoBase64: string | null = null;
   try {
     logoBase64 = await imageUrlToBase64(appLogoUrl);
@@ -7207,8 +7211,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     console.warn('Could not fetch app logo for invoice');
   }
 
-  // Ensure amount is exactly what was recorded, no automatic deductions
-  const totalReceived = invoicePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalReceived = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
   const isPaid = balanceDue <= 0 && subTotalActual > 0;
@@ -7339,7 +7342,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
   const addTransactionHistory = (startY: number) => {
     let localY = startY;
-    if (invoicePayments.length > 0) {
+    if (relatedPayments.length > 0) {
       if (localY > 220) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
       doc.setDrawColor(200);
       doc.line(20, localY, 190, localY);
@@ -7362,7 +7365,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
       localY += 6;
       
       doc.setTextColor(0);
-      invoicePayments.forEach(p => {
+      relatedPayments.forEach(p => {
         if (localY > 260) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
         const dateRaw = p.paymentDate || p.createdAt;
         const justDate = format(new Date(dateRaw), 'dd/MM/yyyy');
@@ -7484,7 +7487,45 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   return doc.output('blob');
 };
 
-// --- Rating Card View ---
+// --- Custom Brand Icons for Footer ---
+const FacebookIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
+const YoutubeIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
+const WhatsAppIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
 const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | null, venues: Venue[], services: ServiceProvider[] }) => {
   const [selectedId, setSelectedId] = useState('');
   const [activeType, setActiveType] = useState<'venue' | 'service' | 'app'>(profile?.role === 'owner' ? 'venue' : 'service');
@@ -12321,42 +12362,42 @@ export default function App() {
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
                 <AppLogo size="lg" showText={false} />
                 <PoweredByCNZ />
-                <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 bg-gray-800/30 p-8 rounded-[3rem] border border-gray-800/50 backdrop-blur-sm">
+                <div className="flex flex-wrap items-center justify-center gap-4 bg-gray-800/30 p-4 rounded-3xl border border-gray-800/50 backdrop-blur-sm">
                   <a 
                     href="https://www.facebook.com/profile.php?id=61588995675011" 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#1877F2]/20 group"
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-md border border-[#1877F2]/20 group"
                     title="Follow us on Facebook"
                   >
-                    <Share2 size={28} className="group-hover:rotate-12" />
+                    <FacebookIcon size={20} className="group-hover:scale-110 transition-transform" />
                   </a>
                   <a 
                     href="https://www.youtube.com/@BestVanueOption" 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#FF0000]/10 text-[#FF0000] hover:bg-[#FF0000] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#FF0000]/20 group"
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#FF0000]/10 text-[#FF0000] hover:bg-[#FF0000] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-md border border-[#FF0000]/20 group"
                     title="Subscribe to our YouTube Channel"
                   >
-                    <Play size={28} className="group-hover:rotate-12 fill-current" />
+                    <YoutubeIcon size={20} className="group-hover:scale-110 transition-transform" />
                   </a>
                   <a 
                     href="https://chat.whatsapp.com/HdawgS9kChJ3JY4vui3YMi?mode=gi_t" 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-[#25D366]/20 group"
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all duration-300 transform hover:scale-110 shadow-md border border-[#25D366]/20 group"
                     title="Join our WhatsApp Group"
                   >
-                    <MessageCircle size={28} className="group-hover:rotate-12" />
+                    <WhatsAppIcon size={20} className="group-hover:scale-110 transition-transform" />
                   </a>
                   <a 
                     href="https://www.bestvenueoption.com" 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="w-16 h-16 flex items-center justify-center rounded-2xl bg-orange-600/10 text-orange-600 hover:bg-orange-600 hover:text-white transition-all duration-300 transform hover:scale-110 shadow-lg border border-orange-600/20 group"
+                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-orange-600/10 text-orange-600 hover:bg-orange-600 hover:text-white transition-all duration-300 transform hover:scale-110 shadow-md border border-orange-600/20 group"
                     title="Visit Website"
                   >
-                    <Globe size={28} className="group-hover:rotate-12" />
+                    <Globe size={20} className="group-hover:rotate-12 transition-transform" />
                   </a>
                 </div>
                 <div className="text-gray-500 text-sm">
