@@ -220,9 +220,9 @@
 */
 
 import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// import * as XLSX from 'xlsx';
+// import { jsPDF } from 'jspdf';
+// import autoTable from 'jspdf-autotable';
 import { 
   HashRouter as Router, 
   Routes, 
@@ -323,6 +323,18 @@ import { format } from 'date-fns';
 import { calculateDistance as calculateGeoDistance } from './lib/utils';
 import LocationPicker from './components/LocationPicker';
 import LocationDisplay from './components/LocationDisplay';
+
+const AdminCharts = React.lazy(() => import('./components/AdminCharts'));
+const UserDistributionChart = ({ users }: { users: any[] }) => (
+  <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-2xl animate-pulse">Loading Chart...</div>}>
+    <AdminCharts.UserDistributionChart users={users} />
+  </React.Suspense>
+);
+const BookingStatusChart = ({ bookings }: { bookings: any[] }) => (
+  <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-2xl animate-pulse">Loading Chart...</div>}>
+    <AdminCharts.BookingStatusChart bookings={bookings} />
+  </React.Suspense>
+);
 
 const SubscriptionUpgradeModal = ({ isOpen, onClose, onUpgrade }: { isOpen: boolean, onClose: () => void, onUpgrade: () => void }) => {
   if (!isOpen) return null;
@@ -782,77 +794,10 @@ const LOCATION_DATA = locations;
 import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
 import { Database as DbIcon } from 'lucide-react';
 
-import { cn } from './lib/utils';
+import { cn, formatDateDDMMYYYY, formatDateTime12h, formatTime12h, generateTransactionId, imageUrlToBase64 } from './lib/utils';
 
 // --- Translation Data ---
-const translations: Record<string, any> = {
-  en: {
-    home: "Home",
-    gallery: "Gallery",
-    search: "Search",
-    about: "About",
-    rateUs: "Rate Us",
-    registration: "Registration",
-    login: "Login",
-    logout: "Logout",
-    adminPanel: "Admin Panel",
-    dashboard: "Dashboard",
-    bookingManager: "Booking Manager",
-    changePassword: "Change Password",
-    heroTitle: "Plan Your Perfect Event with Confidence",
-    heroTagline: "ALL IN ONE BOOKING PLAT FORM FOR YOUR SPECIAL TIME",
-    searchPlaceholder: "Search venues, caterers, DJs...",
-    searchNow: "Search Now",
-    allStates: "All States",
-    allDistricts: "All Districts",
-    allBlocks: "All Blocks",
-    whyPlanTitle: "Why Plan with BEST VENUE OPTION?",
-    verifiedPartners: "Verified Partners",
-    bestPrices: "Best Prices",
-    support247: "24/7 Support",
-    footerCopyright: "© 2026 BEST VENUE OPTION India. All rights reserved.",
-    joinAsOwner: "Join Us as Venue Owner",
-    joinAsProvider: "Join Us as Service Provider",
-    register: "Register",
-    termsAndConditions: "Terms & Conditions",
-    helpCenter: "Help Center",
-    contactUs: "Contact Us",
-    loginNow: "Login Now"
-  },
-  hi: {
-    home: "होम",
-    gallery: "गैलरी",
-    search: "खोजें",
-    about: "हमारे बारे में",
-    rateUs: "हमें रेट करें",
-    registration: "पंजीकरण",
-    login: "लॉगिन",
-    logout: "लॉगआउट",
-    adminPanel: "एडमिन पैनल",
-    dashboard: "डैशबोर्ड",
-    bookingManager: "बुकिंग मैनेजर",
-    changePassword: "पासवर्ड बदलें",
-    heroTitle: "आत्मविश्वास के साथ अपने सही कार्यक्रम की योजना बनाएं",
-    heroTagline: "आपके विशेष समय के लिए ऑल इन वन बुकिंग प्लेटफॉर्म",
-    searchPlaceholder: "स्थान, कैटरर्स, डीजे खोजें...",
-    searchNow: "अभी खोजें",
-    allStates: "सभी राज्य",
-    allDistricts: "सभी जिले",
-    allBlocks: "सभी ब्लॉक",
-    whyPlanTitle: "BEST VENUE OPTION के साथ योजना क्यों बनाएं?",
-    verifiedPartners: "सत्यापित भागीदार",
-    bestPrices: "सर्वोत्तम मूल्य",
-    support247: "24/7 सहायता",
-    footerCopyright: "© 2026 BEST VENUE OPTION इंडिया। सर्वाधिकार सुरक्षित।",
-    joinAsOwner: "वेन्यू मालिक के रूप में जुड़ें",
-    joinAsProvider: "सेवा प्रदाता के रूप में जुड़ें",
-    register: "पंजीकरण करें",
-    termsAndConditions: "नियम और शर्तें",
-    helpCenter: "सहायता केंद्र",
-    contactUs: "संपर्क करें",
-    loginNow: "अभी लॉगिन करें"
-  }
-};
+import { translations } from './data/translations';
 
 const LanguageContext = React.createContext({
   lang: 'en',
@@ -940,65 +885,7 @@ const getCurrentYear = () => {
   return new Date().getFullYear();
 };
 
-const formatTime12h = (timeStr: string | null | undefined) => {
-  if (!timeStr) return '';
-  try {
-    // Handle timestamp strings that might be passed here
-    if (timeStr.includes('T') || timeStr.includes('-')) {
-      const d = new Date(timeStr);
-      if (!isNaN(d.getTime())) {
-        return format(d, 'hh:mm a');
-      }
-    }
 
-    const parts = timeStr.split(':');
-    if (parts.length < 2) return timeStr;
-    
-    const hours = parts[0];
-    const minutes = parts[1].split(' ')[0]; // Remove any trailing info like ' AM' or ' PM'
-    
-    const h = parseInt(hours);
-    if (isNaN(h)) return timeStr;
-    
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    const m = minutes.padStart(2, '0');
-    return `${h12.toString().padStart(2, '0')}:${m} ${ampm}`;
-  } catch (err) {
-    return timeStr;
-  }
-};
-
-const formatDateTime12h = (date: Date | string | null | undefined) => {
-  if (!date) return '';
-  try {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
-    return format(d, 'dd/MM/yyyy hh:mm a');
-  } catch {
-    return typeof date === 'string' ? date : '';
-  }
-};
-
-const formatDateDDMMYYYY = (date: Date | string | null | undefined) => {
-  if (!date) return '';
-  try {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
-    return format(d, 'dd/MM/yyyy');
-  } catch {
-    return typeof date === 'string' ? date : '';
-  }
-};
-
-const generateTransactionId = (ownerRegId: string, count: number, isManual: boolean = false) => {
-  // Extract only the numeric part from the registration ID (e.g., BVOVO900001 -> 900001)
-  const idNumber = ownerRegId.replace(/\D/g, '') || '000000';
-  const type = isManual ? 'MB' : 'PB';
-  // Serial number resets annually, passed as a count of bookings for the user in the current year
-  const serial = (count + 1).toString().padStart(4, '0');
-  return `BVO/${idNumber}/${type}/${serial}`;
-};
 
 const MultiSelect = ({ 
   label, 
@@ -1084,7 +971,7 @@ const MultiSelect = ({
   );
 };
 
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+// import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 export enum OperationType {
   CREATE = 'create',
@@ -2424,11 +2311,13 @@ const Hero = ({ banners }: { banners: AppBanner[] }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 2 }}
+            transition={{ duration: 0.8 }} // Reduced duration for faster perceived load
             src={resolveUrl(banners[currentBanner]?.imageUrl) || defaultBanner} 
             alt="Wedding Venue" 
             className="w-full h-full object-cover brightness-50"
             referrerPolicy="no-referrer"
+            loading="eager"
+            fetchPriority="high"
           />
         </AnimatePresence>
       </div>
@@ -2662,7 +2551,7 @@ const CategoryDisplay = () => {
 // --- Utilities ---
 
 
-const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
+const VenueCard = React.memo(({ venue }: { venue: Venue, key?: any }) => (
   <motion.div 
     whileHover={{ y: -5 }}
     className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100"
@@ -2673,6 +2562,7 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
           src={resolveUrl(venue.images?.[0]) || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
           alt={venue.name} 
           className="w-full h-full object-cover"
+          loading="lazy"
           referrerPolicy="no-referrer"
         />
       </div>
@@ -2707,9 +2597,9 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
       </div>
     </Link>
   </motion.div>
-);
+));
 
-const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
+const ServiceCard = React.memo(({ service }: { service: ServiceProvider, key?: any }) => {
   return (
     <motion.div 
       whileHover={{ y: -5 }}
@@ -2721,6 +2611,7 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
             src={resolveUrl(service.images?.[0]) || 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800'} 
             alt={service.name} 
             className="w-full h-full object-cover"
+            loading="lazy"
             referrerPolicy="no-referrer"
           />
         </div>
@@ -2751,7 +2642,7 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
       </Link>
     </motion.div>
   );
-};
+});
 
 // --- Pages ---
 
@@ -2766,26 +2657,26 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-orange-100"
+        className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl border border-orange-100 max-h-[90vh] overflow-y-auto"
       >
-        <div className="bg-orange-600 p-8 text-white text-center relative">
+        <div className="bg-orange-600 p-8 text-white text-center relative sticky top-0 z-10">
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
             <CheckCircle size={40} className="text-white" />
           </div>
-          <h2 className="text-3xl font-bold">Registration Successful!</h2>
-          <p className="mt-2 opacity-90">Welcome to the BEST VENUE OPTION family</p>
+          <h2 className="text-2xl md:text-3xl font-bold">Registration Successful!</h2>
+          <p className="mt-2 opacity-90 text-sm md:text-base">Welcome to the BEST VENUE OPTION family</p>
         </div>
 
-        <div className="p-8 space-y-6">
+        <div className="p-6 md:p-8 space-y-6">
           <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100 space-y-4">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Your Registration ID</p>
-                <p className="text-2xl font-black text-gray-900 font-mono">{regId}</p>
+                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Your Registration ID</p>
+                <p className="text-xl md:text-2xl font-black text-gray-900 font-mono">{regId}</p>
               </div>
               <button onClick={() => handleCopy(regId)} className="p-2 bg-white text-orange-600 rounded-xl shadow-sm hover:bg-orange-100 transition-colors">
                 <Plus size={20} className="rotate-45" />
@@ -2794,8 +2685,8 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
             <div className="h-px bg-orange-200" />
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Your Initial Password</p>
-                <p className="text-2xl font-black text-gray-900 font-mono">{mobileNumber}</p>
+                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Your Initial Password</p>
+                <p className="text-xl md:text-2xl font-black text-gray-900 font-mono">{mobileNumber}</p>
               </div>
               <button onClick={() => handleCopy(mobileNumber)} className="p-2 bg-white text-orange-600 rounded-xl shadow-sm hover:bg-orange-100 transition-colors">
                 <Plus size={20} className="rotate-45" />
@@ -2804,23 +2695,23 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
           </div>
 
           <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-start space-x-3">
-            <AlertCircle className="text-blue-600 mt-0.5" size={20} />
-            <p className="text-sm text-blue-800">
+            <AlertCircle className="text-blue-600 mt-0.5 flex-shrink-0" size={20} />
+            <p className="text-[11px] md:text-sm text-blue-800">
               Please note down these credentials. You can also send a welcome message to your WhatsApp number <strong>{mobileNumber}</strong>.
             </p>
           </div>
 
           <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-100 space-y-3">
-            <h4 className="font-bold text-yellow-800 flex items-center">
+            <h4 className="font-bold text-yellow-800 flex items-center text-sm md:text-base">
               <Star size={18} className="mr-2 fill-yellow-500 text-yellow-500" />
               Unlock Premium Features
             </h4>
-            <p className="text-sm text-yellow-700">
+            <p className="text-[11px] md:text-sm text-yellow-700">
               Get full access to the booking manager, unlimited venue listings, and smart analytics by subscribing to a professional plan.
             </p>
             <Link 
               to="/pricing" 
-              className="inline-block bg-yellow-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-yellow-700 transition-colors shadow-lg shadow-yellow-200"
+              className="inline-block bg-yellow-600 text-white px-6 py-2 rounded-xl font-bold text-xs md:text-sm hover:bg-yellow-700 transition-colors shadow-lg shadow-yellow-200"
               onClick={onClose}
             >
               View Subscription Plans
@@ -2833,14 +2724,14 @@ const RegistrationSuccessModal = ({ isOpen, onClose, regId, mobileNumber }: { is
                 const whatsappMsg = `*Welcome to Event Manager!*%0A%0AHello, your registration is successful.%0A%0A*Your ID:* ${regId}%0A*Your Password:* ${mobileNumber}%0A%0APlease login at: ${window.location.origin}/%23/login%0A%0AThank you for joining us!`;
                 window.open(`https://wa.me/91${mobileNumber}?text=${whatsappMsg}`, '_blank');
               }}
-              className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-700 shadow-xl shadow-green-200 transition-all flex items-center justify-center space-x-2"
+              className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-base md:text-lg hover:bg-green-700 shadow-xl shadow-green-200 transition-all flex items-center justify-center space-x-2"
             >
               <span>Send WhatsApp Welcome</span>
             </button>
 
             <button 
               onClick={onClose}
-              className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all"
+              className="w-full bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold text-base md:text-lg hover:bg-gray-200 transition-all"
             >
               Skip, Proceed to Login
             </button>
@@ -7277,24 +7168,11 @@ const numberToWords = (num: number): string => {
   return convert(num) + ' Rupees Only';
 };
 
-const imageUrlToBase64 = async (url: string): Promise<string | null> => {
-  if (!url) return null;
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    console.error('Error fetching image for invoice:', e);
-    return null;
-  }
-};
+
 
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
+  const { jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF();
   
   // Fetch App Branding from admin_settings
@@ -7707,7 +7585,8 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     }
   }, [selectedId, activeType]);
 
-  const downloadCard = () => {
+  const downloadCard = async () => {
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -7975,7 +7854,7 @@ const DashboardView = ({
     year: new Date().getFullYear().toString()
   });
 
-  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
     const filteredBookings = bookings.filter(b => {
       const bName = (b.visitorName || b.partyName || '').toLowerCase();
       const bMobile = b.visitorMobile || '';
@@ -7991,6 +7870,7 @@ const DashboardView = ({
     });
 
     if (type === 'excel') {
+      const XLSX = await import('xlsx');
       const data = filteredBookings.map((b, index) => {
         const total = Number(b.updatedAmount || b.totalAmount || 0);
         const totalReceived = (b.payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
@@ -8017,6 +7897,8 @@ const DashboardView = ({
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
       XLSX.writeFile(workbook, `Booking_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     } else {
+      const { jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
@@ -12570,6 +12452,7 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId), [items, selectedItemId]);
 
   const generateFlex = async () => {
+    const { jsPDF } = await import('jspdf');
     const sizeObj = selectedType === 4 
       ? cardSizes.find(s => s.value === selectedInchSize) 
       : flexSizes.find(s => s.value === selectedSize);
@@ -13503,7 +13386,7 @@ const AdminView = ({
     }
   };
 
-  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
     if (activeTab === 'users') {
       const data = users.map(u => ({
         'Registration ID': u.registrationId,
@@ -13516,12 +13399,15 @@ const AdminView = ({
       }));
       
       if (type === 'excel') {
+        const XLSX = await import('xlsx');
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
         XLSX.writeFile(workbook, "registered_users_report.xlsx");
         toast.success('User report downloaded');
       } else {
+        const { jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
         const doc = new jsPDF();
         doc.text("Registered Users Report", 14, 15);
         autoTable(doc, {
@@ -13923,47 +13809,13 @@ const AdminView = ({
                       <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
                       <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height={300} debounce={50}>
-                          <PieChart>
-                            <Pie
-                              data={[
-                                { name: 'Owners', value: users.filter(u => u.role === 'owner').length },
-                                { name: 'Providers', value: users.filter(u => u.role === 'provider').length }
-                              ]}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              <Cell fill="#f97316" />
-                              <Cell fill="#0ea5e9" />
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        <UserDistributionChart users={users} />
                       </div>
                     </div>
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <h4 className="text-lg font-bold text-gray-900 mb-6">Booking Status</h4>
                       <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height={300} debounce={50}>
-                          <BarChart data={[
-                            { name: 'Total', count: bookings.length },
-                            { name: 'Completed', count: bookings.filter(b => {
-                              const bTotal = Number(b.updatedAmount || b.totalAmount || 0);
-                              const bPaid = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                              return (bPaid >= (bTotal - 0.1) && bTotal > 0) || b.status === 'completed' || b.status === 'paid' || b.paymentStatus === 'Paid';
-                            }).length },
-                            { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
-                            { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
-                          ]}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <BookingStatusChart bookings={bookings} />
                       </div>
                     </div>
                   </div>
