@@ -1,0 +1,9 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Host
+Host: https://www.bestvenueoption.com
+
+# Sitemaps
+Sitemap: https://www.bestvenueoption.com/sitemap.xml

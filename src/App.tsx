@@ -12350,7 +12350,7 @@ export default function App() {
                 </div>
               </div>
               <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
-                <AppLogo size="lg" showText={false} />
+                <AppLogo size="lg" showText={false} circleBg={true} />
                 <PoweredByCNZ />
                 <div className="flex flex-wrap items-center justify-center gap-3 bg-gray-800/30 p-3 rounded-2xl border border-gray-800/50 backdrop-blur-sm">
                   <a 
