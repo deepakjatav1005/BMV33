@@ -6,6 +6,7 @@ import Razorpay from "razorpay";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import multer from "multer";
+import compression from "compression";
 
 console.log(">>> [BOOT] NODEJS PROCESS STARTED <<<");
 console.log(">>> [BOOT] NODE VERSION:", process.version);
@@ -135,6 +136,9 @@ async function startServer() {
   
   const app = express();
   const PORT = 3000;
+
+  // Gzip compression middleware
+  app.use(compression());
 
   // Request logging middleware
   app.use((req, res, next) => {
@@ -624,7 +628,18 @@ async function startServer() {
       console.log(">>> [INFO] Current directory contents:", fs.readdirSync(__dirname));
     }
 
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: '1y',
+      etag: true,
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       const indexPath = path.join(distPath, "index.html");
       if (!fs.existsSync(indexPath)) {
@@ -651,7 +666,18 @@ async function startServer() {
     } catch (e) {
       console.warn(">>> [WARN] Vite not found, falling back to static serving");
       const distPath = path.resolve(__dirname, "dist");
-      app.use(express.static(distPath));
+      app.use(express.static(distPath, {
+        maxAge: '1y',
+        etag: true,
+        immutable: true,
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          }
+        }
+      }));
       app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"), (err) => {
           if (err) {

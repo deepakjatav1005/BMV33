@@ -4,9 +4,6 @@
    */
   
   import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { 
   HashRouter as Router, 
   Routes, 
@@ -97,7 +94,6 @@ import {
   Globe,
   MessageCircle,
   Share2,
-  Play,
   ArrowLeft,
   QrCode,
   Bot
@@ -889,7 +885,7 @@ const MultiSelect = ({
   );
 };
 
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+const AdminCharts = React.lazy(() => import('./components/AdminCharts'));
 
 export enum OperationType {
   CREATE = 'create',
@@ -7172,6 +7168,8 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
 };
 
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF();
   
   // Fetch App Branding from admin_settings
@@ -7221,7 +7219,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
   }
 
-  const relatedPayments = (invoicePayments || []).filter(p => 
+  const relatedPayments = (invoicePayments || []).filter((p: any) => 
     p && (p.booking_id === booking.id || p.bookingId === booking.id || p.id === booking.id)
   );
   
@@ -7266,7 +7264,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   };
 
   // --- MODULAR DRAWERS ---
-  const drawHeader = (d: jsPDF) => {
+  const drawHeader = (d: any) => {
     const headerTitle = (booking.targetName || "BUSINESS").split('(')[0].trim().toUpperCase();
     d.setFontSize(20);
     d.setTextColor(234, 88, 12); 
@@ -7303,7 +7301,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     return 45; 
   };
 
-  const drawFooter = (d: jsPDF) => {
+  const drawFooter = (d: any) => {
     const footerBaseline = 282;
     d.setDrawColor(234, 88, 12);
     d.setLineWidth(0.3);
@@ -7487,7 +7485,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.text(`₹ ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 5;
   doc.setFontSize(10);
-  doc.setTextColor(balanceDue > 0 ? [220, 38, 38] : [22, 163, 74]);
+  if (balanceDue > 0) {
+    doc.setTextColor(220, 38, 38);
+  } else {
+    doc.setTextColor(22, 163, 74);
+  }
   doc.text("Balance Due:", 110, currentY);
   doc.text(`₹ ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 10;
@@ -7581,7 +7583,8 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
     }
   }, [selectedId, activeType]);
 
-  const downloadCard = () => {
+  const downloadCard = async () => {
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -7849,7 +7852,7 @@ const DashboardView = ({
     year: new Date().getFullYear().toString()
   });
 
-  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
     const filteredBookings = bookings.filter(b => {
       const bName = (b.visitorName || b.partyName || '').toLowerCase();
       const bMobile = b.visitorMobile || '';
@@ -7886,11 +7889,14 @@ const DashboardView = ({
           'Type': b.isManual ? 'Manual' : 'Order'
         };
       });
+      const XLSX = await import('xlsx');
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Bookings");
       XLSX.writeFile(workbook, `Booking_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     } else {
+      const { jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
       const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
       doc.setFontSize(18);
       doc.text("Booking Transaction Report", 14, 20);
@@ -12468,6 +12474,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
     
     if (!sizeObj) return;
 
+    const { jsPDF } = await import('jspdf');
+
     // Use landscape if width > height
     const orientation = sizeObj.w >= sizeObj.h ? 'l' : 'p';
     const doc = new jsPDF({
@@ -13395,7 +13403,7 @@ const AdminView = ({
     }
   };
 
-  const downloadReport = (type: 'excel' | 'pdf' = 'excel') => {
+  const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
     if (activeTab === 'users') {
       const data = users.map(u => ({
         'Registration ID': u.registrationId,
@@ -13408,12 +13416,15 @@ const AdminView = ({
       }));
       
       if (type === 'excel') {
+        const XLSX = await import('xlsx');
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
         XLSX.writeFile(workbook, "registered_users_report.xlsx");
         toast.success('User report downloaded');
       } else {
+        const { jsPDF } = await import('jspdf');
+        const autoTable = (await import('jspdf-autotable')).default;
         const doc = new jsPDF();
         doc.text("Registered Users Report", 14, 15);
         autoTable(doc, {
@@ -13811,54 +13822,16 @@ const AdminView = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                      <h4 className="text-lg font-bold text-gray-900 mb-6">User Distribution</h4>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height={300} debounce={50}>
-                          <PieChart>
-                            <Pie
-                              data={[
-                                { name: 'Owners', value: users.filter(u => u.role === 'owner').length },
-                                { name: 'Providers', value: users.filter(u => u.role === 'provider').length }
-                              ]}
-                              innerRadius={60}
-                              outerRadius={80}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              <Cell fill="#f97316" />
-                              <Cell fill="#0ea5e9" />
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                    <React.Suspense fallback={
+                      <div className="h-[350px] col-span-2 flex items-center justify-center bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm text-gray-500">
+                        <div className="flex flex-col items-center">
+                          <Loader className="animate-spin text-orange-500 mb-3" size={32} />
+                          <span className="font-medium text-sm">Loading charts and statistics...</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                      <h4 className="text-lg font-bold text-gray-900 mb-6">Booking Status</h4>
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height={300} debounce={50}>
-                          <BarChart data={[
-                            { name: 'Total', count: bookings.length },
-                            { name: 'Completed', count: bookings.filter(b => {
-                              const bTotal = Number(b.updatedAmount || b.totalAmount || 0);
-                              const bPaid = (b.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-                              return (bPaid >= (bTotal - 0.1) && bTotal > 0) || b.status === 'completed' || b.status === 'paid' || b.paymentStatus === 'Paid';
-                            }).length },
-                            { name: 'Pending', count: bookings.filter(b => (!b.paymentStatus || b.paymentStatus === 'Pending') && b.status !== 'cancelled' && b.status !== 'completed' && b.status !== 'paid').length },
-                            { name: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length }
-                          ]}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </div>
+                    }>
+                      <AdminCharts users={users} bookings={bookings} />
+                    </React.Suspense>
 
                   <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                     <h3 className="text-xl font-bold text-gray-900 mb-6">Subscription Statistics</h3>
