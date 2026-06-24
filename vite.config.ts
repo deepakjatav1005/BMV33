@@ -26,6 +26,8 @@ export default defineConfig(({ mode }) => {
             if (id.includes('node_modules')) {
               if (id.includes('jspdf')) return 'vendor-jspdf';
               if (id.includes('xlsx')) return 'vendor-xlsx';
+              if (id.includes('qrcode')) return 'vendor-qrcode';
+              if (id.includes('google-maps') || id.includes('@react-google-maps')) return 'vendor-maps';
               if (id.includes('lucide-react')) return 'vendor-lucide';
               if (id.includes('motion')) return 'vendor-motion';
               if (id.includes('@supabase')) return 'vendor-supabase';

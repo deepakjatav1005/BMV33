@@ -98,7 +98,6 @@ import {
   QrCode,
   Bot
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -122,8 +121,20 @@ export const WhatsAppIcon = ({ size = 24, className = "" }: { size?: number, cla
   </svg>
 );
 import { calculateDistance as calculateGeoDistance } from './lib/utils';
-import LocationPicker from './components/LocationPicker';
-import LocationDisplay from './components/LocationDisplay';
+
+const LazyLocationPicker = React.lazy(() => import('./components/LocationPicker'));
+const LocationPicker = (props: any) => (
+  <React.Suspense fallback={<div className="h-[350px] bg-gray-50 rounded-3xl animate-pulse flex items-center justify-center text-gray-400 font-bold text-sm">Loading location selector...</div>}>
+    <LazyLocationPicker {...props} />
+  </React.Suspense>
+);
+
+const LazyLocationDisplay = React.lazy(() => import('./components/LocationDisplay'));
+const LocationDisplay = (props: any) => (
+  <React.Suspense fallback={<div className="h-[300px] bg-gray-50 rounded-3xl animate-pulse flex items-center justify-center text-gray-400 font-bold text-sm">Loading map view...</div>}>
+    <LazyLocationDisplay {...props} />
+  </React.Suspense>
+);
 
 const SubscriptionUpgradeModal = ({ isOpen, onClose, onUpgrade }: { isOpen: boolean, onClose: () => void, onUpgrade: () => void }) => {
   if (!isOpen) return null;
@@ -7570,15 +7581,20 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
         url = `${window.location.origin}/#${activeType === 'venue' ? '/venues/' : '/services/'}${selectedId}?review=true#reviews`;
       }
       
-      QRCode.toDataURL(url, { 
-        width: 600, 
-        margin: 2,
-        color: {
-          dark: '#ea580c', // orange-600
-          light: '#ffffff'
-        }
-      }, (err, url) => {
-        if (!err) setQrDataUrl(url);
+      import('qrcode').then((QRCodeModule) => {
+        const QRCode = QRCodeModule.default || QRCodeModule;
+        QRCode.toDataURL(url, { 
+          width: 600, 
+          margin: 2,
+          color: {
+            dark: '#ea580c', // orange-600
+            light: '#ffffff'
+          }
+        }, (err: any, url: string) => {
+          if (!err) setQrDataUrl(url);
+        });
+      }).catch(err => {
+        console.error("Failed to load qrcode library:", err);
       });
     }
   }, [selectedId, activeType]);
@@ -12632,6 +12648,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
 
       try {
         const url = `${window.location.origin}/${selectedType === 1 ? 'venues' : 'services'}/${item.id}`;
+        const QRCodeLib = await import('qrcode');
+        const QRCode = QRCodeLib.default || QRCodeLib;
         const qr = await QRCode.toDataURL(url, { width: 1000, margin: 2 });
         doc.addImage(qr, 'PNG', bQrX, bQrY, qrSize, qrSize);
       } catch(e) {}
@@ -12761,6 +12779,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       // -- ILLUSTRATION / ICON at bottom right of main --
       try {
         const url = `${window.location.origin}/#/registration`;
+        const QRCodeLib = await import('qrcode');
+        const QRCode = QRCodeLib.default || QRCodeLib;
         const qr = await QRCode.toDataURL(url, { width: 500, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } });
         doc.addImage(qr, 'PNG', pageWidth - margin - (pageHeight * 0.2), pageHeight * 0.65, pageHeight * 0.2, pageHeight * 0.2);
         doc.setFontSize(pageHeight * 0.02);
@@ -12823,6 +12843,8 @@ const FlexBannerDownloadView = ({ venues, services }: { venues: Venue[], service
       const bQrY = pageHeight * 0.56;
       
       try {
+        const QRCodeLib = await import('qrcode');
+        const QRCode = QRCodeLib.default || QRCodeLib;
         const qr = await QRCode.toDataURL(window.location.origin + "/#/app-rating", { 
           width: 1000, 
           margin: 2,
