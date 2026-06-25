@@ -22,6 +22,7 @@ let pool: mysql.Pool;
 let isDbHealthy = true;
 let lastDbCheck = 0;
 let lastOutboundIp = "Checking...";
+let lastDbError: any = null;
 const DB_CHECK_INTERVAL = 5000; // Check every 5s if requested
 
 // adding comment to check override issue
@@ -56,8 +57,10 @@ async function checkDbHealth(force = false) {
     connection.release();
     console.log(">>> [HEALTH CHECK] Connection successful.");
     isDbHealthy = true;
+    lastDbError = null;
     return true;
   } catch (err: any) {
+    lastDbError = err;
     console.error(">>> [HEALTH CHECK] MySQL Connection ERROR:", err.message);
     if (err.code) console.error(">>> [HEALTH CHECK] ERROR CODE:", err.code);
     
@@ -65,6 +68,10 @@ async function checkDbHealth(force = false) {
       console.error(">>> [CRITICAL ADVICE] Your MySQL host is not responding. This is 99% a Firewall/IP whitelisting issue.");
       console.error(">>> [ACTION REQUIRED] Go to your Hosting Panel (Hostinger/CPanel) -> Remote MySQL -> Add '%' as an allowed host.");
       console.error(">>> [CURRENT_HOST]:", process.env.MYSQL_HOST);
+      console.error(">>> [WHITELIST THIS IP]:", lastOutboundIp);
+    } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error(">>> [CRITICAL ADVICE] MySQL Access Denied. Your host is reachable, but rejecting the connection.");
+      console.error(">>> [ACTION REQUIRED] Go to your Hosting Panel (Hostinger/CPanel) -> Remote MySQL -> Ensure user has access and '%' or '" + lastOutboundIp + "' is whitelisted.");
       console.error(">>> [WHITELIST THIS IP]:", lastOutboundIp);
     }
     
@@ -215,23 +222,34 @@ async function startServer() {
       const maskedHost = host.length > 5 ? host.substring(0, 3) + '...' + host.substring(host.length - 2) : '***';
       
       if (!healthy) {
-        let specificAdvice = "Whitelisting '%' for Remote MySQL in Hostinger/CPanel is usually required.";
+        const errorMsg = lastDbError ? lastDbError.message : "Database connection failed or timed out.";
+        const errorCode = lastDbError ? lastDbError.code : "ETIMEDOUT";
         
-        // Check for specific error patterns if we can get them from a shared variable or re-test
-        // For now, give a more comprehensive advice block
+        let troubleshooting = [
+          "1. Double-check that '%' is whitelisted in Hostinger/CPanel Remote MySQL.",
+          `2. If '%' doesn't work, try whitelisting specific outbound IP: ${lastOutboundIp}`,
+          "3. Verify Host, Port, Database name, User, and Password in your configuration.",
+          "4. Ensure your DB user has permissions for the specific database.",
+          "5. Verify if your host requires SSL (some do). If so, set MYSQL_SSL=true."
+        ];
+
+        if (errorCode === 'ER_ACCESS_DENIED_ERROR') {
+          troubleshooting = [
+            "1. ACCESS DENIED: The connection succeeded but the credentials were rejected or the IP is blocked.",
+            `2. Fix: Whitelist '%' or '${lastOutboundIp}' in your Hostinger/cPanel 'Remote MySQL' panel.`,
+            "3. Double-check your MYSQL_USER and MYSQL_PASSWORD are correct.",
+            "4. Make sure your user actually has ALL PRIVILEGES granted to the target database."
+          ];
+        }
+
         return res.status(503).json({
           status: "error",
           database: "MySQL Unreachable",
           host: maskedHost,
           outbound_ip: lastOutboundIp,
-          error_code: "ETIMEDOUT",
-          troubleshooting: [
-            "1. Double-check that '%' is whitelisted in Hostinger/CPanel Remote MySQL.",
-            `2. If '%' doesn't work, try whitelisting specific IP: ${lastOutboundIp}`,
-            "3. Ensure your DB user has permissions for the specific database.",
-            "4. Verify if your host requires SSL (some do). If so, set MYSQL_SSL=true.",
-            "5. Make sure the port is actually 3306."
-          ],
+          error_message: errorMsg,
+          error_code: errorCode,
+          troubleshooting: troubleshooting,
           timestamp: new Date().toISOString()
         });
       }

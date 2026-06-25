@@ -1908,18 +1908,35 @@ const ImageUpload = ({
 const DatabaseStatusIndicator = () => {
   const [isOffline, setIsOffline] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [errCode, setErrCode] = useState<string | null>(null);
+  const [outboundIp, setOutboundIp] = useState<string | null>(null);
+  const [troubleshooting, setTroubleshooting] = useState<string[]>([]);
 
   useEffect(() => {
-    // Import checking functions dynamically or use shared state
     const check = async () => {
       const offline = (window as any).forceOffline || false;
       setIsOffline(offline);
+      if (offline && !dbError) {
+        try {
+          const response = await fetch('/api/health');
+          const data = await response.json();
+          if (data.status === 'error') {
+            setDbError(data.error_message || "Database connection failed");
+            setErrCode(data.error_code || "ETIMEDOUT");
+            setOutboundIp(data.outbound_ip || "Unknown");
+            setTroubleshooting(data.troubleshooting || []);
+          }
+        } catch (e) {
+          // Fallback if network is completely unreachable
+        }
+      }
     };
     
     check();
     const interval = setInterval(check, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dbError]);
 
   const handleReconnect = async () => {
     setIsChecking(true);
@@ -1931,11 +1948,16 @@ const DatabaseStatusIndicator = () => {
         // Force back to online
         (window as any).forceOffline = false;
         setIsOffline(false);
+        setDbError(null);
         toast.success('Database reconnected successfully!');
         window.location.reload(); // Refresh to resync
       } else {
-        const errorMsg = result.error || result.database || 'Database is still unreachable.';
+        const errorMsg = result.error_message || result.error || result.database || 'Database is still unreachable.';
         toast.error(errorMsg);
+        setDbError(errorMsg);
+        setErrCode(result.error_code || "ETIMEDOUT");
+        setOutboundIp(result.outbound_ip || "Unknown");
+        setTroubleshooting(result.troubleshooting || []);
         console.warn('Reconnect failed:', result);
       }
     } catch (err) {
@@ -1960,20 +1982,33 @@ const DatabaseStatusIndicator = () => {
       </button>
       
       {/* Tooltip */}
-      <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl shadow-xl border border-red-100 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-[100]">
-        <p className="text-[10px] text-gray-700 font-bold mb-1">
-          Database Connection Failed
+      <div className="absolute top-full right-0 mt-2 w-72 p-4 bg-white rounded-2xl shadow-xl border border-red-100 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-[100] text-left">
+        <p className="text-xs text-gray-800 font-extrabold mb-1">
+          MySQL Connection Failure ({errCode || "ETIMEDOUT"})
         </p>
-        <p className="text-[9px] text-gray-500 font-medium leading-tight mb-2">
-          Backend connection timed out (ETIMEDOUT). This usually means your MySQL host is blocking our connection.
+        <p className="text-[10px] text-red-600 font-semibold mb-2 leading-snug break-words">
+          Error: {dbError || "Connection timed out. MySQL host not responding."}
         </p>
+        {outboundIp && (
+          <div className="bg-gray-50 border border-gray-100 p-1.5 rounded-lg mb-2 flex justify-between items-center text-[9px]">
+            <span className="text-gray-500 font-medium">Your Outbound IP:</span>
+            <code className="text-orange-600 font-black">{outboundIp}</code>
+          </div>
+        )}
         <div className="space-y-1">
-          <p className="text-[8px] text-red-600 font-black uppercase tracking-widest">How to Fix:</p>
-          <ul className="text-[8px] text-gray-600 list-disc pl-3 space-y-0.5">
-            <li>Go to CPanel/Hostinger -&gt; Remote MySQL</li>
-            <li>Add <code className="bg-gray-100 px-0.5 rounded">%</code> to whitelist all IPs</li>
-            <li>If that fails, check the server logs (F12 -&gt; Console) for <strong className="text-red-700">WHITELIST THIS IP</strong> and add that specific IP.</li>
-            <li>Verify Host, Port, and Credentials</li>
+          <p className="text-[9px] text-gray-800 font-extrabold uppercase tracking-wider">Troubleshooting Steps:</p>
+          <ul className="text-[9px] text-gray-600 list-disc pl-3.5 space-y-1 font-medium">
+            {troubleshooting.length > 0 ? (
+              troubleshooting.map((step, idx) => (
+                <li key={idx} className="leading-tight">{step}</li>
+              ))
+            ) : (
+              <>
+                <li className="leading-tight">Go to CPanel/Hostinger -&gt; Remote MySQL</li>
+                <li className="leading-tight">Add <code className="bg-gray-100 px-1 rounded text-red-500">%</code> to whitelist all IPs</li>
+                <li className="leading-tight">Verify Host, Port, and Credentials in settings</li>
+              </>
+            )}
           </ul>
         </div>
       </div>
