@@ -2521,6 +2521,7 @@ const VenueCard = ({ venue }: { venue: Venue, key?: any }) => (
           alt={venue.name} 
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
+          loading="lazy"
         />
       </div>
       <div className="p-5">
@@ -2569,6 +2570,7 @@ const ServiceCard = ({ service }: { service: ServiceProvider, key?: any }) => {
             alt={service.name} 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            loading="lazy"
           />
         </div>
         <div className="p-5">
@@ -3725,6 +3727,7 @@ const ServiceInfoStickers = () => {
                   alt={service.title} 
                   className="w-full h-full object-contain relative z-10 drop-shadow-[0_20px_30px_rgba(0,0,0,0.15)] group-hover:drop-shadow-[0_25px_35px_rgba(0,0,0,0.2)] transition-all duration-500"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
               </div>
               <h3 className={`text-2xl font-black ${service.textColor} mb-3`}>{service.title}</h3>
@@ -3825,6 +3828,7 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boole
                   alt="Moment" 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -3900,6 +3904,7 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: 
                   alt={p.serviceType} 
                   className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
               </div>
               <div className="absolute inset-x-0 bottom-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-100/50 flex items-center justify-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
