@@ -591,7 +591,7 @@ import { locations } from './data/locations';
 const LOCATION_DATA = locations;
 
 // Mock database to remove backend connection as requested
-import { dataService as db, isSupabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
+import { dataService as db, isDatabaseConnected, setOfflineMode, resolveUrl, getIsOffline, generateUUID } from './services/dataService';
 import { Database as DbIcon } from 'lucide-react';
 
 import { cn } from './lib/utils';
@@ -3172,7 +3172,9 @@ const RegistrationView = () => {
 
       <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-orange-100 relative">
         <div className="bg-orange-600 p-8 text-white text-center flex flex-col items-center">
-          <AppLogo size="lg" showText={false} className="mb-4" />
+          <div className="bg-white/20 p-4 rounded-full mb-4">
+            <Users size={32} />
+          </div>
           <h1 className="text-3xl font-bold">Partner Registration</h1>
           <p className="mt-2 opacity-90">Join India's largest event planning network</p>
         </div>
@@ -3438,7 +3440,9 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
           <span>Back to Home</span>
         </Link>
         <div className="text-center mb-10">
-          <AppLogo size="xl" className="justify-center mb-4" showText={false} />
+          <div className="inline-flex items-center justify-center bg-orange-50 p-4 rounded-full text-orange-600 mb-4">
+            <Lock size={32} />
+          </div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Login Portal</h1>
           <p className="text-gray-500 mt-2 font-medium">Enter your credentials to continue</p>
         </div>
@@ -3586,7 +3590,9 @@ const AboutView = () => {
         <Home size={18} />
         <span>{t('home')}</span>
       </Link>
-      <AppLogo size="xl" className="justify-center mb-8" showText={false} />
+      <div className="inline-flex items-center justify-center bg-orange-100 p-6 rounded-full text-orange-600 mb-8 mt-4">
+        <Info size={48} />
+      </div>
       <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VENUE OPTION</h1>
       <p className="text-xl text-gray-600 leading-relaxed mb-12">
         BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
@@ -9724,8 +9730,8 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 md:p-10 rounded-[2.5rem] border border-orange-100 shadow-2xl shadow-orange-100/20 gap-8 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-64 h-64 bg-orange-50 rounded-full -mr-20 -mt-20 blur-3xl opacity-50 group-hover:scale-110 transition-transform duration-700" />
         <div className="flex items-center gap-8 relative z-10">
-          <div className="bg-white p-4 rounded-3xl shadow-xl border border-orange-50">
-            <AppLogo size="xl" />
+          <div className="bg-orange-50 p-6 rounded-3xl shadow-xl border border-orange-100 text-orange-600">
+            <Sparkles size={48} className="animate-pulse" />
           </div>
         </div>
         <div className="text-center md:text-right relative z-10">
@@ -10356,7 +10362,7 @@ const AddServiceView = ({ user, profile }: { user: any, profile: UserProfile | n
       if (error) {
         console.error('Add Service Error:', error);
         if (error.message?.includes('column "facilities" does not exist') || error.message?.includes('schema cache')) {
-          toast.error('Failed to add service: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in Supabase.', { duration: 10000 });
+          toast.error('Failed to add service: DB schema outdated. Please run the MASTER SQL SCRIPT migration section in the Database settings panel.', { duration: 10000 });
         } else {
           toast.error(`Failed to add service: ${error.message || 'Unknown error'}`);
         }
@@ -11797,7 +11803,7 @@ const DatabaseMonitor = () => {
   const [isRetrying, setIsRetrying] = useState(false);
 
   const check = useCallback(async () => {
-    if (!isSupabaseConnected || getIsOffline()) {
+    if (!isDatabaseConnected || getIsOffline()) {
       setStatus('mock');
       return;
     }
@@ -11933,13 +11939,13 @@ export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
   
   useEffect(() => {
-    console.log(`[DATABASE] Mode: ${isSupabaseConnected ? 'REAL SUPABASE' : 'MOCK DATA'}`);
-    if (isSupabaseConnected) {
+    console.log(`[DATABASE] Mode: ${isDatabaseConnected ? 'REAL DATABASE' : 'MOCK DATA'}`);
+    if (isDatabaseConnected) {
       // Test connection
       db.from('users').select('uid').limit(1).then(({ error }) => {
         if (error) {
           console.error('[DATABASE] Connection test failed:', error.message);
-          toast.error('Database connection failed. Please check your Supabase keys.');
+          toast.error('Database connection failed. Please check your database settings.');
         } else {
           console.log('[DATABASE] Connection test successful!');
         }
@@ -12262,12 +12268,17 @@ export default function App() {
 
     if (loading) {
       return (
-        <div className="h-screen flex items-center justify-center bg-orange-50">
+        <div className="h-screen flex flex-col items-center justify-center bg-orange-50/50">
           <motion.div 
-            animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-            transition={{ repeat: Infinity, duration: 2 }}
+            animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            className="flex flex-col items-center space-y-4"
           >
-            <AppLogo size="xl" />
+            <div className="h-16 w-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <div className="text-center">
+              <span className="text-2xl font-black text-blue-600">BEST VENUE </span>
+              <span className="text-2xl font-black text-red-500">OPTION</span>
+            </div>
           </motion.div>
         </div>
       );
@@ -12406,8 +12417,7 @@ export default function App() {
                   </ul>
                 </div>
               </div>
-              <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-8">
-                <AppLogo size="lg" showText={false} circleBg={true} />
+              <div className="mt-16 pt-8 border-t border-gray-800 flex flex-col items-center justify-center space-y-6">
                 <PoweredByCNZ />
                 <div className="flex flex-wrap items-center justify-center gap-3 bg-gray-800/30 p-3 rounded-2xl border border-gray-800/50 backdrop-blur-sm">
                   <a 
@@ -13803,8 +13813,8 @@ const AdminView = ({
                         </div>
                         <div className="flex flex-col items-end">
                           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${isSupabaseConnected ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                            {isSupabaseConnected ? 'LIVE DB' : 'MOCK DB'}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${isDatabaseConnected ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                            {isDatabaseConnected ? 'LIVE DB' : 'MOCK DB'}
                           </span>
                         </div>
                       </div>
@@ -13859,11 +13869,11 @@ const AdminView = ({
                       <div className="space-y-4">
                         <div className="flex items-start space-x-3">
                           <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
-                          <p className="text-sm opacity-90">Verify <span className="font-bold underline">bookmyvenue.in</span> is added to Supabase Authentication &gt; URL Configuration &gt; Redirect URIs.</p>
+                          <p className="text-sm opacity-90">Verify <span className="font-bold underline">bookmyvenue.in</span> domain pointing is configured in your DNS.</p>
                         </div>
                         <div className="flex items-start space-x-3">
                           <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
-                          <p className="text-sm opacity-90">Ensure your build platform (GitHub/Vercel/etc) has <span className="font-bold">VITE_SUPABASE_URL</span> and <span className="font-bold">VITE_SUPABASE_ANON_KEY</span> set correctly.</p>
+                          <p className="text-sm opacity-90">Ensure your server environment has <span className="font-bold">MYSQL_HOST</span>, <span className="font-bold">MYSQL_USER</span>, and <span className="font-bold">MYSQL_PASSWORD</span> set correctly.</p>
                         </div>
                         <div className="flex items-start space-x-3">
                           <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
@@ -14539,19 +14549,19 @@ const AdminView = ({
               {activeTab === 'database' && (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className={`p-8 rounded-[2.5rem] border-2 shadow-sm ${isSupabaseConnected ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                    <div className={`p-8 rounded-[2.5rem] border-2 shadow-sm ${isDatabaseConnected ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                       <div className="flex items-center justify-between mb-6">
-                        <div className={`p-4 rounded-2xl ${isSupabaseConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                        <div className={`p-4 rounded-2xl ${isDatabaseConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                           <Database size={24} />
                         </div>
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${isSupabaseConnected ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700'}`}>
-                          {isSupabaseConnected ? 'CONNECTED' : 'OFFLINE'}
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${isDatabaseConnected ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700'}`}>
+                          {isDatabaseConnected ? 'CONNECTED' : 'OFFLINE'}
                         </span>
                       </div>
-                      <h4 className="text-xl font-bold text-gray-900 mb-2">Supabase Connectivity</h4>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">MySQL Connectivity</h4>
                       <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                        {isSupabaseConnected 
-                          ? 'App is currently communicating with live Supabase environment.' 
+                        {isDatabaseConnected 
+                          ? 'App is currently communicating with live MySQL database environment.' 
                           : 'App is running in Offline/Mock mode. Check environment variables.'}
                       </p>
                       <button 
@@ -14573,9 +14583,9 @@ const AdminView = ({
                         </div>
                         <span className="text-xs font-bold text-blue-700 bg-blue-200 px-3 py-1 rounded-full uppercase tracking-tighter">Secure</span>
                       </div>
-                      <h4 className="text-xl font-bold text-gray-900 mb-2">SQL Master Script</h4>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">MySQL Master Script</h4>
                       <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                        Ensure your Supabase project has all required tables by running this script in the SQL editor.
+                        Ensure your MySQL database has all required tables by running this script in your database manager (phpMyAdmin).
                       </p>
                       <button 
                         onClick={() => {
@@ -14595,14 +14605,14 @@ const AdminView = ({
                           <Settings size={24} />
                         </div>
                       </div>
-                      <h4 className="text-xl font-bold text-gray-900 mb-2">Supabase Settings</h4>
+                      <h4 className="text-xl font-bold text-gray-900 mb-2">MySQL Settings</h4>
                       <p className="text-sm text-gray-600 leading-relaxed mb-6">
                         Verify your settings if connection is intermittent.
                       </p>
                       <ul className="text-xs text-orange-800 space-y-2 font-medium">
-                        <li>• Enable RLS Policies on all public tables</li>
-                        <li>• Add Domain to Allowed Redirect URLs</li>
-                        <li>• Check if "gen_random_uuid()" is enabled</li>
+                        <li>• Enable Remote MySQL on your hosting provider</li>
+                        <li>• Whitelist outbound IP address</li>
+                        <li>• Ensure credentials (host, database, user, pass) match perfectly</li>
                       </ul>
                     </div>
                   </div>
@@ -14613,7 +14623,7 @@ const AdminView = ({
                       <span className="text-gray-500 text-xs font-mono">schema_v1.0.sql</span>
                     </div>
                     <pre id="sql-master-script-hidden" className="text-green-400 font-mono text-[10px] h-64 overflow-y-auto custom-scrollbar">
-{`-- SUPABASE MASTER SQL SETUP
+{`-- MYSQL MASTER SQL SETUP
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS public.users (

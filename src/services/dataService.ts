@@ -1,16 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_MOCK_DATA } from '../constants';
 
 const STORAGE_KEY = 'BEST_VANUE_OPTION_DATA_V1';
 const SESSION_KEY = 'APP_SESSION';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-// Add fallback check for common deployment mistakes (missing VITE_ prefix)
-const rawUrl = supabaseUrl && supabaseUrl !== 'undefined' ? supabaseUrl : undefined;
-const rawKey = supabaseAnonKey && supabaseAnonKey !== 'undefined' ? supabaseAnonKey : undefined;
 
 // Initialize real Database if keys or health check passed
 let forceOffline = false;
@@ -576,8 +568,7 @@ const mysqlDataService = {
   }
 };
 
-export const supabase = null;
-export const isSupabaseConnected = true; 
+export const isDatabaseConnected = true; 
 
 // Proxy the dataService to allow runtime switching between MySQL/Mock modes
 export const dataService = new Proxy({} as any, {

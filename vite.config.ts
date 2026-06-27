@@ -30,7 +30,6 @@ export default defineConfig(({ mode }) => {
               if (id.includes('google-maps') || id.includes('@react-google-maps')) return 'vendor-maps';
               if (id.includes('lucide-react')) return 'vendor-lucide';
               if (id.includes('motion')) return 'vendor-motion';
-              if (id.includes('@supabase')) return 'vendor-supabase';
               if (id.includes('react-router')) return 'vendor-router';
               if (id.includes('react-dom')) return 'vendor-react-dom';
               if (id.includes('react/')) return 'vendor-react';

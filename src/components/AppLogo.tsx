@@ -11,7 +11,7 @@ interface AppLogoProps {
   circleBg?: boolean;
 }
 
-export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', showText = true, circleBg = false }) => {
+export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', showText = true, circleBg = true }) => {
   const [logoUrl, setLogoUrl] = useState<string>('/logo.png');
 
   useEffect(() => {
@@ -45,11 +45,11 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
 
   return (
     <div className={`inline-flex items-center space-x-3 ${className}`}>
-      <div className={`${sizeClasses[size]} aspect-square flex items-center justify-center group ${circleBg ? 'rounded-full bg-white p-3 border-2 border-orange-500 shadow-lg overflow-hidden' : ''}`}>
+      <div className={`${sizeClasses[size]} aspect-square flex-shrink-0 flex items-center justify-center group rounded-full bg-white p-1 border-2 border-orange-500 shadow-md overflow-hidden`}>
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
           alt="Best Venue Option Logo" 
-          className={`w-full h-full object-contain transition-all duration-500 group-hover:scale-110 ${circleBg ? 'rounded-full' : ''}`}
+          className="w-full h-full object-contain p-0.5 rounded-full transition-all duration-500 group-hover:scale-110"
           referrerPolicy="no-referrer"
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/logo.png';
