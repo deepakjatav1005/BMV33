@@ -125,6 +125,19 @@ async function startServer() {
       const healthy = await checkDbHealth();
       if (healthy) {
         console.log(">>> [SUCCESS] MySQL Database connected and verified healthy.");
+        // Initialize uploaded_files table for persistence across deployments
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS uploaded_files (
+              \`path\` VARCHAR(500) PRIMARY KEY,
+              \`base64_content\` LONGTEXT NOT NULL,
+              \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+          `);
+          console.log(">>> [STORAGE SETUP] Checked and verified uploaded_files table in database.");
+        } catch (tableErr: any) {
+          console.error(">>> [STORAGE SETUP ERROR] Failed to create or verify uploaded_files table:", tableErr.message);
+        }
         break;
       }
       retries--;
@@ -554,10 +567,78 @@ async function startServer() {
     console.log(`>>> [STORAGE] Using upload directory: ${uploadDir}`);
   }
 
+  // Auto-healing middleware for uploads: if a file requested under /uploads is missing on disk
+  // (e.g. after a new deployment/rebuild on ephemeral server container), we retrieve it from the
+  // uploaded_files database table, write it back to local disk, and serve it.
+  app.use("/uploads", async (req, res, next) => {
+    try {
+      const decodedUrl = decodeURIComponent(req.path);
+      const relativePath = decodedUrl.replace(/^\//, '');
+      const fullPath = path.join(uploadDir, relativePath);
+
+      // If file exists on disk, let express.static serve it
+      if (fs.existsSync(fullPath)) {
+        return next();
+      }
+
+      // If database is unhealthy or not loaded, we can't fetch from DB
+      if (!isDbHealthy || !pool) {
+        return next();
+      }
+
+      console.log(`>>> [STORAGE AUTO-HEAL] File missing on disk: ${relativePath}. Querying DB...`);
+      const [rows]: any = await pool.query(
+        "SELECT `base64_content` FROM uploaded_files WHERE \`path\` = ?",
+        [relativePath]
+      );
+
+      if (rows && rows.length > 0) {
+        const base64Content = rows[0].base64_content;
+        const fileBuffer = Buffer.from(base64Content, 'base64');
+
+        // Ensure parent directory exists
+        const fileDir = path.dirname(fullPath);
+        if (!fs.existsSync(fileDir)) {
+          fs.mkdirSync(fileDir, { recursive: true });
+        }
+
+        // Write file back to disk so next requests are served instantly by express.static
+        await fs.promises.writeFile(fullPath, fileBuffer);
+        console.log(`>>> [STORAGE AUTO-HEAL] Restored ${relativePath} from database to disk.`);
+
+        // Determine correct Content-Type
+        const ext = path.extname(relativePath).toLowerCase();
+        let contentType = 'application/octet-stream';
+        if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+        else if (ext === '.png') contentType = 'image/png';
+        else if (ext === '.gif') contentType = 'image/gif';
+        else if (ext === '.svg') contentType = 'image/svg+xml';
+        else if (ext === '.webp') contentType = 'image/webp';
+        else if (ext === '.pdf') contentType = 'application/pdf';
+        else if (ext === '.mp4') contentType = 'video/mp4';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=2592000, must-revalidate');
+        return res.send(fileBuffer);
+      } else {
+        console.log(`>>> [STORAGE AUTO-HEAL] File not found in DB: ${relativePath}`);
+      }
+    } catch (err: any) {
+      console.error(`>>> [STORAGE AUTO-HEAL ERROR] Failed to recover ${req.path} from DB:`, err.message);
+    }
+    next();
+  });
+
   // Serve uploads. 
   // IMPORTANT: On production VPS, it is better to point UPLOAD_DIR outside your deploy/build folder 
   // so that new uploads don't wipe out your existing files.
-  app.use("/uploads", express.static(uploadDir));
+  app.use("/uploads", express.static(uploadDir, {
+    maxAge: '30d',
+    etag: true,
+    setHeaders: (res, filePath) => {
+      res.setHeader('Cache-Control', 'public, max-age=2592000, must-revalidate');
+    }
+  }));
 
   // ESM Interop for multer
   const multerLib = (multer as any).default || multer;
@@ -595,7 +676,7 @@ async function startServer() {
   });
   const uploadMiddleware = multerLib({ storage });
 
-  app.post("/api/storage/upload", uploadMiddleware.single("file"), (req: any, res: any) => {
+  app.post("/api/storage/upload", uploadMiddleware.single("file"), async (req: any, res: any) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
     // Get the relative path from the uploads directory
@@ -603,6 +684,24 @@ async function startServer() {
     const publicUrl = `/uploads/${relativePath}`;
     
     console.log(`>>> [STORAGE] Uploaded: ${relativePath} -> ${publicUrl}`);
+
+    // Back up to the MySQL database to persist across new deployments
+    if (isDbHealthy && pool) {
+      try {
+        const fileBuffer = await fs.promises.readFile(req.file.path);
+        const base64Content = fileBuffer.toString('base64');
+        await pool.query(
+          "INSERT INTO uploaded_files (`path`, `base64_content`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `base64_content` = ?, `created_at` = CURRENT_TIMESTAMP",
+          [relativePath, base64Content, base64Content]
+        );
+        console.log(`>>> [STORAGE SYNC] Successfully backed up ${relativePath} to database.`);
+      } catch (syncErr: any) {
+        console.error(`>>> [STORAGE SYNC ERROR] Failed to back up ${relativePath} to DB:`, syncErr.message);
+      }
+    } else {
+      console.warn(`>>> [STORAGE SYNC SKIP] Database not healthy or pool uninitialized. Skipping database backup for ${relativePath}.`);
+    }
+    
     res.json({ data: { path: relativePath, publicUrl }, error: null });
   });
 
@@ -634,11 +733,11 @@ async function startServer() {
     res.status(404).json({ error: "API route not found", path: req.url });
   });
 
-  const isProduction = process.env.NODE_ENV === "production";
+  const distPath = path.resolve(__dirname, "dist");
+  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(distPath);
   console.log(`>>> [BOOT] Mode: ${isProduction ? 'Production' : 'Development/Fallback'}`);
 
   if (isProduction) {
-    const distPath = path.resolve(__dirname, "dist");
     console.log(`>>> [BOOT] Serving static files from: ${distPath}`);
     
     if (!fs.existsSync(distPath)) {

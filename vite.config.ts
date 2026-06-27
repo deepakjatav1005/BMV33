@@ -24,20 +24,11 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('jspdf')) return 'vendor-jspdf';
-              if (id.includes('xlsx')) return 'vendor-xlsx';
-              if (id.includes('qrcode')) return 'vendor-qrcode';
-              if (id.includes('google-maps') || id.includes('@react-google-maps')) return 'vendor-maps';
+              // Heavy packages that are statically imported
               if (id.includes('lucide-react')) return 'vendor-lucide';
-              if (id.includes('motion')) return 'vendor-motion';
-              if (id.includes('react-router')) return 'vendor-router';
-              if (id.includes('react-dom')) return 'vendor-react-dom';
-              if (id.includes('react/')) return 'vendor-react';
-              if (id.includes('date-fns')) return 'vendor-date-fns';
-              if (id.includes('razorpay')) return 'vendor-razorpay';
-              if (id.includes('@google/genai')) return 'vendor-genai';
-              // Group all other node_modules into a single vendor chunk
-              return 'vendor-others';
+              if (id.includes('google-maps') || id.includes('@react-google-maps')) return 'vendor-maps';
+              // Consolidated core dependencies (React, Router, Motion, etc.) to minimize HTTP/1.1 latency
+              return 'vendor-core';
             }
           },
         },
