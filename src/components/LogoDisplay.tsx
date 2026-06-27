@@ -31,7 +31,7 @@ export const LogoDisplay: React.FC = () => {
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
           alt="BV Logo" 
-          className="w-full h-full object-contain p-2"
+          className="w-full h-full object-cover"
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/logo.png';
           }}
