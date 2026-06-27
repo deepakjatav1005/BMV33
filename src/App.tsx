@@ -9632,6 +9632,43 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
     if (!user || !profile) return;
     
     try {
+      // Dynamic script loader for Razorpay Checkout
+      if (typeof (window as any).Razorpay === 'undefined') {
+        toast.loading('Loading secure payment gateway...', { id: 'rzp-load' });
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => {
+            toast.dismiss('rzp-load');
+            resolve();
+          };
+          script.onerror = () => {
+            toast.dismiss('rzp-load');
+            reject(new Error('Failed to load Razorpay payment gateway script. Please check your internet connection.'));
+          };
+          document.body.appendChild(script);
+        });
+      }
+
+      // Fetch Razorpay key ID if not available client-side
+      let razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        try {
+          const keyRes = await fetch('/api/razorpay/key');
+          if (keyRes.ok) {
+            const keyData = await keyRes.json();
+            razorpayKey = keyData.keyId;
+          }
+        } catch (keyErr) {
+          console.error("Failed to fetch Razorpay Key ID from server:", keyErr);
+        }
+      }
+
+      if (!razorpayKey) {
+        toast.error('Razorpay public key ID is not configured. Please contact support or set VITE_RAZORPAY_KEY_ID.');
+        return;
+      }
+
       // 1. Create order on server
       const response = await fetch('/api/razorpay/order', {
         method: 'POST',
@@ -9653,7 +9690,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       
       // 2. Open Razorpay Checkout
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: razorpayKey,
         amount: order.amount,
         currency: order.currency,
         name: "BEST VENUE OPTION",

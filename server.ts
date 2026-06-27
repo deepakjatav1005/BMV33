@@ -206,17 +206,26 @@ async function startServer() {
 
   // Razorpay instance with ESM interop fix
   let razorpay: any = null;
-  try {
-    const RazorpayConstructor = (Razorpay as any).default || Razorpay;
-    console.log(">>> [BOOT] Initializing Razorpay...");
-    razorpay = new RazorpayConstructor({
-      key_id: process.env.VITE_RAZORPAY_KEY_ID || "",
-      key_secret: process.env.RAZORPAY_KEY_SECRET || "",
-    });
-    console.log(">>> [BOOT] Razorpay initialized");
-  } catch (err) {
-    console.error(">>> [ERROR] Failed to initialize Razorpay:", err);
-  }
+  const getRazorpayInstance = () => {
+    if (razorpay) return razorpay;
+    try {
+      const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+      const key_id = process.env.VITE_RAZORPAY_KEY_ID;
+      const key_secret = process.env.RAZORPAY_KEY_SECRET;
+      if (key_id && key_secret) {
+        console.log(">>> [LAZY INIT] Initializing Razorpay dynamically...");
+        razorpay = new RazorpayConstructor({ key_id, key_secret });
+      } else {
+        console.warn(">>> [LAZY INIT WARN] Cannot initialize Razorpay: VITE_RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not set.");
+      }
+    } catch (err: any) {
+      console.error(">>> [LAZY INIT ERROR] Failed to dynamically initialize Razorpay:", err.message);
+    }
+    return razorpay;
+  };
+
+  // Try initial setup (fails-safe if keys aren't set yet)
+  getRazorpayInstance();
 
   // DB Test (Non-blocking)
   pool.getConnection().then(connection => {
@@ -705,21 +714,27 @@ async function startServer() {
     res.json({ data: { path: relativePath, publicUrl }, error: null });
   });
 
+  app.get("/api/razorpay/key", (req, res) => {
+    res.json({ keyId: process.env.VITE_RAZORPAY_KEY_ID || "" });
+  });
+
   app.post("/api/razorpay/order", async (req, res) => {
     console.log("> [API] Received Razorpay order request");
-    if (!razorpay) {
-      return res.status(500).json({ error: "Razorpay not initialized" });
+    const rzpInstance = getRazorpayInstance();
+    if (!rzpInstance) {
+      return res.status(500).json({ error: "Razorpay not initialized. Please configure VITE_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET." });
     }
     try {
       const { amount, currency, receipt, notes } = req.body;
+      const amountInPaise = Math.round(parseFloat(amount) * 100);
       const options = {
-        amount: amount * 100,
-        currency,
-        receipt,
-        notes,
+        amount: amountInPaise,
+        currency: currency || 'INR',
+        receipt: receipt || `receipt_${Date.now()}`,
+        notes: notes || {},
       };
  
-      const order = await razorpay.orders.create(options);
+      const order = await rzpInstance.orders.create(options);
       res.json(order);
     } catch (error) {
       console.error("> [ERROR] Razorpay order error:", error);
