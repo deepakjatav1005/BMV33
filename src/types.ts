@@ -225,6 +225,7 @@ export interface Booking {
   paymentStatus?: 'Pending' | 'Paid';
   isManual?: boolean;
   isLocked?: boolean;
+  isAmountUpdated?: boolean;
   is_invoice_generated?: boolean;
   invoice_url?: string;
   transaction_id?: string;

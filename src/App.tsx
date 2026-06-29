@@ -970,6 +970,42 @@ export class ErrorBoundary extends Component<any, any> {
 
   render() {
     if (this.state.hasError) {
+      const errorMessage = this.state.error?.message || "";
+      const isDatabasePermissionError = errorMessage.startsWith('{') && (
+        errorMessage.toLowerCase().includes("permission") ||
+        errorMessage.toLowerCase().includes("insufficient") ||
+        errorMessage.toLowerCase().includes("unauthorized")
+      );
+      
+      const isSessionExpired = localStorage.getItem('session_expired_flag') === 'true' || isDatabasePermissionError;
+
+      if (isSessionExpired) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-amber-50 p-4">
+            <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center border border-amber-100">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="text-amber-600" size={32} />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">your session expired please login again</h1>
+              <p className="text-gray-600 mb-6">
+                Your session has expired or timed out due to inactivity. Please log in again to securely access your account.
+              </p>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('session_expired_flag');
+                  localStorage.removeItem('custom_user');
+                  localStorage.removeItem('custom_profile');
+                  window.location.href = '/login';
+                }}
+                className="w-full bg-orange-600 text-white py-3 rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-100"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
           <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
@@ -2111,39 +2147,11 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               )}
               {user && (
                 <div className="flex items-center space-x-4">
-                  <button 
-                    onClick={onRateApp}
-                    className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-xl transition-all group"
-                    title="Rate App"
-                  >
-                    <Star size={20} className="group-hover:scale-110 transition-transform" fill="currentColor" />
-                  </button>
-                  <Link to={profile?.role === 'admin' ? "/admin" : "/dashboard"} className="flex items-center space-x-3 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 hover:bg-orange-100 transition-all group">
-                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-orange-200">
-                      {profile?.photoURL ? (
-                        <img 
-                          src={resolveUrl(profile.photoURL)} 
-                          alt={profile.displayName} 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-orange-200 flex items-center justify-center text-orange-600 font-bold text-xs">
-                          {profile?.displayName?.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-sm font-bold text-orange-700 group-hover:text-orange-800 hidden lg:block">{profile?.displayName}</span>
-                  </Link>
-                  <Link to="/change-password" title="Change Password" className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all">
-                    <ShieldCheck size={20} />
-                  </Link>
-                  {profile?.role === 'admin' && (
+                  {profile?.role === 'admin' ? (
                     <Link to="/admin" className="bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200">Admin Panel</Link>
+                  ) : (
+                    <Link to="/dashboard" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">Dashboard</Link>
                   )}
-                  <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Logout">
-                    <LogOut size={20} />
-                  </button>
                 </div>
               )}
             </div>
@@ -2200,28 +2208,14 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
 
             {user ? (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 px-4">Account</p>
-                {[
-                  { to: "/change-password", label: "Change Password", icon: <ShieldCheck size={18} /> },
-                  { to: profile?.role === 'admin' ? "/admin" : "/dashboard", label: profile?.role === 'admin' ? "Admin Panel" : "Dashboard", icon: <LayoutDashboard size={18} /> },
-                ].sort((a, b) => a.label.localeCompare(b.label)).map((item) => (
-                  <Link 
-                    key={item.to}
-                    to={item.to} 
-                    className="flex items-center space-x-3 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-2xl transition-all" 
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
-                <button 
-                  onClick={handleLogout} 
-                  className="flex items-center space-x-3 px-4 py-3 text-red-600 font-bold hover:bg-red-50 rounded-2xl w-full transition-all"
+                <Link 
+                  to={profile?.role === 'admin' ? "/admin" : "/dashboard"} 
+                  className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" 
+                  onClick={() => setIsMenuOpen(false)}
                 >
-                  <LogOut size={18} />
-                  <span>Logout</span>
-                </button>
+                  <LayoutDashboard size={18} />
+                  <span>{profile?.role === 'admin' ? "Admin Panel" : "Dashboard"}</span>
+                </Link>
               </div>
             ) : (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
@@ -3335,6 +3329,13 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
   const [regId, setRegId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem('session_expired_flag') === 'true') {
+      toast.error('your session expired please login again', { id: 'session-expired-toast' });
+      localStorage.removeItem('session_expired_flag');
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -7240,10 +7241,46 @@ const imageUrlToBase64 = async (url: string): Promise<string | null> => {
   }
 };
 
+const fetchAndAddHindiFont = async (doc: any) => {
+  try {
+    const fontUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/hind/Hind-Regular.ttf";
+    const res = await fetch(fontUrl);
+    if (!res.ok) throw new Error("Font fetch failed");
+    const arrayBuffer = await res.arrayBuffer();
+    
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = "";
+    const chunkSize = 65536;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, chunk as any);
+    }
+    const base64Font = btoa(binary);
+    
+    doc.addFileToVFS("Hind-Regular.ttf", base64Font);
+    doc.addFont("Hind-Regular.ttf", "Hind", "normal");
+    return true;
+  } catch (err) {
+    console.warn("Could not load Hindi font, falling back to default font", err);
+    return false;
+  }
+};
+
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF();
+  
+  const hasHindiFont = await fetchAndAddHindiFont(doc);
+  const defaultFont = hasHindiFont ? "Hind" : "helvetica";
+
+  const setDocFont = (d: any, style: 'normal' | 'bold' | 'italic') => {
+    if (hasHindiFont) {
+      d.setFont("Hind", "normal");
+    } else {
+      d.setFont("helvetica", style);
+    }
+  };
   
   // Fetch latest booking from database to ensure it's 100% updated in real-time
   let latestBooking = booking;
@@ -7380,12 +7417,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     const headerTitle = (booking.targetName || "BUSINESS").split('(')[0].trim().toUpperCase();
     d.setFontSize(20);
     d.setTextColor(234, 88, 12); 
-    d.setFont("helvetica", "bold");
+    setDocFont(d, "bold");
     d.text(headerTitle, 105, 12, { align: 'center', maxWidth: 170 });
     
     d.setFontSize(9);
     d.setTextColor(0);
-    d.setFont("helvetica", "normal");
+    setDocFont(d, "normal");
     d.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 20);
     d.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 24);
     
@@ -7400,11 +7437,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
     d.setFontSize(12);
     d.setTextColor(0);
-    d.setFont("helvetica", "bold");
+    setDocFont(d, "bold");
     d.text("INVOICE", 20, 36);
     
     d.setFontSize(8);
-    d.setFont("helvetica", "normal");
+    setDocFont(d, "normal");
     d.setTextColor(100);
   d.text(`Invoice No: ${customInvoiceNo || 'N/A'}`, 190, 34, { align: 'right' });
   d.text(`Date: ${formatDateDDMMYYYY(new Date()) || ''}`, 190, 37, { align: 'right' });
@@ -7439,7 +7476,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     })();
 
     d.setFontSize(11);
-    d.setFont("helvetica", "bold");
+    setDocFont(d, "bold");
     d.setTextColor(77, 121, 255); 
     d.text(nameParts.part1, 32, 288);
     if (nameParts.part2) {
@@ -7450,17 +7487,17 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     
     d.setFontSize(7);
     d.setTextColor(100);
-    d.setFont("helvetica", "normal");
+    setDocFont(d, "normal");
     d.text(appTagline.toUpperCase(), 32, 292);
     
     d.setTextColor(234, 88, 12);
     d.setFontSize(9);
-    d.setFont("helvetica", "bold");
+    setDocFont(d, "bold");
     d.text("WWW.BESTVENUEOPTION.COM", 190, 288, { align: 'right' });
 
     d.setFontSize(8);
     d.setTextColor(150);
-    d.setFont("helvetica", "normal");
+    setDocFont(d, "normal");
     d.text("Thank you for choosing Best Venue Option!", 105, 274, { align: 'center' }); 
     d.setFontSize(7);
     d.text("This is a computer generated invoice and does not require a physical signature.", 105, 278, { align: 'center' });
@@ -7481,7 +7518,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     if (relatedPayments.length > 0) {
       if (localY > 210) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
       
-      doc.setFont("helvetica", "bold");
+      setDocFont(doc, "bold");
       doc.setFontSize(10);
       doc.setTextColor(234, 88, 12);
       doc.text("TRANSACTION HISTORY", 20, localY);
@@ -7503,7 +7540,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
         head: [['Date', 'Type', 'Mode', 'Amount']],
         body: txRows,
         theme: 'grid',
-        headStyles: { fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { font: defaultFont, fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
         margin: { left: 20, right: 20 },
         columnStyles: {
           0: { cellWidth: 35, halign: 'left' },
@@ -7511,7 +7548,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
           2: { cellWidth: 45, halign: 'left' },
           3: { cellWidth: 45, halign: 'right' }
         },
-        styles: { fontSize: 8, lineColor: [200, 200, 200], lineWidth: 0.2 },
+        styles: { 
+          font: defaultFont, 
+          fontSize: 8, 
+          lineColor: [200, 200, 200], 
+          lineWidth: 0.2,
+          cellPadding: 4,
+          valign: 'middle'
+        },
         didDrawPage: (data) => {
           drawHeader(doc);
           drawFooter(doc);
@@ -7528,11 +7572,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   // Customer Details (Bill To)
   doc.setFontSize(10);
   doc.setTextColor(0);
-  doc.setFont("helvetica", "bold");
+  setDocFont(doc, "bold");
   doc.text("BILL TO:", 20, currentY);
   
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  setDocFont(doc, "normal");
   doc.text(`Name: ${partyName || 'N/A'}`, 20, currentY + 6);
   doc.text(`Mobile: ${partyMobile}`, 20, currentY + 10);
   
@@ -7550,14 +7594,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, billToY + 8);
   }
 
-  doc.setFont("helvetica", "bold");
+  setDocFont(doc, "bold");
   doc.text(`Booking Status:`, 140, currentY + 6);
-  doc.setFont("helvetica", "normal");
+  setDocFont(doc, "normal");
   doc.text(`${getDisplayStatus()}`, 190, currentY + 6, { align: 'right' });
   
-  doc.setFont("helvetica", "bold");
+  setDocFont(doc, "bold");
   doc.text(`Payment Status:`, 140, currentY + 10);
-  doc.setFont("helvetica", "normal");
+  setDocFont(doc, "normal");
   doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, currentY + 10, { align: 'right' });
 
   // Items Table
@@ -7580,10 +7624,17 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     head: [['Description', 'Amount']],
     body: tableRows,
     theme: 'grid',
-    headStyles: { fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
+    headStyles: { font: defaultFont, fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
     margin: { left: 20, right: 20 },
     columnStyles: { 0: { cellWidth: 120, halign: 'left' }, 1: { cellWidth: 50, halign: 'right' } },
-    styles: { fontSize: 9, lineColor: [200, 200, 200], lineWidth: 0.2 },
+    styles: { 
+      font: defaultFont, 
+      fontSize: 9, 
+      lineColor: [200, 200, 200], 
+      lineWidth: 0.2,
+      cellPadding: 4,
+      valign: 'middle'
+    },
     didDrawPage: (data) => {
       // Unconditionally draw header and footer on every page
       // page 1 header was drawn manually but re-drawing is harmless if coordinates match
@@ -7595,11 +7646,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   currentY = (doc as any).lastAutoTable.finalY + 8;
   doc.setFontSize(10);
   doc.setTextColor(0);
-  doc.setFont("helvetica", "bold");
+  setDocFont(doc, "bold");
   doc.text("Final Booking Total:", 110, currentY);
   doc.text(`${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 5;
   doc.setFontSize(9);
+  setDocFont(doc, "normal");
   doc.text("Total Amount Paid:", 110, currentY);
   doc.text(`${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 5;
@@ -7617,7 +7669,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
   doc.setFontSize(9);
   doc.setTextColor(0);
-  doc.setFont("helvetica", "italic");
+  setDocFont(doc, "italic");
   const words = `Amount in words (Balance): ${numberToWords(Math.round(balanceDue || 0))}`;
   const splitWords = doc.splitTextToSize(words, 170);
   let wordsY = finalY;
@@ -7964,8 +8016,9 @@ const DashboardView = ({
   onUpgradeNeeded: () => void
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment' | 'query-complaint'>(initialTab);
+  const navigate = useNavigate();
+  const initialTab = searchParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [reportFilters, setReportFilters] = useState({
     name: '',
     mobile: '',
@@ -7975,6 +8028,7 @@ const DashboardView = ({
     bookingType: '',
     year: new Date().getFullYear().toString()
   });
+  const [downloadingReportInvoiceId, setDownloadingReportInvoiceId] = useState<string | null>(null);
 
   const downloadReport = async (type: 'excel' | 'pdf' = 'excel') => {
     const filteredBookings = bookings.filter(b => {
@@ -8135,7 +8189,12 @@ const DashboardView = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = async (tab: string) => {
+    if (tab === 'logout') {
+      await db.auth.signOut();
+      navigate('/');
+      return;
+    }
     setActiveTab(tab as any);
     setSearchParams({ tab });
     setIsMobileMenuOpen(false);
@@ -8194,6 +8253,7 @@ const DashboardView = ({
             paymentMode: d.payment_mode,
             isManual: d.is_manual,
             isLocked: !!d.is_locked,
+            isAmountUpdated: !!d.is_amount_updated,
             is_invoice_generated: d.is_invoice_generated,
             invoice_url: d.invoice_url,
             extra_services: d.extra_services || [],
@@ -8320,22 +8380,20 @@ const DashboardView = ({
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <BarChart2 size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
+    { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
     { id: 'manually-booking', label: 'Manually Booking', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
     { id: 'public-booking', label: profile?.role === 'user' ? 'My Bookings' : 'Public Booking', icon: <Calendar size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'manage-payment', label: 'Manage Payment', icon: <IndianRupee size={20} />, roles: ['owner', 'provider'] },
-    { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
-    { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} /> },
-    { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
-    { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
-    { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
     { id: 'rating-card', label: 'Rating Accept Card', icon: <QrCode size={20} />, roles: ['owner', 'provider'] },
+    { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
+    { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
     { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
     { id: 'query-complaint', label: 'Query or Complaint', icon: <MessageSquare size={20} />, roles: ['owner', 'provider', 'user'] },
-  ].sort((a, b) => {
-    if (a.id === 'overview') return -1;
-    if (b.id === 'overview') return 1;
-    return a.label.localeCompare(b.label);
-  });
+    { id: 'logout', label: 'Logout', icon: <LogOut size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'reset-password', label: 'Reset password', icon: <ShieldCheck size={20} />, roles: ['owner', 'provider', 'user'] },
+  ];
 
   const filteredMenu = menuItems.filter(item => {
     if (profile?.role === 'admin') {
@@ -8896,8 +8954,10 @@ const DashboardView = ({
                                   <td className="py-4 text-xs font-bold text-gray-500 uppercase">{b.isManual ? 'Manual' : 'Order'}</td>
                                   <td className="py-4">
                                     <button 
+                                      disabled={downloadingReportInvoiceId === b.id}
                                       onClick={async () => {
                                         try {
+                                          setDownloadingReportInvoiceId(b.id);
                                           await generateInvoice(b, 0, profile, bookings, globalSettings);
 
 
@@ -8916,12 +8976,21 @@ const DashboardView = ({
                                         } catch (err) {
                                           console.error('Download error:', err);
                                           toast.error('Failed to generate invoice');
+                                        } finally {
+                                          setDownloadingReportInvoiceId(null);
                                         }
                                       }}
-                                      className="p-2 text-orange-600 hover:bg-orange-100 rounded-xl transition-all"
+                                      className={cn(
+                                        "p-2 text-orange-600 hover:bg-orange-100 rounded-xl transition-all",
+                                        downloadingReportInvoiceId === b.id && "opacity-50 cursor-not-allowed"
+                                      )}
                                       title="Download PDF Invoice"
                                     >
-                                      <Download size={18} />
+                                      {downloadingReportInvoiceId === b.id ? (
+                                        <Loader size={18} className="animate-spin" />
+                                      ) : (
+                                        <Download size={18} />
+                                      )}
                                     </button>
                                   </td>
                                 </tr>
@@ -8951,6 +9020,11 @@ const DashboardView = ({
                 }>
                   <QueryComplaintView user={user} profile={profile} />
                 </React.Suspense>
+              )}
+              {activeTab === 'reset-password' && (
+                <div className="bg-white rounded-3xl p-3 md:p-8 border border-orange-100 shadow-sm min-h-[500px]">
+                  <ChangePasswordView user={user} profile={profile} onUpdateProfile={onUpdateProfile} />
+                </div>
               )}
             </motion.div>
           </AnimatePresence>
@@ -9349,6 +9423,7 @@ const ManagePaymentView = ({
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newAmount, setNewAmount] = useState(0);
   const [editableExtraServices, setEditableExtraServices] = useState<any[]>([]);
+  const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
   const filteredBookings = useMemo(() => bookings.filter(b => {
     // Show confirmed/paid bookings that are not completed
@@ -9356,6 +9431,9 @@ const ManagePaymentView = ({
     
     // Only show if user is owner/admin or it belongs to them
     if (profile?.role !== 'admin' && b.ownerId !== user?.uid) return false;
+
+    // For manual bookings, show only when locked by the user
+    if (b.isManual && !b.isLocked) return false;
 
     const matchesDate = !dateFilter || b.eventDate === dateFilter;
     return matchesDate;
@@ -9375,7 +9453,8 @@ const ManagePaymentView = ({
     const { error } = await db.from('bookings').update({ 
       updated_amount: newAmount,
       extra_services: editableExtraServices,
-      is_invoice_generated: false 
+      is_invoice_generated: false,
+      is_amount_updated: true
     }).eq('id', selectedBooking.id);
 
     if (!error) {
@@ -9432,6 +9511,9 @@ const ManagePaymentView = ({
             <div className="w-full">
               <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
                 <span className="font-bold text-sm md:text-lg truncate max-w-[160px] md:max-w-none">{b.targetName}</span>
+                <span className="bg-blue-50 text-blue-800 text-[10px] md:text-xs px-2.5 py-1 rounded-lg font-bold border border-blue-100 shadow-sm flex items-center">
+                  Customer: {b.isManual ? b.partyName : (b.visitorName || b.partyName || 'N/A')}
+                </span>
                 <span className="px-2 py-0.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase bg-orange-100 text-orange-700">
                   LOCKED
                 </span>
@@ -9484,6 +9566,10 @@ const ManagePaymentView = ({
                     toast.error('Please lock this booking transaction first before adding payments');
                     return;
                   }
+                  if (!b.isAmountUpdated) {
+                    toast.error('Please update/confirm the booking amount under Manage Payment first before adding a payment transaction.');
+                    return;
+                  }
                   setSelectedBooking(b);
                   setIsPaymentRecordModalOpen(true);
                 }}
@@ -9491,17 +9577,19 @@ const ManagePaymentView = ({
                   "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all shadow-lg",
                   pendingAmount < 1 
                     ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed shadow-none" 
-                    : !b.isLocked
+                    : (!b.isLocked || !b.isAmountUpdated)
                       ? "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 shadow-none"
                       : "bg-green-600 text-white hover:bg-green-700 shadow-green-100"
                 )}
               >
-                {pendingAmount < 1 ? <CheckCircle size={16} /> : !b.isLocked ? <Lock size={16} /> : <Plus size={16} />}
-                <span>{pendingAmount < 1 ? 'Fully Paid' : !b.isLocked ? 'Lock to Pay' : 'Add Payment'}</span>
+                {pendingAmount < 1 ? <CheckCircle size={16} /> : (!b.isLocked || !b.isAmountUpdated) ? <Lock size={16} /> : <Plus size={16} />}
+                <span>{pendingAmount < 1 ? 'Fully Paid' : !b.isLocked ? 'Lock to Pay' : !b.isAmountUpdated ? 'Update Amount First' : 'Add Payment'}</span>
               </button>
               <button 
+                disabled={isDownloading === b.id}
                 onClick={async () => {
                   try {
+                    setIsDownloading(b.id);
                     await generateInvoice(b, 0, profile, bookings, globalSettings);
 
 
@@ -9514,12 +9602,21 @@ const ManagePaymentView = ({
 
                   } catch (err) {
                     toast.error('Failed to generate invoice');
+                  } finally {
+                    setIsDownloading(null);
                   }
                 }}
-                className="flex-1 md:flex-none justify-center px-4 py-2 bg-purple-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 hover:bg-purple-700 shadow-lg shadow-purple-100"
+                className={cn(
+                  "flex-1 md:flex-none justify-center px-4 py-2 bg-purple-600 text-white rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 hover:bg-purple-700 shadow-lg shadow-purple-100 transition-all",
+                  isDownloading === b.id && "opacity-70 cursor-not-allowed bg-purple-500"
+                )}
               >
-                <Download size={16} />
-                <span>Invoice</span>
+                {isDownloading === b.id ? (
+                  <Loader size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                <span>{isDownloading === b.id ? 'Downloading...' : 'Invoice'}</span>
               </button>
             </div>
           </div>
@@ -12106,8 +12203,9 @@ export default function App() {
       if (user.email === 'deepakjatav1005@gmail.com') return;
       
       timeout = setTimeout(() => {
+        localStorage.setItem('session_expired_flag', 'true');
         handleLogout();
-        toast.error('Session expired due to 5 minutes of inactivity', { id: 'session-expired' });
+        toast.error('your session expired please login again', { id: 'session-expired' });
       }, 5 * 60 * 1000); // 5 minutes
     };
 
@@ -13287,6 +13385,7 @@ const AdminView = ({
           paymentMode: d.payment_mode,
           paymentStatus: d.payment_status,
           is_invoice_generated: d.is_invoice_generated,
+          isAmountUpdated: !!d.is_amount_updated,
           invoice_url: d.invoice_url,
           extra_services: d.extra_services,
           createdAt: d.created_at
