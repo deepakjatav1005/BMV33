@@ -2145,15 +2145,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                   <Link to="/login" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">{t('login')}</Link>
                 </>
               )}
-              {user && (
-                <div className="flex items-center space-x-4">
-                  {profile?.role === 'admin' ? (
-                    <Link to="/admin" className="bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200">Admin Panel</Link>
-                  ) : (
-                    <Link to="/dashboard" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">Dashboard</Link>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="md:hidden">
@@ -2206,18 +2197,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
             </button>
 
-            {user ? (
-              <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
-                <Link 
-                  to={profile?.role === 'admin' ? "/admin" : "/dashboard"} 
-                  className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" 
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <LayoutDashboard size={18} />
-                  <span>{profile?.role === 'admin' ? "Admin Panel" : "Dashboard"}</span>
-                </Link>
-              </div>
-            ) : (
+            {!user && (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
                 <Link to="/login" className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
                   <LogIn size={18} />
@@ -7266,6 +7246,37 @@ const fetchAndAddHindiFont = async (doc: any) => {
   }
 };
 
+const renderTextToImage = (text: string, fontSize: number, isBold: boolean, color: string = '#000000'): { dataUrl: string, width: number, height: number } => {
+  if (!text || !text.trim()) return { dataUrl: '', width: 0, height: 0 };
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { dataUrl: '', width: 0, height: 0 };
+  
+  const scale = 4;
+  const scaledFontSize = fontSize * scale;
+  const fontStyle = `${isBold ? '700' : '400'} ${scaledFontSize}px "Hind", "Noto Sans Devanagari", "Inter", sans-serif`;
+  ctx.font = fontStyle;
+  
+  const metrics = ctx.measureText(text);
+  const textWidth = Math.ceil(metrics.width);
+  const textHeight = Math.ceil(scaledFontSize * 1.5);
+  
+  canvas.width = textWidth + 20;
+  canvas.height = textHeight;
+  
+  ctx.font = fontStyle;
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillText(text, 10, textHeight / 2);
+  
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    width: (textWidth + 20) / scale,
+    height: textHeight / scale
+  };
+};
+
 const generateInvoice = async (booking: Booking, expenditure: number, providerProfile?: UserProfile | null, allBookings: Booking[] = [], globalSettings: any = null) => {
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
@@ -7279,6 +7290,39 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
       d.setFont("Hind", "normal");
     } else {
       d.setFont("helvetica", style);
+    }
+  };
+
+  const drawText = (d: any, text: string | string[], x: number, y: number, options?: { align?: 'left' | 'right' | 'center', maxWidth?: number, fontSize?: number, isBold?: boolean, color?: string }) => {
+    if (!text) return;
+    const align = options?.align || 'left';
+    const fontSize = options?.fontSize || d.getFontSize();
+    const isBold = options?.isBold !== undefined ? options.isBold : false;
+    const color = options?.color || '#000000';
+    
+    if (Array.isArray(text)) {
+      let currentY = y;
+      text.forEach(line => {
+        drawText(d, line, x, currentY, options);
+        currentY += fontSize * 0.4 + 4;
+      });
+      return;
+    }
+
+    if (/[\u0900-\u097F]/.test(text)) {
+      const { dataUrl, width, height } = renderTextToImage(text, fontSize, isBold, color);
+      if (dataUrl) {
+        let drawX = x;
+        if (align === 'right') {
+          drawX = x - width;
+        } else if (align === 'center') {
+          drawX = x - width / 2;
+        }
+        const drawY = y - (height * 0.72);
+        d.addImage(dataUrl, 'PNG', drawX, drawY, width, height, undefined, 'FAST');
+      }
+    } else {
+      d.text(text, x, y, options);
     }
   };
   
@@ -7418,17 +7462,17 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     d.setFontSize(20);
     d.setTextColor(234, 88, 12); 
     setDocFont(d, "bold");
-    d.text(headerTitle, 105, 12, { align: 'center', maxWidth: 170 });
+    drawText(d, headerTitle, 105, 12, { align: 'center', maxWidth: 170, isBold: true, color: '#EA580C', fontSize: 20 });
     
     d.setFontSize(9);
     d.setTextColor(0);
     setDocFont(d, "normal");
-    d.text(`Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 20);
-    d.text(`Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 24);
+    drawText(d, `Owner: ${providerProfile?.displayName || 'N/A'}`, 20, 20, { fontSize: 9 });
+    drawText(d, `Mobile: ${providerProfile?.mobileNumber || 'N/A'}`, 20, 24, { fontSize: 9 });
     
     if (providerProfile) {
       const address = `${providerProfile.block || ''}, ${providerProfile.district || ''}, ${providerProfile.state || ''} - ${providerProfile.pincode || ''}`;
-      d.text(address, 190, 20, { align: 'right', maxWidth: 80 });
+      drawText(d, address, 190, 20, { align: 'right', maxWidth: 80, fontSize: 9 });
     }
     
     d.setDrawColor(234, 88, 12);
@@ -7438,14 +7482,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     d.setFontSize(12);
     d.setTextColor(0);
     setDocFont(d, "bold");
-    d.text("INVOICE", 20, 36);
+    drawText(d, "INVOICE", 20, 36, { isBold: true, fontSize: 12 });
     
     d.setFontSize(8);
     setDocFont(d, "normal");
     d.setTextColor(100);
-  d.text(`Invoice No: ${customInvoiceNo || 'N/A'}`, 190, 34, { align: 'right' });
-  d.text(`Date: ${formatDateDDMMYYYY(new Date()) || ''}`, 190, 37, { align: 'right' });
-  d.text(`Time: ${formatTime12h(new Date().toLocaleTimeString()) || ''}`, 190, 40, { align: 'right' });
+    drawText(d, `Invoice No: ${customInvoiceNo || 'N/A'}`, 190, 34, { align: 'right', fontSize: 8 });
+    drawText(d, `Date: ${formatDateDDMMYYYY(new Date()) || ''}`, 190, 37, { align: 'right', fontSize: 8 });
+    drawText(d, `Time: ${formatTime12h(new Date().toLocaleTimeString()) || ''}`, 190, 40, { align: 'right', fontSize: 8 });
     
     return 45; 
   };
@@ -7478,29 +7522,29 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     d.setFontSize(11);
     setDocFont(d, "bold");
     d.setTextColor(77, 121, 255); 
-    d.text(nameParts.part1, 32, 288);
+    drawText(d, nameParts.part1, 32, 288, { isBold: true, fontSize: 11, color: '#4D79FF' });
     if (nameParts.part2) {
       const part1Width = d.getTextWidth(nameParts.part1 + ' ');
       d.setTextColor(255, 77, 77); 
-      d.text(nameParts.part2, 32 + part1Width, 288);
+      drawText(d, nameParts.part2, 32 + part1Width, 288, { isBold: true, fontSize: 11, color: '#FF4D4D' });
     }
     
     d.setFontSize(7);
     d.setTextColor(100);
     setDocFont(d, "normal");
-    d.text(appTagline.toUpperCase(), 32, 292);
+    drawText(d, appTagline.toUpperCase(), 32, 292, { fontSize: 7 });
     
     d.setTextColor(234, 88, 12);
     d.setFontSize(9);
     setDocFont(d, "bold");
-    d.text("WWW.BESTVENUEOPTION.COM", 190, 288, { align: 'right' });
+    drawText(d, "WWW.BESTVENUEOPTION.COM", 190, 288, { align: 'right', isBold: true, fontSize: 9, color: '#EA580C' });
 
     d.setFontSize(8);
     d.setTextColor(150);
     setDocFont(d, "normal");
-    d.text("Thank you for choosing Best Venue Option!", 105, 274, { align: 'center' }); 
+    drawText(d, "Thank you for choosing Best Venue Option!", 105, 274, { align: 'center', fontSize: 8 }); 
     d.setFontSize(7);
-    d.text("This is a computer generated invoice and does not require a physical signature.", 105, 278, { align: 'center' });
+    drawText(d, "This is a computer generated invoice and does not require a physical signature.", 105, 278, { align: 'center', fontSize: 7 });
   };
 
   const sanitizeName = (n: string) => {
@@ -7521,7 +7565,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
       setDocFont(doc, "bold");
       doc.setFontSize(10);
       doc.setTextColor(234, 88, 12);
-      doc.text("TRANSACTION HISTORY", 20, localY);
+      drawText(doc, "TRANSACTION HISTORY", 20, localY, { isBold: true, fontSize: 10, color: '#EA580C' });
       localY += 6;
 
       const txRows = relatedPayments.map(p => {
@@ -7537,7 +7581,12 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
       autoTable(doc, {
         startY: localY,
-        head: [['Date', 'Type', 'Mode', 'Amount']],
+        head: [[
+          { content: 'Date', styles: { halign: 'left' } },
+          { content: 'Type', styles: { halign: 'left' } },
+          { content: 'Mode', styles: { halign: 'left' } },
+          { content: 'Amount', styles: { halign: 'right' } }
+        ]],
         body: txRows,
         theme: 'grid',
         headStyles: { font: defaultFont, fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -7556,6 +7605,34 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
           cellPadding: 4,
           valign: 'middle'
         },
+        willDrawCell: (data) => {
+          if (data.section === 'body' || data.section === 'head') {
+            const text = data.cell.text.join('\n');
+            if (/[\u0900-\u097F]/.test(text)) {
+              (data.cell as any).rawHindiText = text;
+              data.cell.text = [];
+            }
+          }
+        },
+        didDrawCell: (data) => {
+          const rawHindiText = (data.cell as any).rawHindiText;
+          if (rawHindiText) {
+            const isHeader = data.section === 'head';
+            const fontSize = isHeader ? 8 : 8;
+            const isBold = isHeader;
+            const color = isHeader ? '#FFFFFF' : '#000000';
+            const { dataUrl, width, height } = renderTextToImage(rawHindiText, fontSize, isBold, color);
+            if (dataUrl) {
+              const paddingLeft = 4;
+              let x = data.cell.x + paddingLeft;
+              if (data.column.index === 3) { // Amount is right aligned
+                x = data.cell.x + data.cell.width - width - paddingLeft;
+              }
+              const y = data.cell.y + (data.cell.height - height) / 2;
+              doc.addImage(dataUrl, 'PNG', x, y, width, height, undefined, 'FAST');
+            }
+          }
+        },
         didDrawPage: (data) => {
           drawHeader(doc);
           drawFooter(doc);
@@ -7573,36 +7650,36 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(10);
   doc.setTextColor(0);
   setDocFont(doc, "bold");
-  doc.text("BILL TO:", 20, currentY);
+  drawText(doc, "BILL TO:", 20, currentY, { isBold: true, fontSize: 10 });
   
   doc.setFontSize(9);
   setDocFont(doc, "normal");
-  doc.text(`Name: ${partyName || 'N/A'}`, 20, currentY + 6);
-  doc.text(`Mobile: ${partyMobile}`, 20, currentY + 10);
+  drawText(doc, `Name: ${partyName || 'N/A'}`, 20, currentY + 6, { fontSize: 9 });
+  drawText(doc, `Mobile: ${partyMobile}`, 20, currentY + 10, { fontSize: 9 });
   
   let billToY = currentY + 14;
   if (booking.partyAddress) {
     const addr = `Address: ${booking.partyAddress}`;
     const splitAddr = doc.splitTextToSize(addr, 90);
-    doc.text(splitAddr, 20, billToY);
+    drawText(doc, splitAddr, 20, billToY, { fontSize: 9 });
     billToY += (splitAddr.length * 4);
   }
   
-  doc.text(`Event: ${booking.eventType || 'N/A'}`, 20, billToY);
-  doc.text(`Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, billToY + 4);
+  drawText(doc, `Event: ${booking.eventType || 'N/A'}`, 20, billToY, { fontSize: 9 });
+  drawText(doc, `Date: ${formatDateDDMMYYYY(booking.eventDate)}${booking.endDate ? ' to ' + formatDateDDMMYYYY(booking.endDate) : ''}`, 20, billToY + 4, { fontSize: 9 });
   if (booking.startTime) {
-    doc.text(`Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, billToY + 8);
+    drawText(doc, `Timing: ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}`, 20, billToY + 8, { fontSize: 9 });
   }
 
   setDocFont(doc, "bold");
-  doc.text(`Booking Status:`, 140, currentY + 6);
+  drawText(doc, `Booking Status:`, 140, currentY + 6, { isBold: true, fontSize: 9 });
   setDocFont(doc, "normal");
-  doc.text(`${getDisplayStatus()}`, 190, currentY + 6, { align: 'right' });
+  drawText(doc, `${getDisplayStatus()}`, 190, currentY + 6, { align: 'right', fontSize: 9 });
   
   setDocFont(doc, "bold");
-  doc.text(`Payment Status:`, 140, currentY + 10);
+  drawText(doc, `Payment Status:`, 140, currentY + 10, { isBold: true, fontSize: 9 });
   setDocFont(doc, "normal");
-  doc.text(`${(isPaid ? 'PAID' : 'PENDING')}`, 190, currentY + 10, { align: 'right' });
+  drawText(doc, `${(isPaid ? 'PAID' : 'PENDING')}`, 190, currentY + 10, { align: 'right', fontSize: 9 });
 
   // Items Table
   const tableRows = [];
@@ -7621,7 +7698,10 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
 
   autoTable(doc, {
     startY: Math.max(currentY + 25, billToY + 12),
-    head: [['Description', 'Amount']],
+    head: [[
+      { content: 'Description', styles: { halign: 'left' } },
+      { content: 'Amount', styles: { halign: 'right' } }
+    ]],
     body: tableRows,
     theme: 'grid',
     headStyles: { font: defaultFont, fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -7635,9 +7715,35 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
       cellPadding: 4,
       valign: 'middle'
     },
+    willDrawCell: (data) => {
+      if (data.section === 'body' || data.section === 'head') {
+        const text = data.cell.text.join('\n');
+        if (/[\u0900-\u097F]/.test(text)) {
+          (data.cell as any).rawHindiText = text;
+          data.cell.text = [];
+        }
+      }
+    },
+    didDrawCell: (data) => {
+      const rawHindiText = (data.cell as any).rawHindiText;
+      if (rawHindiText) {
+        const isHeader = data.section === 'head';
+        const fontSize = isHeader ? 9 : 9;
+        const isBold = isHeader;
+        const color = isHeader ? '#FFFFFF' : '#000000';
+        const { dataUrl, width, height } = renderTextToImage(rawHindiText, fontSize, isBold, color);
+        if (dataUrl) {
+          const paddingLeft = 4;
+          let x = data.cell.x + paddingLeft;
+          if (data.column.index === 1) { // Amount is right aligned
+            x = data.cell.x + data.cell.width - width - paddingLeft;
+          }
+          const y = data.cell.y + (data.cell.height - height) / 2;
+          doc.addImage(dataUrl, 'PNG', x, y, width, height, undefined, 'FAST');
+        }
+      }
+    },
     didDrawPage: (data) => {
-      // Unconditionally draw header and footer on every page
-      // page 1 header was drawn manually but re-drawing is harmless if coordinates match
       drawHeader(doc);
       drawFooter(doc);
     }
@@ -7647,22 +7753,19 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setFontSize(10);
   doc.setTextColor(0);
   setDocFont(doc, "bold");
-  doc.text("Final Booking Total:", 110, currentY);
-  doc.text(`${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  drawText(doc, "Final Booking Total:", 110, currentY, { isBold: true, fontSize: 10 });
+  drawText(doc, `${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right', isBold: true, fontSize: 10 });
   currentY += 5;
   doc.setFontSize(9);
   setDocFont(doc, "normal");
-  doc.text("Total Amount Paid:", 110, currentY);
-  doc.text(`${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  drawText(doc, "Total Amount Paid:", 110, currentY, { fontSize: 9 });
+  drawText(doc, `${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right', fontSize: 9 });
   currentY += 5;
   doc.setFontSize(10);
-  if (balanceDue > 0) {
-    doc.setTextColor(220, 38, 38);
-  } else {
-    doc.setTextColor(22, 163, 74);
-  }
-  doc.text("Balance Due:", 110, currentY);
-  doc.text(`${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  
+  const balanceColor = balanceDue > 0 ? '#DC2626' : '#16A34A';
+  drawText(doc, "Balance Due:", 110, currentY, { isBold: true, fontSize: 10, color: balanceColor });
+  drawText(doc, `${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right', isBold: true, fontSize: 10, color: balanceColor });
   currentY += 10;
 
   const finalY = addTransactionHistory(currentY);
@@ -7674,11 +7777,8 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const splitWords = doc.splitTextToSize(words, 170);
   let wordsY = finalY;
   if (wordsY > 260) { drawFooter(doc); doc.addPage(); drawHeader(doc); wordsY = 45; }
-  doc.text(splitWords, 20, wordsY);
+  drawText(doc, splitWords, 20, wordsY, { fontSize: 9 });
   
-  // No need to call drawFooter manually at the end if we used didDrawPage for the last component?
-  // Actually, didDrawPage only calls on page finish. Transaction history is the last part.
-  // We should call drawFooter one last time for the current page.
   drawFooter(doc);
   
   doc.save(`Invoice_${customInvoiceNo.replace(/\//g, '_')}.pdf`);
