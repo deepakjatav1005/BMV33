@@ -7230,6 +7230,36 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF();
   
+  // Fetch latest booking from database to ensure it's 100% updated in real-time
+  let latestBooking = booking;
+  try {
+    const { data: bData, error: bErr } = await db.from('bookings').select('*').eq('id', booking.id).maybeSingle();
+    if (bData && !bErr) {
+      latestBooking = {
+        ...booking,
+        updatedAmount: Number(bData.updated_amount !== undefined ? bData.updated_amount : (bData.updatedAmount !== undefined ? bData.updatedAmount : booking.updatedAmount)) || 0,
+        totalAmount: Number(bData.total_amount !== undefined ? bData.total_amount : (bData.totalAmount !== undefined ? bData.totalAmount : booking.totalAmount)) || 0,
+        status: bData.status || booking.status,
+        paymentStatus: bData.payment_status || bData.paymentStatus || booking.paymentStatus,
+        paymentMode: bData.payment_mode || bData.paymentMode || booking.paymentMode,
+        isManual: bData.is_manual !== undefined ? bData.is_manual : (bData.isManual !== undefined ? bData.isManual : booking.isManual),
+        extra_services: typeof bData.extra_services === 'string' ? JSON.parse(bData.extra_services) : (bData.extra_services || booking.extra_services || []),
+        partyName: bData.party_name || bData.partyName || booking.partyName,
+        partyAddress: bData.party_address || bData.partyAddress || booking.partyAddress,
+        visitorName: bData.visitor_name || bData.visitorName || booking.visitorName,
+        visitorMobile: bData.visitor_mobile || bData.visitorMobile || booking.visitorMobile,
+        targetName: bData.target_name || bData.targetName || booking.targetName,
+        eventType: bData.event_type || bData.eventType || booking.eventType,
+        eventDate: bData.event_date || bData.eventDate || booking.eventDate,
+        endDate: bData.end_date || bData.endDate || booking.endDate,
+        startTime: bData.start_time || bData.startTime || booking.startTime,
+        endTime: bData.end_time || bData.endTime || booking.endTime,
+      };
+    }
+  } catch (e) {
+    console.error('Error fetching latest booking for invoice:', e);
+  }
+
   // Fetch App Branding from admin_settings
   let appLogoUrl = '/logo.png';
   let appName = 'BEST VENUE OPTION';
@@ -7250,35 +7280,44 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   }
 
   const timestamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
-  const fullTotalRecord = Number(booking.updatedAmount || 0) || Number(booking.totalAmount || 0) || 0;
-  const extraServicesTotal = (booking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount || 0) || 0), 0);
+  const fullTotalRecord = Number(latestBooking.updatedAmount || 0) || Number(latestBooking.totalAmount || 0) || 0;
+  const extraServicesTotal = (latestBooking.extra_services || []).reduce((sum, s) => sum + (Number(s.amount || 0) || 0), 0);
   const baseAmount = Math.max(0, fullTotalRecord - extraServicesTotal);
   const subTotalActual = Number(fullTotalRecord + (Number(expenditure || 0) || 0));
   
   // Accurately sum all payments, fetch if empty
-  let invoicePayments = (booking.payments || []).map(p => ({...p, amount: Number(p.amount || 0) || 0}));
-  if (invoicePayments.length === 0) {
-    try {
-      const { data } = await db.from('booking_payments').select('*').eq('booking_id', booking.id);
-      if (data) {
-        invoicePayments = data.map((p: any) => ({
-          id: p.id,
-          booking_id: p.booking_id,
-          amount: Number(p.amount) || 0,
-          paymentMode: p.payment_mode,
-          paymentDate: p.payment_date,
-          paymentType: p.payment_type,
-          transaction_id: p.transaction_id || p.id?.substring(0, 8).toUpperCase(),
-          createdAt: p.created_at
-        }));
-      }
-    } catch (e) {
-      console.error('Invoice: Failed to fetch payments', e);
+  let invoicePayments: any[] = [];
+  try {
+    const { data: pData, error: pErr } = await db.from('booking_payments').select('*').eq('booking_id', latestBooking.id);
+    if (pData && !pErr) {
+      invoicePayments = pData.map((p: any) => ({
+        id: p.id,
+        booking_id: p.booking_id,
+        bookingId: p.booking_id,
+        amount: Number(p.amount) || 0,
+        paymentMode: p.payment_mode || p.paymentMode,
+        paymentDate: p.payment_date || p.paymentDate,
+        paymentType: p.payment_type || p.paymentType,
+        transaction_id: p.transaction_id || p.transactionId || p.id?.substring(0, 8).toUpperCase(),
+        createdAt: p.created_at || p.createdAt
+      }));
     }
+  } catch (e) {
+    console.error('Invoice: Failed to fetch payments in real-time', e);
+  }
+
+  // Fallback to latestBooking.payments if database query failed or returned empty
+  if (invoicePayments.length === 0 && latestBooking.payments && latestBooking.payments.length > 0) {
+    invoicePayments = latestBooking.payments.map((p: any) => ({
+      ...p,
+      amount: Number(p.amount) || 0,
+      booking_id: latestBooking.id,
+      bookingId: latestBooking.id,
+    }));
   }
 
   const relatedPayments = (invoicePayments || []).filter((p: any) => 
-    p && (p.booking_id === booking.id || p.bookingId === booking.id || p.id === booking.id)
+    p && (p.booking_id === latestBooking.id || p.bookingId === latestBooking.id || p.id === latestBooking.id)
   );
   
   // Fetch logo base64 once
@@ -7293,30 +7332,30 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const balanceDue = Math.max(0, subTotalActual - totalReceived);
   
   const isPaid = balanceDue <= 0 && subTotalActual > 0;
-  const partyName = booking.isManual ? booking.partyName : (booking.visitorName || booking.partyName);
-  const partyMobile = booking.isManual ? booking.visitorMobile : (booking.visitorMobile || '');
+  const partyName = latestBooking.isManual ? latestBooking.partyName : (latestBooking.visitorName || latestBooking.partyName);
+  const partyMobile = latestBooking.isManual ? latestBooking.visitorMobile : (latestBooking.visitorMobile || '');
 
   // CUSTOM INVOICE NUMBER LOGIC
-  const bookingTypePrefix = booking.isManual ? 'MB' : 'PB';
+  const bookingTypePrefix = latestBooking.isManual ? 'MB' : 'PB';
   
   // Calculate Serial Number
   const currentYear = new Date().getFullYear();
   const providerBookingsThisYear = allBookings
     .filter(b => {
       const bYear = new Date(b.createdAt || new Date()).getFullYear();
-      return b.ownerId === booking.ownerId && bYear === currentYear;
+      return b.ownerId === latestBooking.ownerId && bYear === currentYear;
     })
     .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
   
-  const bookingIndex = providerBookingsThisYear.findIndex(b => b.id === booking.id);
+  const bookingIndex = providerBookingsThisYear.findIndex(b => b.id === latestBooking.id);
   const serialNo = (bookingIndex !== -1 ? bookingIndex + 1 : providerBookingsThisYear.length + 1).toString().padStart(4, '0');
   
   const customInvoiceNo = `BVO/${bookingTypePrefix}/${serialNo}`;
   
   const getDisplayStatus = () => {
-    const status = (booking.status || 'pending').toLowerCase();
+    const status = (latestBooking.status || 'pending').toLowerCase();
     if (isPaid || status === 'completed') return 'COMPLETED';
-    if (!globalSettings.subscriptionEnabled) return 'PAID';
+    if (!globalSettings?.subscriptionEnabled) return 'PAID';
     if (status === 'confirmed' || status === 'approved' || status === 'paid') return 'CONFIRMED';
     return status.toUpperCase();
   };
@@ -8837,16 +8876,16 @@ const DashboardView = ({
                                     <button 
                                       onClick={async () => {
                                         try {
-                                          const pdfBlob = await generateInvoice(b, 0, profile, bookings, globalSettings);
-                                          const url = URL.createObjectURL(pdfBlob);
-                                          const link = document.createElement('a');
-                                          link.href = url;
-                                          link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
-                                          document.body.appendChild(link);
-                                          link.click();
-                                          document.body.removeChild(link);
-                                          URL.revokeObjectURL(url);
-                                          toast.success('Invoice downloaded successfully');
+                                          await generateInvoice(b, 0, profile, bookings, globalSettings);
+
+
+
+
+
+
+
+
+
                                           
                                           // Mark as generated
                                           db.from('bookings').update({ is_invoice_generated: true }).eq('id', b.id).then(() => {
@@ -9435,16 +9474,16 @@ const ManagePaymentView = ({
               <button 
                 onClick={async () => {
                   try {
-                    const pdfBlob = await generateInvoice(b, 0, profile, bookings, globalSettings);
-                    const url = URL.createObjectURL(pdfBlob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `Invoice-${b.id.substring(0, 8).toUpperCase()}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                    toast.success('Invoice downloaded successfully');
+                    await generateInvoice(b, 0, profile, bookings, globalSettings);
+
+
+
+
+
+
+
+
+
                   } catch (err) {
                     toast.error('Failed to generate invoice');
                   }
