@@ -286,6 +286,10 @@ const ManagePaymentModal = ({
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!booking) return;
+    if (!booking.isLocked) {
+      toast.error('Booking transaction must be locked first before adding payment.');
+      return;
+    }
     if (newPayment.amount <= 0) {
       toast.error('Please enter a valid amount');
       return;
@@ -430,11 +434,22 @@ const ManagePaymentModal = ({
               </h4>
               {pendingAmount > 0 && booking.status !== 'completed' && booking.status !== 'paid' && !isRegistering && currentUserUid === booking.ownerId && (
                 <button 
-                  onClick={() => setIsRegistering(true)}
-                  className="px-6 py-2 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition-all flex items-center shadow-lg shadow-orange-100"
+                  onClick={() => {
+                    if (!booking.isLocked) {
+                      toast.error('Booking transaction must be locked first before adding payment.');
+                      return;
+                    }
+                    setIsRegistering(true);
+                  }}
+                  className={cn(
+                    "px-6 py-2 rounded-xl font-bold text-sm transition-all flex items-center shadow-lg",
+                    !booking.isLocked 
+                      ? "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 shadow-none" 
+                      : "bg-orange-600 text-white hover:bg-orange-700 shadow-orange-100"
+                  )}
                 >
-                  <Plus size={16} className="mr-2" />
-                  Register Payment
+                  {!booking.isLocked ? <Lock size={16} className="mr-2" /> : <Plus size={16} className="mr-2" />}
+                  {!booking.isLocked ? 'Lock to Register Payment' : 'Register Payment'}
                 </button>
               )}
             </div>
@@ -7464,40 +7479,46 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const addTransactionHistory = (startY: number) => {
     let localY = startY;
     if (relatedPayments.length > 0) {
-      if (localY > 220) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
-      doc.setDrawColor(200);
-      doc.line(20, localY, 190, localY);
-      localY += 6;
+      if (localY > 210) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
+      
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setTextColor(234, 88, 12);
       doc.text("TRANSACTION HISTORY", 20, localY);
       localY += 6;
-      
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      doc.setFont("helvetica", "normal");
-      doc.text("Date", 20, localY);
-      doc.text("Type", 60, localY);
-      doc.text("Mode", 100, localY);
-      doc.text("Amount", 190, localY, { align: "right" });
-      localY += 2;
-      doc.line(20, localY, 190, localY);
-      localY += 6;
-      
-      doc.setTextColor(0);
-      relatedPayments.forEach(p => {
-        if (localY > 260) { drawFooter(doc); doc.addPage(); drawHeader(doc); localY = 45; }
+
+      const txRows = relatedPayments.map(p => {
         const dateRaw = p.paymentDate || p.createdAt;
         const justDate = format(new Date(dateRaw), 'dd/MM/yyyy');
-        doc.text(justDate, 20, localY);
-        doc.text((p.paymentType || 'Payment').toUpperCase(), 60, localY);
-        doc.text((p.paymentMode || 'N/A').toUpperCase(), 100, localY);
-        doc.text(`₹ ${Number(p.amount || 0).toLocaleString()}`, 190, localY, { align: "right" });
-        localY += 6;
+        return [
+          justDate,
+          (p.paymentType || 'Payment').toUpperCase(),
+          (p.paymentMode || 'N/A').toUpperCase(),
+          Number(p.amount || 0).toLocaleString()
+        ];
       });
-      doc.line(20, localY, 190, localY);
-      localY += 8;
+
+      autoTable(doc, {
+        startY: localY,
+        head: [['Date', 'Type', 'Mode', 'Amount']],
+        body: txRows,
+        theme: 'grid',
+        headStyles: { fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
+        margin: { left: 20, right: 20 },
+        columnStyles: {
+          0: { cellWidth: 35, halign: 'left' },
+          1: { cellWidth: 45, halign: 'left' },
+          2: { cellWidth: 45, halign: 'left' },
+          3: { cellWidth: 45, halign: 'right' }
+        },
+        styles: { fontSize: 8, lineColor: [200, 200, 200], lineWidth: 0.2 },
+        didDrawPage: (data) => {
+          drawHeader(doc);
+          drawFooter(doc);
+        }
+      });
+
+      localY = (doc as any).lastAutoTable.finalY + 8;
     }
     return localY;
   };
@@ -7543,14 +7564,14 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   const tableRows = [];
   if (baseAmount > 0) {
     const displayName = (booking.targetName || 'Booking').split('(')[0].trim();
-    tableRows.push([`Base Booking Amount for ${sanitizeName(displayName)}`, `₹ ${baseAmount.toLocaleString()}`]);
+    tableRows.push([`Base Booking Amount for ${sanitizeName(displayName)}`, `${baseAmount.toLocaleString()}`]);
   }
   if (expenditure > 0) {
-    tableRows.push(['Additional Expenditure', `₹ ${Math.round(expenditure).toLocaleString()}`]);
+    tableRows.push(['Additional Expenditure', `${Math.round(expenditure).toLocaleString()}`]);
   }
   if (booking.extra_services && booking.extra_services.length > 0) {
     booking.extra_services.forEach(s => {
-      tableRows.push([sanitizeName(s.name), `₹ ${Math.round(s.amount || 0).toLocaleString()}`]);
+      tableRows.push([sanitizeName(s.name), `${Math.round(s.amount || 0).toLocaleString()}`]);
     });
   }
 
@@ -7558,10 +7579,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     startY: Math.max(currentY + 25, billToY + 12),
     head: [['Description', 'Amount']],
     body: tableRows,
-    theme: 'striped',
-    headStyles: { fillColor: [234, 88, 12] },
+    theme: 'grid',
+    headStyles: { fillColor: [234, 88, 12], textColor: [255, 255, 255], fontStyle: 'bold' },
     margin: { left: 20, right: 20 },
-    columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 50, halign: 'right' } },
+    columnStyles: { 0: { cellWidth: 120, halign: 'left' }, 1: { cellWidth: 50, halign: 'right' } },
+    styles: { fontSize: 9, lineColor: [200, 200, 200], lineWidth: 0.2 },
     didDrawPage: (data) => {
       // Unconditionally draw header and footer on every page
       // page 1 header was drawn manually but re-drawing is harmless if coordinates match
@@ -7575,11 +7597,11 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
   doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
   doc.text("Final Booking Total:", 110, currentY);
-  doc.text(`₹ ${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`${Number(subTotalActual || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 5;
   doc.setFontSize(9);
   doc.text("Total Amount Paid:", 110, currentY);
-  doc.text(`₹ ${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`${Number(totalReceived || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 5;
   doc.setFontSize(10);
   if (balanceDue > 0) {
@@ -7588,7 +7610,7 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     doc.setTextColor(22, 163, 74);
   }
   doc.text("Balance Due:", 110, currentY);
-  doc.text(`₹ ${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
+  doc.text(`${Number(balanceDue || 0).toLocaleString()}`, 190, currentY, { align: 'right' });
   currentY += 10;
 
   const finalY = addTransactionHistory(currentY);
@@ -9456,8 +9478,12 @@ const ManagePaymentView = ({
                 <span>Update Amount</span>
               </button>
               <button 
-                disabled={pendingAmount < 1}
                 onClick={() => {
+                  if (pendingAmount < 1) return;
+                  if (!b.isLocked) {
+                    toast.error('Please lock this booking transaction first before adding payments');
+                    return;
+                  }
                   setSelectedBooking(b);
                   setIsPaymentRecordModalOpen(true);
                 }}
@@ -9465,11 +9491,13 @@ const ManagePaymentView = ({
                   "flex-1 md:flex-none justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center space-x-2 transition-all shadow-lg",
                   pendingAmount < 1 
                     ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed shadow-none" 
-                    : "bg-green-600 text-white hover:bg-green-700 shadow-green-100"
+                    : !b.isLocked
+                      ? "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 shadow-none"
+                      : "bg-green-600 text-white hover:bg-green-700 shadow-green-100"
                 )}
               >
-                {pendingAmount < 1 ? <CheckCircle size={16} /> : <Plus size={16} />}
-                <span>{pendingAmount < 1 ? 'Fully Paid' : 'Add Payment'}</span>
+                {pendingAmount < 1 ? <CheckCircle size={16} /> : !b.isLocked ? <Lock size={16} /> : <Plus size={16} />}
+                <span>{pendingAmount < 1 ? 'Fully Paid' : !b.isLocked ? 'Lock to Pay' : 'Add Payment'}</span>
               </button>
               <button 
                 onClick={async () => {
