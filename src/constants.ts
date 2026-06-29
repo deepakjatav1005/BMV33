@@ -9,6 +9,7 @@ export const DEFAULT_MOCK_DATA: Record<string, any[]> = {
   bookings: [],
   reviews: [],
   app_feedback: [],
+  complaints: [],
   users: [
     { id: 'admin-id', uid: 'admin-id', email: 'deepakjatav1005@gmail.com', password: '9165436918', role: 'admin', display_name: 'Deepak Jatav', mobile_number: '9165436918' }
   ],

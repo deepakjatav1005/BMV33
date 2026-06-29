@@ -138,6 +138,27 @@ async function startServer() {
         } catch (tableErr: any) {
           console.error(">>> [STORAGE SETUP ERROR] Failed to create or verify uploaded_files table:", tableErr.message);
         }
+
+        // Initialize complaints table
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS complaints (
+              \`id\` VARCHAR(50) PRIMARY KEY,
+              \`user_id\` VARCHAR(100) NOT NULL,
+              \`sender_name\` VARCHAR(255),
+              \`sender_mobile\` VARCHAR(50),
+              \`sender_address\` TEXT,
+              \`category\` VARCHAR(100),
+              \`detail\` TEXT,
+              \`status\` VARCHAR(50) DEFAULT 'pending',
+              \`remark\` TEXT,
+              \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+          `);
+          console.log(">>> [COMPLAINTS SETUP] Checked and verified complaints table in database.");
+        } catch (tableErr: any) {
+          console.error(">>> [COMPLAINTS SETUP ERROR] Failed to create complaints table:", tableErr.message);
+        }
         break;
       }
       retries--;
@@ -206,26 +227,17 @@ async function startServer() {
 
   // Razorpay instance with ESM interop fix
   let razorpay: any = null;
-  const getRazorpayInstance = () => {
-    if (razorpay) return razorpay;
-    try {
-      const RazorpayConstructor = (Razorpay as any).default || Razorpay;
-      const key_id = process.env.VITE_RAZORPAY_KEY_ID;
-      const key_secret = process.env.RAZORPAY_KEY_SECRET;
-      if (key_id && key_secret) {
-        console.log(">>> [LAZY INIT] Initializing Razorpay dynamically...");
-        razorpay = new RazorpayConstructor({ key_id, key_secret });
-      } else {
-        console.warn(">>> [LAZY INIT WARN] Cannot initialize Razorpay: VITE_RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not set.");
-      }
-    } catch (err: any) {
-      console.error(">>> [LAZY INIT ERROR] Failed to dynamically initialize Razorpay:", err.message);
-    }
-    return razorpay;
-  };
-
-  // Try initial setup (fails-safe if keys aren't set yet)
-  getRazorpayInstance();
+  try {
+    const RazorpayConstructor = (Razorpay as any).default || Razorpay;
+    console.log(">>> [BOOT] Initializing Razorpay...");
+    razorpay = new RazorpayConstructor({
+      key_id: process.env.VITE_RAZORPAY_KEY_ID || "",
+      key_secret: process.env.RAZORPAY_KEY_SECRET || "",
+    });
+    console.log(">>> [BOOT] Razorpay initialized");
+  } catch (err) {
+    console.error(">>> [ERROR] Failed to initialize Razorpay:", err);
+  }
 
   // DB Test (Non-blocking)
   pool.getConnection().then(connection => {
@@ -714,27 +726,21 @@ async function startServer() {
     res.json({ data: { path: relativePath, publicUrl }, error: null });
   });
 
-  app.get("/api/razorpay/key", (req, res) => {
-    res.json({ keyId: process.env.VITE_RAZORPAY_KEY_ID || "" });
-  });
-
   app.post("/api/razorpay/order", async (req, res) => {
     console.log("> [API] Received Razorpay order request");
-    const rzpInstance = getRazorpayInstance();
-    if (!rzpInstance) {
-      return res.status(500).json({ error: "Razorpay not initialized. Please configure VITE_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET." });
+    if (!razorpay) {
+      return res.status(500).json({ error: "Razorpay not initialized" });
     }
     try {
       const { amount, currency, receipt, notes } = req.body;
-      const amountInPaise = Math.round(parseFloat(amount) * 100);
       const options = {
-        amount: amountInPaise,
-        currency: currency || 'INR',
-        receipt: receipt || `receipt_${Date.now()}`,
-        notes: notes || {},
+        amount: amount * 100,
+        currency,
+        receipt,
+        notes,
       };
  
-      const order = await rzpInstance.orders.create(options);
+      const order = await razorpay.orders.create(options);
       res.json(order);
     } catch (error) {
       console.error("> [ERROR] Razorpay order error:", error);

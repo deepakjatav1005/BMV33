@@ -96,25 +96,23 @@ const mockDataService = {
       select: (cols: string, opts: any = {}) => createQueryBuilder(getTableData(), opts),
       insert: (newData: any) => {
         const data = getLocalData();
+        if (!data[table]) data[table] = [];
         const items = Array.isArray(newData) ? newData : [newData];
         const insertedItems = items.map(item => ({
           id: Math.random().toString(36).substr(2, 9),
           created_at: new Date().toISOString(),
           ...item
         }));
-        if (data[table]) {
-          data[table].push(...insertedItems);
-          saveLocalData(data);
-        }
+        data[table].push(...insertedItems);
+        saveLocalData(data);
         return Promise.resolve({ data: insertedItems, error: null });
       },
       update: (updateData: any) => {
         const updateInTable = (predicate: (item: any) => boolean) => {
           const data = getLocalData();
-          if (data[table]) {
-            data[table] = data[table].map((item: any) => predicate(item) ? { ...item, ...updateData, updated_at: new Date().toISOString() } : item);
-            saveLocalData(data);
-          }
+          if (!data[table]) data[table] = [];
+          data[table] = data[table].map((item: any) => predicate(item) ? { ...item, ...updateData, updated_at: new Date().toISOString() } : item);
+          saveLocalData(data);
           return Promise.resolve({ data: null, error: null });
         };
 
@@ -127,10 +125,9 @@ const mockDataService = {
       delete: () => {
         const deleteFromTable = (predicate: (item: any) => boolean) => {
           const data = getLocalData();
-          if (data[table]) {
-            data[table] = data[table].filter((item: any) => !predicate(item));
-            saveLocalData(data);
-          }
+          if (!data[table]) data[table] = [];
+          data[table] = data[table].filter((item: any) => !predicate(item));
+          saveLocalData(data);
           return Promise.resolve({ data: null, error: null });
         };
 
@@ -141,15 +138,14 @@ const mockDataService = {
       },
       upsert: (upsertData: any) => {
         const data = getLocalData();
+        if (!data[table]) data[table] = [];
         const items = Array.isArray(upsertData) ? upsertData : [upsertData];
-        if (data[table]) {
-          items.forEach(item => {
-            const index = data[table].findIndex((i: any) => i.id === item.id);
-            if (index > -1) data[table][index] = { ...data[table][index], ...item, updated_at: new Date().toISOString() };
-            else data[table].push({ id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString(), ...item });
-          });
-          saveLocalData(data);
-        }
+        items.forEach(item => {
+          const index = data[table].findIndex((i: any) => i.id === item.id);
+          if (index > -1) data[table][index] = { ...data[table][index], ...item, updated_at: new Date().toISOString() };
+          else data[table].push({ id: Math.random().toString(36).substr(2, 9), created_at: new Date().toISOString(), ...item });
+        });
+        saveLocalData(data);
         return Promise.resolve({ data: items, error: null });
       }
     };

@@ -897,6 +897,7 @@ const MultiSelect = ({
 };
 
 const AdminCharts = React.lazy(() => import('./components/AdminCharts'));
+const QueryComplaintView = React.lazy(() => import('./components/QueryComplaintView'));
 
 export enum OperationType {
   CREATE = 'create',
@@ -7903,7 +7904,7 @@ const DashboardView = ({
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'venues' | 'orders' | 'services' | 'catalogue' | 'facilities' | 'subscription' | 'booking-manager' | 'reports' | 'rating-card' | 'manually-booking' | 'public-booking' | 'manage-payment' | 'query-complaint'>(initialTab);
   const [reportFilters, setReportFilters] = useState({
     name: '',
     mobile: '',
@@ -8268,6 +8269,7 @@ const DashboardView = ({
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
     { id: 'rating-card', label: 'Rating Accept Card', icon: <QrCode size={20} />, roles: ['owner', 'provider'] },
     { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
+    { id: 'query-complaint', label: 'Query or Complaint', icon: <MessageSquare size={20} />, roles: ['owner', 'provider', 'user'] },
   ].sort((a, b) => {
     if (a.id === 'overview') return -1;
     if (b.id === 'overview') return 1;
@@ -8878,6 +8880,16 @@ const DashboardView = ({
                 <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm min-h-[500px]">
                   <RatingCardView profile={profile} venues={venues} services={services} />
                 </div>
+              )}
+              {activeTab === 'query-complaint' && (
+                <React.Suspense fallback={
+                  <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mb-4"></div>
+                    <span className="text-sm font-bold text-gray-500">Loading Query & Complaint Portal...</span>
+                  </div>
+                }>
+                  <QueryComplaintView user={user} profile={profile} />
+                </React.Suspense>
               )}
             </motion.div>
           </AnimatePresence>
@@ -9632,43 +9644,6 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
     if (!user || !profile) return;
     
     try {
-      // Dynamic script loader for Razorpay Checkout
-      if (typeof (window as any).Razorpay === 'undefined') {
-        toast.loading('Loading secure payment gateway...', { id: 'rzp-load' });
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-          script.onload = () => {
-            toast.dismiss('rzp-load');
-            resolve();
-          };
-          script.onerror = () => {
-            toast.dismiss('rzp-load');
-            reject(new Error('Failed to load Razorpay payment gateway script. Please check your internet connection.'));
-          };
-          document.body.appendChild(script);
-        });
-      }
-
-      // Fetch Razorpay key ID if not available client-side
-      let razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!razorpayKey) {
-        try {
-          const keyRes = await fetch('/api/razorpay/key');
-          if (keyRes.ok) {
-            const keyData = await keyRes.json();
-            razorpayKey = keyData.keyId;
-          }
-        } catch (keyErr) {
-          console.error("Failed to fetch Razorpay Key ID from server:", keyErr);
-        }
-      }
-
-      if (!razorpayKey) {
-        toast.error('Razorpay public key ID is not configured. Please contact support or set VITE_RAZORPAY_KEY_ID.');
-        return;
-      }
-
       // 1. Create order on server
       const response = await fetch('/api/razorpay/order', {
         method: 'POST',
@@ -9690,7 +9665,7 @@ const SubscriptionManageView = ({ user, profile }: { user: any, profile: UserPro
       
       // 2. Open Razorpay Checkout
       const options = {
-        key: razorpayKey,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: "BEST VENUE OPTION",
@@ -13145,7 +13120,7 @@ const AdminView = ({
   activeSubscription: UserSubscription | null
 }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download' | 'query-complaint'>('dashboard');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -13812,6 +13787,7 @@ const AdminView = ({
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
             { id: 'moments', label: 'Moments Photos', icon: Sparkles },
             { id: 'flex-download', label: 'Flex & Banner', icon: QrCode },
+            { id: 'query-complaint', label: 'Query or Complaint', icon: MessageSquare },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
             { id: 'database', label: 'Database & Security', icon: Database },
           ].map(tab => (
@@ -14588,6 +14564,17 @@ const AdminView = ({
                 <FlexBannerDownloadView venues={adminVenues} services={adminServices} />
               )}
 
+              {activeTab === 'query-complaint' && (
+                <React.Suspense fallback={
+                  <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500 mb-4"></div>
+                    <span className="text-sm font-bold text-gray-500">Loading Query & Complaint Portal...</span>
+                  </div>
+                }>
+                  <QueryComplaintView user={user} profile={profile} />
+                </React.Suspense>
+              )}
+
               {activeTab === 'database' && (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -14763,6 +14750,19 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     message TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.complaints (
+    id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(100) NOT NULL,
+    sender_name VARCHAR(255),
+    sender_mobile VARCHAR(50),
+    sender_address TEXT,
+    category VARCHAR(100),
+    detail TEXT,
+    status VARCHAR(50) DEFAULT 'pending',
+    remark TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );`}
                     </pre>
                   </div>
