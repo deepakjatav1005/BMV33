@@ -81,6 +81,220 @@ async function checkDbHealth(force = false) {
   }
 }
 
+// Robust server-side local JSON-based database fallback helper
+const JSON_DB_FILE = path.join(process.cwd(), "local_db_fallback.json");
+
+function getJsonDb() {
+  try {
+    if (fs.existsSync(JSON_DB_FILE)) {
+      const content = fs.readFileSync(JSON_DB_FILE, "utf8");
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    console.error(">>> [JSON DB ERROR] Failed to read JSON DB:", e);
+  }
+  
+  // Default structure consistent with DEFAULT_MOCK_DATA
+  const defaultDb = {
+    venues: [],
+    service_providers: [],
+    banners: [],
+    notifications: [
+      { id: '1', title: 'Welcome!', message: 'Welcome to BEST VANUE OPTION! Start by exploring venues and services.', created_at: new Date().toISOString() },
+    ],
+    bookings: [],
+    reviews: [],
+    app_feedback: [],
+    complaints: [],
+    users: [
+      { id: 'admin-id', uid: 'admin-id', email: 'deepakjatav1005@gmail.com', password: '9165436918', role: 'admin', display_name: 'Deepak Jatav', mobile_number: '9165436918' }
+    ],
+    subscription_plans: [
+      { id: '1', role: 'owner', name: 'Monthly Plan', price: 100, duration: 'month', isActive: true },
+      { id: '2', role: 'owner', name: 'Annual Plan', price: 1000, duration: 'year', isActive: true },
+      { id: '3', role: 'provider', name: 'Monthly Plan', price: 30, duration: 'month', isActive: true },
+      { id: '4', role: 'provider', name: 'Annual Plan', price: 300, duration: 'year', isActive: true },
+    ],
+    user_subscriptions: [],
+    service_type_photos: []
+  };
+  
+  try {
+    fs.writeFileSync(JSON_DB_FILE, JSON.stringify(defaultDb, null, 2), "utf8");
+  } catch (e) {
+    console.error(">>> [JSON DB ERROR] Failed to write initial JSON DB:", e);
+  }
+  return defaultDb;
+}
+
+function saveJsonDb(dbData: any) {
+  try {
+    fs.writeFileSync(JSON_DB_FILE, JSON.stringify(dbData, null, 2), "utf8");
+  } catch (e) {
+    console.error(">>> [JSON DB ERROR] Failed to save JSON DB:", e);
+  }
+}
+
+function handleJsonQuery(table: string, body: any): { data: any, count?: number, error: any } {
+  const dbData = getJsonDb() as any;
+  if (!dbData[table]) {
+    dbData[table] = [];
+  }
+  
+  const { method, filters, data, limit, order } = body;
+  let tableData = [...dbData[table]];
+
+  if (method === 'SELECT') {
+    // Apply filters
+    if (filters && filters.length > 0) {
+      tableData = tableData.filter((item: any) => {
+        return filters.every((f: any) => {
+          if (f.op === 'eq') {
+            return String(item[f.col]) === String(f.val);
+          }
+          if (f.op === 'neq') {
+            return String(item[f.col]) !== String(f.val);
+          }
+          if (f.op === 'gt') {
+            return Number(item[f.col]) > Number(f.val);
+          }
+          if (f.op === 'gte') {
+            return Number(item[f.col]) >= Number(f.val);
+          }
+          if (f.op === 'lt') {
+            return Number(item[f.col]) < Number(f.val);
+          }
+          if (f.op === 'lte') {
+            return Number(item[f.col]) <= Number(f.val);
+          }
+          if (f.op === 'like') {
+            const search = String(f.val).toLowerCase().replace(/%/g, '');
+            return String(item[f.col] || '').toLowerCase().includes(search);
+          }
+          if (f.op === 'in') {
+            const vals = Array.isArray(f.val) ? f.val : [f.val];
+            return vals.map(String).includes(String(item[f.col]));
+          }
+          if (f.op === 'or') {
+            const parts = f.val.split(',');
+            return parts.some((part: string) => {
+              const pieces = part.split('.');
+              const col = pieces[0];
+              const op = pieces[1];
+              const val = pieces.slice(2).join('.');
+              if (op === 'eq') return String(item[col]) === String(val);
+              if (op === 'like') return String(item[col] || '').toLowerCase().includes(val.toLowerCase());
+              return false;
+            });
+          }
+          return true;
+        });
+      });
+    }
+
+    // Apply sorting
+    if (order && order.col) {
+      const col = order.col;
+      const asc = order.ascending !== false;
+      tableData.sort((a: any, b: any) => {
+        const valA = a[col];
+        const valB = b[col];
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return asc ? valA - valB : valB - valA;
+        }
+        const strA = String(valA || '').toLowerCase();
+        const strB = String(valB || '').toLowerCase();
+        if (strA < strB) return asc ? -1 : 1;
+        if (strA > strB) return asc ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Apply limit
+    if (limit) {
+      tableData = tableData.slice(0, Number(limit));
+    }
+
+    return { data: tableData, count: tableData.length, error: null };
+  }
+
+  if (method === 'INSERT') {
+    const items = Array.isArray(data) ? data : [data];
+    const insertedItems = items.map((item: any, idx: number) => {
+      const newItem = { ...item };
+      if (!newItem.id) {
+        newItem.id = Date.now() + "_" + Math.floor(Math.random() * 10000) + "_" + idx;
+      }
+      dbData[table].push(newItem);
+      return newItem;
+    });
+    saveJsonDb(dbData);
+    return { data: Array.isArray(data) ? insertedItems : insertedItems[0], error: null };
+  }
+
+  if (method === 'UPDATE') {
+    let updatedCount = 0;
+    dbData[table] = dbData[table].map((item: any) => {
+      let matches = true;
+      if (filters && filters.length > 0) {
+        matches = filters.every((f: any) => String(item[f.col]) === String(f.val));
+      }
+      if (matches) {
+        updatedCount++;
+        return { ...item, ...data };
+      }
+      return item;
+    });
+    if (updatedCount > 0) {
+      saveJsonDb(dbData);
+    }
+    return { data: null, error: null };
+  }
+
+  if (method === 'UPSERT') {
+    const items = Array.isArray(data) ? data : [data];
+    const upsertedItems = items.map((item: any) => {
+      const matchCol = item.id ? 'id' : item.key ? 'key' : null;
+      if (matchCol && item[matchCol]) {
+        const idx = dbData[table].findIndex((x: any) => String(x[matchCol]) === String(item[matchCol]));
+        if (idx > -1) {
+          dbData[table][idx] = { ...dbData[table][idx], ...item };
+          return dbData[table][idx];
+        }
+      }
+      const newItem = { ...item };
+      if (!newItem.id) {
+        newItem.id = Date.now() + "_" + Math.floor(Math.random() * 10000);
+      }
+      dbData[table].push(newItem);
+      return newItem;
+    });
+    saveJsonDb(dbData);
+    return { data: Array.isArray(data) ? upsertedItems : upsertedItems[0], error: null };
+  }
+
+  if (method === 'DELETE') {
+    let deletedCount = 0;
+    dbData[table] = dbData[table].filter((item: any) => {
+      let matches = true;
+      if (filters && filters.length > 0) {
+        matches = filters.every((f: any) => String(item[f.col]) === String(f.val));
+      }
+      if (matches) {
+        deletedCount++;
+        return false;
+      }
+      return true;
+    });
+    if (deletedCount > 0) {
+      saveJsonDb(dbData);
+    }
+    return { data: null, error: null };
+  }
+
+  return { data: null, error: "Unsupported operation" };
+}
+
 async function startServer() {
   console.log(">>> [BOOT] Starting server initialization...");
   
@@ -111,7 +325,7 @@ async function startServer() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    connectTimeout: 30000,   // Wait up to 30s for connection
+    connectTimeout: 4000,   // Wait up to 4s for connection
     enableKeepAlive: true,    // Prevent idle disconnects
     keepAliveInitialDelay: 10000,
     decimalNumbers: true,    // Support decimal as numbers
@@ -312,11 +526,13 @@ async function startServer() {
 
     // Check health before trying
     if (!isDbHealthy) {
-      console.warn(`>>> [FAIL-FAST] Skipping ${method} on ${table} due to known DB downtime.`);
-      return res.status(503).json({ 
-        error: "Database currently unreachable. Working in offline mode.",
-        code: "DB_UNREACHABLE"
-      });
+      console.warn(`>>> [FAIL-FAST] Routing ${method} on ${table} to local JSON DB fallback.`);
+      try {
+        const result = handleJsonQuery(table, req.body);
+        return res.json(result);
+      } catch (jsonErr: any) {
+        return res.status(500).json({ error: "Local JSON fallback DB error: " + jsonErr.message });
+      }
     }
 
     try {
@@ -543,6 +759,14 @@ async function startServer() {
         isDbHealthy = false;
         lastDbCheck = Date.now(); // Reset check timer
         console.error(">>> [CONNECTION ADVICE] If you are using Hostinger or CPanel, please ensure you have whitelisted '%' in the 'Remote MySQL' settings.");
+        
+        console.warn(`>>> [FALLBACK-ON-ERROR] Instantly routing ${method} on ${table} to local JSON DB fallback.`);
+        try {
+          const result = handleJsonQuery(table, req.body);
+          return res.json(result);
+        } catch (jsonErr: any) {
+          return res.status(500).json({ error: "Local JSON fallback DB error: " + jsonErr.message });
+        }
       }
 
       // Attempt to fix common column/table errors

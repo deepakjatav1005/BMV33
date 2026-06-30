@@ -5,7 +5,7 @@
   
   import React, { Component, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
-  HashRouter as Router, 
+  BrowserRouter as Router, 
   Routes, 
   Route, 
   Link, 
