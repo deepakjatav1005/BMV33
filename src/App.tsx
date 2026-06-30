@@ -8149,7 +8149,7 @@ const RatingCardView = ({ profile, venues, services }: { profile: UserProfile | 
 
              <div className="border-t-2 border-orange-200 pt-3 w-full flex flex-col items-center">
                <div className="flex items-center gap-2 mb-1">
-                 <div className="shadow-sm rounded-lg overflow-hidden border border-orange-100">
+                 <div className="shadow-sm rounded-full overflow-hidden">
                    <AppLogo size="xs" showText={false} />
                  </div>
                  <h1 className="text-xl font-black tracking-tighter leading-none flex gap-1">

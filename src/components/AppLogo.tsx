@@ -45,11 +45,11 @@ export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 'md', s
 
   return (
     <div className={`inline-flex items-center space-x-3 ${className}`}>
-      <div className={`${sizeClasses[size]} aspect-square flex-shrink-0 flex items-center justify-center group rounded-full bg-white p-0 border-2 border-orange-500 shadow-md overflow-hidden`}>
+      <div className={`${sizeClasses[size]} aspect-square flex-shrink-0 flex items-center justify-center group rounded-full overflow-hidden`}>
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
           alt="Best Venue Option Logo" 
-          className="w-full h-full object-cover rounded-full transition-all duration-500 group-hover:scale-110"
+          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
           referrerPolicy="no-referrer"
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/logo.png';

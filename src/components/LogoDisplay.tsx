@@ -27,7 +27,7 @@ export const LogoDisplay: React.FC = () => {
 
   return (
     <div className="flex justify-center p-4">
-      <div className="w-[200px] h-[200px] rounded-full overflow-hidden bg-white shadow-xl border-4 border-white">
+      <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full overflow-hidden">
         <img 
           src={resolveUrl(logoUrl) || '/logo.png'} 
           alt="BV Logo" 
