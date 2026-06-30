@@ -2139,7 +2139,22 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                 <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
               </button>
 
-              {!user && (
+              {user ? (
+                <div className="flex items-center space-x-4">
+                  {profile?.role === 'admin' ? (
+                    <Link to="/admin" className="bg-red-600 text-white px-5 py-2 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200">Admin Panel</Link>
+                  ) : (
+                    <Link to="/dashboard" className="bg-orange-600 text-white px-5 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">Dashboard</Link>
+                  )}
+                  <button 
+                    onClick={handleLogout} 
+                    className="flex items-center space-x-1.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 px-4 py-2 rounded-full font-bold transition-all border border-gray-200"
+                  >
+                    <LogOut size={16} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : (
                 <>
                   <Link to="/registration" className="text-gray-600 hover:text-orange-600 font-medium transition-colors">{t('registration')}</Link>
                   <Link to="/login" className="bg-orange-600 text-white px-6 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">{t('login')}</Link>
@@ -2147,9 +2162,35 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               )}
             </div>
 
-            <div className="md:hidden">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-600">
-                {isMenuOpen ? <X /> : <Menu />}
+            <div className="md:hidden flex items-center space-x-3">
+              {!user ? (
+                <>
+                  <Link to="/login" className="bg-orange-600 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:bg-orange-700 transition-all shadow-sm">
+                    {t('login')}
+                  </Link>
+                  <Link to="/registration" className="text-gray-600 hover:text-orange-600 text-xs font-bold px-1 transition-all">
+                    Register
+                  </Link>
+                </>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Link 
+                    to={profile?.role === 'admin' ? "/admin" : "/dashboard"} 
+                    className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-orange-200 transition-all"
+                  >
+                    {profile?.role === 'admin' ? 'Admin' : 'Dashboard'}
+                  </Link>
+                  <button 
+                    onClick={handleLogout} 
+                    className="text-gray-600 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors"
+                    title="Logout"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+              )}
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-600 p-1">
+                {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
@@ -2197,7 +2238,28 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
             </button>
 
-            {!user && (
+            {user ? (
+              <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
+                <Link 
+                  to={profile?.role === 'admin' ? "/admin" : "/dashboard"} 
+                  className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <LayoutDashboard size={18} />
+                  <span>{profile?.role === 'admin' ? "Admin Panel" : "Dashboard"}</span>
+                </Link>
+                <button 
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex items-center space-x-3 px-4 py-3 w-full text-red-600 font-bold bg-red-50 hover:bg-red-100 rounded-2xl transition-all mt-2"
+                >
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
                 <Link to="/login" className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
                   <LogIn size={18} />
@@ -7246,11 +7308,21 @@ const fetchAndAddHindiFont = async (doc: any) => {
   }
 };
 
-const renderTextToImage = (text: string, fontSize: number, isBold: boolean, color: string = '#000000'): { dataUrl: string, width: number, height: number } => {
-  if (!text || !text.trim()) return { dataUrl: '', width: 0, height: 0 };
+const renderTextToImage = (
+  text: string, 
+  fontSize: number, 
+  isBold: boolean, 
+  color: string = '#000000', 
+  scaleFactor: number = 2.8346
+): { dataUrl: string, width: number, height: number, baselineOffset: number, leftPaddingOffset: number, textWidthOffset: number } => {
+  if (!text || !text.trim()) {
+    return { dataUrl: '', width: 0, height: 0, baselineOffset: 0, leftPaddingOffset: 0, textWidthOffset: 0 };
+  }
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  if (!ctx) return { dataUrl: '', width: 0, height: 0 };
+  if (!ctx) {
+    return { dataUrl: '', width: 0, height: 0, baselineOffset: 0, leftPaddingOffset: 0, textWidthOffset: 0 };
+  }
   
   const scale = 4;
   const scaledFontSize = fontSize * scale;
@@ -7261,19 +7333,28 @@ const renderTextToImage = (text: string, fontSize: number, isBold: boolean, colo
   const textWidth = Math.ceil(metrics.width);
   const textHeight = Math.ceil(scaledFontSize * 1.5);
   
-  canvas.width = textWidth + 20;
+  canvas.width = textWidth + 20; // 10px padding on each side
   canvas.height = textHeight;
   
   ctx.font = fontStyle;
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = color;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillText(text, 10, textHeight / 2);
+  
+  const baselineY = Math.ceil(scaledFontSize * 1.1);
+  ctx.fillText(text, 10, baselineY);
+  
+  const scaleToPdf = (fontSize / scaleFactor) / scaledFontSize;
+  const widthInPdf = canvas.width * scaleToPdf;
+  const heightInPdf = canvas.height * scaleToPdf;
   
   return {
     dataUrl: canvas.toDataURL('image/png'),
-    width: (textWidth + 20) / scale,
-    height: textHeight / scale
+    width: widthInPdf,
+    height: heightInPdf,
+    baselineOffset: baselineY * scaleToPdf,
+    leftPaddingOffset: 10 * scaleToPdf,
+    textWidthOffset: textWidth * scaleToPdf
   };
 };
 
@@ -7310,15 +7391,18 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
     }
 
     if (/[\u0900-\u097F]/.test(text)) {
-      const { dataUrl, width, height } = renderTextToImage(text, fontSize, isBold, color);
-      if (dataUrl) {
+      const imgInfo = renderTextToImage(text, fontSize, isBold, color, d.internal.scaleFactor);
+      if (imgInfo && imgInfo.dataUrl) {
+        const { dataUrl, width, height, baselineOffset, leftPaddingOffset, textWidthOffset } = imgInfo;
         let drawX = x;
-        if (align === 'right') {
-          drawX = x - width;
+        if (align === 'left') {
+          drawX = x - leftPaddingOffset;
+        } else if (align === 'right') {
+          drawX = x - (leftPaddingOffset + textWidthOffset);
         } else if (align === 'center') {
-          drawX = x - width / 2;
+          drawX = x - (leftPaddingOffset + textWidthOffset / 2);
         }
-        const drawY = y - (height * 0.72);
+        const drawY = y - baselineOffset;
         d.addImage(dataUrl, 'PNG', drawX, drawY, width, height, undefined, 'FAST');
       }
     } else {
@@ -7621,12 +7705,13 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
             const fontSize = isHeader ? 8 : 8;
             const isBold = isHeader;
             const color = isHeader ? '#FFFFFF' : '#000000';
-            const { dataUrl, width, height } = renderTextToImage(rawHindiText, fontSize, isBold, color);
-            if (dataUrl) {
+            const imgInfo = renderTextToImage(rawHindiText, fontSize, isBold, color, doc.internal.scaleFactor);
+            if (imgInfo && imgInfo.dataUrl) {
+              const { dataUrl, width, height, leftPaddingOffset } = imgInfo;
               const paddingLeft = 4;
-              let x = data.cell.x + paddingLeft;
+              let x = data.cell.x + paddingLeft - leftPaddingOffset;
               if (data.column.index === 3) { // Amount is right aligned
-                x = data.cell.x + data.cell.width - width - paddingLeft;
+                x = data.cell.x + data.cell.width - width - paddingLeft + leftPaddingOffset;
               }
               const y = data.cell.y + (data.cell.height - height) / 2;
               doc.addImage(dataUrl, 'PNG', x, y, width, height, undefined, 'FAST');
@@ -7731,12 +7816,13 @@ const generateInvoice = async (booking: Booking, expenditure: number, providerPr
         const fontSize = isHeader ? 9 : 9;
         const isBold = isHeader;
         const color = isHeader ? '#FFFFFF' : '#000000';
-        const { dataUrl, width, height } = renderTextToImage(rawHindiText, fontSize, isBold, color);
-        if (dataUrl) {
+        const imgInfo = renderTextToImage(rawHindiText, fontSize, isBold, color, doc.internal.scaleFactor);
+        if (imgInfo && imgInfo.dataUrl) {
+          const { dataUrl, width, height, leftPaddingOffset } = imgInfo;
           const paddingLeft = 4;
-          let x = data.cell.x + paddingLeft;
+          let x = data.cell.x + paddingLeft - leftPaddingOffset;
           if (data.column.index === 1) { // Amount is right aligned
-            x = data.cell.x + data.cell.width - width - paddingLeft;
+            x = data.cell.x + data.cell.width - width - paddingLeft + leftPaddingOffset;
           }
           const y = data.cell.y + (data.cell.height - height) / 2;
           doc.addImage(dataUrl, 'PNG', x, y, width, height, undefined, 'FAST');
@@ -12607,7 +12693,7 @@ export default function App() {
               <Route path="/search" element={<SearchResultsView />} />
               <Route path="/services/:id" element={<ServiceDetailView user={user} profile={profile} />} />
               <Route path="/dashboard" element={<DashboardView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} activeSubscription={activeSubscription} onUpgradeNeeded={() => setIsUpgradeModalOpen(true)} />} />
-              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} activeSubscription={activeSubscription} />} />
+              <Route path="/admin" element={<AdminView user={user} profile={profile} onUpdateProfile={handleUpdateProfile} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings} activeSubscription={activeSubscription} onLogout={handleLogout} />} />
               <Route path="/add-venue" element={<AddVenueView user={user} profile={profile} />} />
               <Route path="/edit-venue/:id" element={<EditVenueView user={user} profile={profile} />} />
               <Route path="/edit-service/:id" element={<EditServiceView user={user} profile={profile} />} />
@@ -13375,14 +13461,16 @@ const AdminView = ({
   onUpdateProfile, 
   globalSettings, 
   setGlobalSettings,
-  activeSubscription
+  activeSubscription,
+  onLogout
 }: { 
   user: any, 
   profile: UserProfile | null, 
   onUpdateProfile: (p: UserProfile) => void, 
   globalSettings: any, 
   setGlobalSettings: any,
-  activeSubscription: UserSubscription | null
+  activeSubscription: UserSubscription | null,
+  onLogout?: () => void
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download' | 'query-complaint'>('dashboard');
@@ -14039,6 +14127,17 @@ const AdminView = ({
               <Download size={18} />
               <span>Download User Report</span>
             </button>
+            <button 
+              onClick={async () => {
+                await db.auth.signOut();
+                if (onLogout) onLogout();
+                navigate('/');
+              }} 
+              className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-100"
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
+            </button>
           </div>
         </div>
 
@@ -14056,12 +14155,23 @@ const AdminView = ({
             { id: 'query-complaint', label: 'Query or Complaint', icon: MessageSquare },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
             { id: 'database', label: 'Database & Security', icon: Database },
+            { id: 'logout', label: 'Logout', icon: LogOut },
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={async () => {
+                if (tab.id === 'logout') {
+                  await db.auth.signOut();
+                  if (onLogout) onLogout();
+                  navigate('/');
+                } else {
+                  setActiveTab(tab.id as any);
+                }
+              }}
               className={`flex items-center space-x-2 px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all ${
-                activeTab === tab.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-gray-600 hover:bg-gray-100'
+                tab.id === 'logout'
+                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-100'
+                  : activeTab === tab.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'bg-white text-gray-600 hover:bg-gray-100'
               }`}
             >
               <tab.icon size={18} />
