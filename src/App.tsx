@@ -2163,32 +2163,6 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
             </div>
 
             <div className="md:hidden flex items-center space-x-3">
-              {!user ? (
-                <>
-                  <Link to="/login" className="bg-orange-600 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:bg-orange-700 transition-all shadow-sm">
-                    {t('login')}
-                  </Link>
-                  <Link to="/registration" className="text-gray-600 hover:text-orange-600 text-xs font-bold px-1 transition-all">
-                    Register
-                  </Link>
-                </>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Link 
-                    to={profile?.role === 'admin' ? "/admin" : "/dashboard"} 
-                    className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-orange-200 transition-all"
-                  >
-                    {profile?.role === 'admin' ? 'Admin' : 'Dashboard'}
-                  </Link>
-                  <button 
-                    onClick={handleLogout} 
-                    className="text-gray-600 hover:text-red-600 p-1.5 rounded-full hover:bg-red-50 transition-colors"
-                    title="Logout"
-                  >
-                    <LogOut size={16} />
-                  </button>
-                </div>
-              )}
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-600 p-1">
                 {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -8567,6 +8541,7 @@ const DashboardView = ({
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <BarChart2 size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'profile', label: 'Profile Manage', icon: <UserIcon size={20} />, roles: ['owner', 'provider', 'user'] },
+    { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
     { id: 'services', label: 'Services Manage', icon: <Music size={20} />, roles: ['provider'] },
     { id: 'catalogue', label: 'Catalogue Manage', icon: <ImageIcon size={20} />, roles: ['owner', 'provider'] },
     { id: 'manually-booking', label: 'Manually Booking', icon: <Plus size={20} />, roles: ['owner', 'provider'] },
@@ -8575,7 +8550,6 @@ const DashboardView = ({
     { id: 'rating-card', label: 'Rating Accept Card', icon: <QrCode size={20} />, roles: ['owner', 'provider'] },
     { id: 'reports', label: 'Reports', icon: <FileText size={20} />, roles: ['owner', 'provider'] },
     { id: 'subscription', label: 'Subscription', icon: <CreditCard size={20} />, roles: ['owner', 'provider'] },
-    { id: 'venues', label: 'Venue Manage', icon: <Home size={20} />, roles: ['owner'] },
     { id: 'query-complaint', label: 'Query or Complaint', icon: <MessageSquare size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'logout', label: 'Logout', icon: <LogOut size={20} />, roles: ['owner', 'provider', 'user'] },
     { id: 'reset-password', label: 'Reset password', icon: <ShieldCheck size={20} />, roles: ['owner', 'provider', 'user'] },
@@ -12385,8 +12359,6 @@ export default function App() {
 
     const resetTimer = () => {
       if (timeout) clearTimeout(timeout);
-      // Only auto-logout if NOT the admin
-      if (user.email === 'deepakjatav1005@gmail.com') return;
       
       timeout = setTimeout(() => {
         localStorage.setItem('session_expired_flag', 'true');
@@ -14126,17 +14098,6 @@ const AdminView = ({
             <button onClick={() => downloadReport('excel')} className="flex items-center space-x-2 bg-orange-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-orange-600 transition-colors">
               <Download size={18} />
               <span>Download User Report</span>
-            </button>
-            <button 
-              onClick={async () => {
-                await db.auth.signOut();
-                if (onLogout) onLogout();
-                navigate('/');
-              }} 
-              className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-100"
-            >
-              <LogOut size={18} />
-              <span>Logout</span>
             </button>
           </div>
         </div>
