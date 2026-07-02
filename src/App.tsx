@@ -828,7 +828,53 @@ const translations: Record<string, any> = {
     "BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. We bridge the gap between hosts and the finest venues and service providers in the country. Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VENUE OPTION provides the tools and connections you need to plan with ease and celebrate with joy.": "BEST VENUE OPTION भारत का प्रमुख इवेंट प्लानिंग प्लेटफॉर्म है, जो आपके विशेष क्षणों को वास्तव में अविस्मरणीय बनाने के लिए समर्पित है। हम देश के बेहतरीन वेन्यू और सेवा प्रदाताओं के बीच की दूरी को पाटते हैं। चाहे वह एक भव्य शादी हो, एक कॉर्पोरेट उत्सव हो, या एक छोटा सा जन्मदिन समारोह हो, BEST VENUE OPTION आपको आसान योजना बनाने और खुशियों के साथ उत्सव मनाने के लिए आवश्यक उपकरण और संपर्क प्रदान करता है।",
     "Verified Venues": "सत्यापित वेन्यू",
     "Service Partners": "सेवा भागीदार",
-    "Happy Events": "सफल कार्यक्रम"
+    "Happy Events": "सफल कार्यक्रम",
+    "Marriage Garden": "मैरिज गार्डन",
+    "Banquet Hall": "बैंक्वेट हॉल",
+    "Hotel": "होटल",
+    "Resort": "रिसॉर्ट",
+    "Party Plot": "पार्टी प्लॉट",
+    "DJ & Music": "डीजे और संगीत",
+    "Makeup Artist": "मेकअप आर्टिस्ट",
+    "Mehendi Artist": "मेहंदी आर्टिस्ट",
+    "Tent House": "टेंट हाउस",
+    "Security": "सुरक्षा",
+    "OUR": "हमारे",
+    "MOMENTS": "पल",
+    "OUR MOMENTS": "हमारे यादगार पल",
+    "Beautiful celebrations captured on our platform": "हमारे प्लेटफॉर्म पर कैद किए गए खूबसूरत समारोह",
+    "Glimpses of beautiful celebrations and special moments": "सुंदर उत्सवों और विशेष क्षणों की झलकियाँ",
+    "Our Moments Gallery": "हमारी गैलरी",
+    "Admin highlight photos will appear here": "एडमिन द्वारा हाईलाइट की गई तस्वीरें यहाँ दिखाई देंगी",
+    "Popular Venues": "लोकप्रिय वेन्यू",
+    "Handpicked venues for your special celebrations": "आपके विशेष समारोहों के लिए चुनिंदा वेन्यू",
+    "View All": "सभी देखें",
+    "Top Service Providers": "शीर्ष सेवा प्रदाता",
+    "Caterers, DJs, and Decorators to make it memorable": "इसे यादगार बनाने के लिए कैटरर्स, डीजे और डेकोरेटर्स",
+    "System Update": "सिस्टम अपडेट",
+    "Now user can access all features of app": "अब उपयोगकर्ता ऐप की सभी सुविधाओं का उपयोग कर सकते हैं",
+    "System Update: Now user can access all features of app": "सिस्टम अपडेट: अब उपयोगकर्ता ऐप की सभी सुविधाओं का उपयोग कर सकते हैं",
+    "MySQL Connected": "MySQL कनेक्टेड",
+    "Working Offline": "ऑफ़लाइन काम कर रहे हैं",
+    "Local Storage Active": "लोकल स्टोरेज सक्रिय",
+    "Connection Failed": "कनेक्शन विफल",
+    "Every venue and provider is manually verified for quality and reliability.": "गुणवत्ता और विश्वसनीयता के लिए प्रत्येक वेन्यू और प्रदाता को मैन्युअल रूप से सत्यापित किया जाता है।",
+    "Get the best rates by booking directly through our platform.": "हमारे प्लेटफॉर्म के माध्यम से सीधे बुकिंग करके सर्वोत्तम दरें प्राप्त करें।",
+    "Our team is here to help you with every step of your event planning.": "हमारी टीम आपके इवेंट प्लानिंग के हर कदम पर आपकी मदद करने के लिए तैयार है।",
+    "Admin Panel": "एडमिन पैनल",
+    "Home": "होम",
+    "Gallery": "गैलरी",
+    "Search": "खोज",
+    "About": "हमारे बारे में",
+    "Registration": "पंजीकरण",
+    "Login": "लॉगिन",
+    "Logout": "लॉगआउट",
+    "Marriage Hall": "मैरिज हॉल",
+    "Venue Type": "वेन्यू का प्रकार",
+    "Pincode": "पिनकोड",
+    "Update Profile": "प्रोफाइल अपडेट करें",
+    "Clear All Filters": "सभी फ़िल्टर साफ़ करें",
+    "Event Gallery": "इवेंट गैलरी"
   }
 };
 
@@ -839,6 +885,516 @@ const LanguageContext = React.createContext({
 });
 
 const useTranslation = () => React.useContext(LanguageContext);
+
+const HINDI_DICT: Record<string, string> = {
+  // Navigation / Auth
+  "home": "होम",
+  "gallery": "गैलरी",
+  "search": "खोज",
+  "about": "हमारे बारे में",
+  "registration": "पंजीकरण",
+  "login": "लॉगिन",
+  "logout": "लॉगआउट",
+  "admin panel": "एडमिन पैनल",
+  "dashboard": "डैशबोर्ड",
+  "booking manager": "बुकिंग मैनेजर",
+  "change password": "पासवर्ड बदलें",
+  "forgot password": "पासवर्ड भूल गए",
+  "forgot password?": "पासवर्ड भूल गए?",
+  "send reset link": "रीसेट लिंक भेजें",
+  "back to login": "लॉगिन पर वापस जाएं",
+  "sign in to your account": "अपने खाते में साइन इन करें",
+  "sign in": "साइन इन करें",
+  "create account": "खाता बनाएं",
+  "already have an account?": "पहले से ही एक खाता है?",
+  "don't have an account?": "खाता नहीं है?",
+  "register now": "अभी पंजीकरण करें",
+  "register": "पंजीकरण करें",
+  "rate us": "हमें रेट करें",
+  "user profile": "उपयोगकर्ता प्रोफ़ाइल",
+  "update profile": "प्रोफ़ाइल अपडेट करें",
+
+  // Roles
+  "venue owner": "वेन्यू मालिक",
+  "service provider": "सेवा प्रदाता",
+  "regular user": "सामान्य उपयोगकर्ता",
+  "admin": "एडमिन",
+  "regular_user": "सामान्य उपयोगकर्ता",
+  "owner": "मालिक",
+  "provider": "सेवा प्रदाता",
+
+  // Core Pages titles & subheadings
+  "plan your perfect event with confidence": "आत्मविश्वास के साथ अपने सही कार्यक्रम की योजना बनाएं",
+  "all in one booking plat form for your special time": "आपके विशेष समय के लिए ऑल इन वन बुकिंग प्लेटफॉर्म",
+  "popular venues": "लोकप्रिय वेन्यू",
+  "handpicked venues for your special celebrations": "आपके विशेष समारोहों के लिए चुनिंदा वेन्यू",
+  "view all": "सभी देखें",
+  "top service providers": "शीर्ष सेवा प्रदाता",
+  "caterers, djs, and decorators to make it memorable": "इसे यादगार बनाने के लिए कैटरर्स, डीजे और डेकोरेटर्स",
+  "why plan with best venue option?": "BEST VENUE OPTION के साथ योजना क्यों बनाएं?",
+  "verified partners": "सत्यापित भागीदार",
+  "best prices": "सर्वोत्तम मूल्य",
+  "24/7 support": "24/7 सहायता",
+  "every venue and provider is manually verified for quality and reliability.": "गुणवत्ता और विश्वसनीयता के लिए प्रत्येक वेन्यू और प्रदाता को मैन्युअल रूप से सत्यापित किया जाता है।",
+  "get the best rates by booking directly through our platform.": "हमारे प्लेटफॉर्म के माध्यम से सीधे बुकिंग करके सर्वोत्तम दरें प्राप्त करें।",
+  "our team is here to help you with every step of your event planning.": "हमारी टीम आपके इवेंट प्लानिंग के हर कदम पर आपकी मदद करने के लिए तैयार है।",
+  "join us as venue owner": "वेन्यू मालिक के रूप में जुड़ें",
+  "join us as service provider": "सेवा प्रदाता के रूप में जुड़ें",
+  "terms & conditions": "नियम और शर्तें",
+  "help center": "सहायता केंद्र",
+  "contact us": "संपर्क करें",
+  "about us": "हमारे बारे में",
+  "our moments gallery": "हमारी गैलरी",
+  "admin highlight photos will appear here": "एडमिन द्वारा हाईलाइट की गई तस्वीरें यहाँ दिखाई देंगी",
+  "event gallery": "इवेंट गैलरी",
+  "glimpses of beautiful celebrations and special moments": "सुंदर उत्सवों और विशेष क्षणों की झलकियाँ",
+  "beautiful celebrations captured on our platform": "हमारे प्लेटफॉर्म पर कैद किए गए खूबसूरत समारोह",
+  "clear all filters": "सभी फ़िल्टर साफ़ करें",
+
+  // System Monitor / Statuses
+  "mysql connected": "MySQL कनेक्टेड",
+  "working offline": "ऑफ़लाइन काम कर रहे हैं",
+  "local storage active": "लोकल स्टोरेज सक्रिय",
+  "connection failed": "कनेक्शन विफल",
+  "system update": "सिस्टम अपडेट",
+  "now user can access all features of app": "अब उपयोगकर्ता ऐप की सभी सुविधाओं का उपयोग कर सकते हैं",
+  "system update: now user can access all features of app": "सिस्टम अपडेट: अब उपयोगकर्ता ऐप की सभी सुविधाओं का उपयोग कर सकते हैं",
+
+  // Dashboard / Tabs
+  "overview": "अवलोकन",
+  "profile manage": "प्रोफाइल प्रबंधन",
+  "venue manage": "वेन्यू प्रबंधन",
+  "services manage": "सेवा प्रबंधन",
+  "catalogue manage": "कैटलॉग प्रबंधन",
+  "manually booking": "मैनुअल बुकिंग",
+  "my bookings": "मेरी बुकिंग",
+  "public booking": "पब्लिक बुकिंग",
+  "manage payment": "भुगतान प्रबंधन",
+  "rating accept card": "रेटिंग क्यूआर कार्ड",
+  "reports": "रिपोर्ट्स",
+  "subscription": "सब्सक्रिप्शन",
+  "query or complaint": "सवाल या शिकायत",
+  "reset password": "पासवर्ड रीसेट करें",
+  "dashboard menu": "डैशबोर्ड मेनू",
+  "welcome": "स्वागत हे",
+  "monthly plan": "मासिक प्लान",
+  "annual plan": "वार्षिक प्लान",
+  "active subscription": "सक्रिय सदस्यता",
+  "expired": "समाप्त",
+  "renewal date": "नवीनीकरण तिथि",
+
+  // Form Fields & Labels
+  "name": "नाम",
+  "full name": "पूरा नाम",
+  "email": "ईमेल",
+  "email address": "ईमेल पता",
+  "mobile number": "मोबाइल नंबर",
+  "phone number": "फ़ोन नंबर",
+  "confirm password": "पासवर्ड की पुष्टि करें",
+  "current password": "वर्तमान पासवर्ड",
+  "new password": "नया पासवर्ड",
+  "role": "भूमिका",
+  "select role": "भूमिका चुनें",
+  "state": "राज्य",
+  "district": "जिला",
+  "block": "ब्लॉक",
+  "city": "शहर",
+  "address": "पता",
+  "full address": "पूरा पता",
+  "description": "विवरण",
+  "price": "कीमत",
+  "price per day": "प्रति दिन की कीमत",
+  "capacity": "क्षमता",
+  "status": "स्थिति",
+  "date": "तारीख",
+  "event date": "कार्यक्रम की तारीख",
+  "time": "समय",
+  "start time": "शुरू होने का समय",
+  "end time": "समाप्त होने का समय",
+  "event type": "कार्यक्रम का प्रकार",
+  "select event type": "कार्यक्रम का प्रकार चुनें",
+  "pincode": "पिनकोड",
+  "venue type": "वेन्यू का प्रकार",
+
+  // Venue Types & Service Types
+  "marriage garden": "मैरिज गार्डन",
+  "banquet hall": "बैंक्वेट हॉल",
+  "hotel": "होटल",
+  "resort": "रिसॉर्ट",
+  "party plot": "पार्टी प्लॉट",
+  "catering": "कैटरिंग",
+  "decoration": "सजावट",
+  "photography": "फोटोग्राफी",
+  "dj & music": "डीजे और संगीत",
+  "makeup artist": "मेकअप आर्टिस्ट",
+  "mehendi artist": "मेहंदी आर्टिस्ट",
+  "tent house": "टेंट हाउस",
+  "security": "सुरक्षा",
+  "marriage hall": "मैरिज हॉल",
+  "restorent": "होटल / रेस्टोरेंट",
+  "community halls": "सामुदायिक भवन",
+  "community hall": "सामुदायिक भवन",
+
+  // Actions
+  "submit": "जमा करें",
+  "cancel": "रद्द करें",
+  "save": "सहेजें",
+  "save changes": "बदलाव सहेजें",
+  "edit": "संपादित करें",
+  "delete": "हटाएं",
+  "add new": "नया जोड़ें",
+  "add new venue": "नया वेन्यू जोड़ें",
+  "add new service": "नई सेवा जोड़ें",
+  "update": "अपडेट करें",
+  "upload": "अपलोड करें",
+  "upload image": "छवि अपलोड करें",
+  "download": "डाउनलोड करें",
+  "download invoice": "इनवॉइस डाउनलोड करें",
+  "search now": "अभी खोजें",
+  "book now": "अभी बुक करें",
+  "send request": "अनुरोध भेजें",
+  "accept": "स्वीकार करें",
+  "reject": "अस्वीकार करें",
+  "pending": "लंबित",
+  "confirmed": "पुष्टि की गई",
+  "cancelled": "रद्द किया गया",
+  "approved": "स्वीकृत",
+  "completed": "पूरा हुआ",
+  "paid": "भुगतान किया गया",
+  "unpaid": "अवैतनिक",
+  "lock booking": "बुकिंग लॉक करें",
+  "unlock booking": "बुकिंग अनलॉक करें",
+  "select state": "राज्य चुनें",
+  "select district": "जिला चुनें",
+  "select block": "ब्लॉक चुनें",
+  "view on map": "मानचित्र पर देखें",
+  "call owner": "मालिक को कॉल करें",
+  "whatsapp owner": "मालिक को व्हाट्सएप करें",
+  "share": "साझा करें",
+  "write a review": "समीक्षा लिखें",
+  "pay now": "अभी भुगतान करें",
+
+  // Services/Amenities details
+  "veg/non-veg": "शाकाहारी/मांसाहारी",
+  "amenities": "सुविधाएं",
+  "facilities": "सुविधाएं",
+  "total venues": "कुल वेन्यू",
+  "total service providers": "कुल सेवा प्रदाता",
+  "total bookings": "कुल बुकिंग",
+  "total users": "कुल उपयोगकर्ता",
+  "today's bookings": "आज की बुकिंग",
+  "pending bookings": "लंबित बुकिंग",
+  "confirmed bookings": "पुष्टि की गई बुकिंग",
+  "completed bookings": "पूरी हुई बुकिंग",
+  "revenue": "राजस्व",
+  "total revenue": "कुल राजस्व",
+  "download user report": "उपयोगकर्ता रिपोर्ट डाउनलोड करें",
+  "download booking report": "बुकिंग रिपोर्ट डाउनलोड करें",
+  "generate invoice": "इनवॉइस जनरेट करें",
+  "booking reports": "बुकिंग रिपोर्ट",
+  "filter by date": "तारीख के अनुसार फ़िल्टर करें",
+  "filter by status": "स्थिति के अनुसार फ़िल्टर करें",
+
+  // Placeholders
+  "search venues, caterers, djs...": "स्थान, कैटरर्स, डीजे खोजें...",
+  "enter your full name": "अपना पूरा नाम दर्ज करें",
+  "enter your email address": "अपना ईमेल पता दर्ज करें",
+  "enter your mobile number": "अपना मोबाइल नंबर दर्ज करें",
+  "enter your password": "अपना पासवर्ड दर्ज करें",
+  "confirm your password": "अपने पासवर्ड की पुष्टि करें",
+  "enter full address": "पूरा पता दर्ज करें",
+  "enter pincode": "पिनकोड दर्ज करें",
+  "enter capacity": "क्षमता दर्ज करें",
+  "enter price": "कीमत दर्ज करें",
+  "enter description": "विवरण दर्ज करें",
+
+  // Facilities
+  "rooms(ac)": "कमरे (एसी)",
+  "rooms(non ac)": "कमरे (बिना एसी)",
+  "dinner hall": "भोजन कक्ष",
+  "wedding hall": "शादी हॉल",
+  "stage site": "स्टेज साइट",
+  "cattering hall": "कैटरिंग हॉल",
+  "parking side": "पार्किंग स्थल",
+  "party hall": "पार्टी हॉल",
+  "meeting hall": "मीटिंग हॉल",
+  "reshort site": "रिसॉर्ट साइट",
+  "reception site": "रिसेप्शन साइट",
+  "garden site": "गार्डन साइट",
+  "ground": "मैदान",
+  "indoor site": "इंडोर साइट",
+  "outdoor site": "आउटडोर साइट",
+
+  // Event types
+  "wedding": "शादी",
+  "sangeet": "संगीत समारोह",
+  "engagement": "सगाई",
+  "haldi": "हल्दी समारोह",
+  "birthday party": "जन्मदिन की पार्टी",
+  "anivviversary": "सालगिरह",
+  "corporate events": "कॉर्पोरेट इवेंट्स",
+  "seminar": "सेमीनार",
+  "workshop": "कार्यशाला",
+  "exhibition": "प्रदर्शनी",
+  "music concert": "संगीत कार्यक्रम",
+  "special occasion": "विशेष अवसर",
+
+  // Extra details
+  "veg per plate": "शाकाहारी प्रति प्लेट",
+  "non-veg per plate": "मांसाहारी प्रति प्लेट",
+  "advance payment required": "अग्रिम भुगतान आवश्यक",
+  "advance booking price": "अग्रिम बुकिंग मूल्य",
+  "minimum advance payment": "न्यूनतम अग्रिम भुगतान",
+  "about best venue option": "BEST VENUE OPTION के बारे में",
+  "quick links": "त्वरित लिंक",
+  "connect with us": "हमसे जुड़ें",
+  "all rights reserved.": "सर्वाधिकार सुरक्षित।",
+  "offline mode": "ऑफ़लाइन मोड",
+  "reconnect": "पुनः कनेक्ट करें",
+  "retry": "पुनः प्रयास करें",
+  "database connection failure": "डेटाबेस कनेक्शन विफलता",
+  "working offline with local data": "स्थानीय डेटा के साथ ऑफ़लाइन काम कर रहे हैं",
+  "mysql connection live": "MySQL कनेक्शन लाइव",
+
+  // States
+  "madhya pradesh": "मध्य प्रदेश",
+  "rajasthan": "राजस्थान",
+  "uttar pradesh": "उत्तर प्रदेश",
+  "gujarat": "गुजरात",
+  "maharashtra": "महाराष्ट्र",
+  "delhi": "दिल्ली",
+  "punjab": "पंजाब",
+  "haryana": "हरियाणा",
+  "bihar": "बिहार",
+  "chhattisgarh": "छत्तीसगढ़",
+  
+  // Custom headers
+  "explore our top-rated options": "हमारे सर्वश्रेष्ठ विकल्पों को देखें",
+  "find the best venue or service provider for your next big event": "अपने अगले बड़े कार्यक्रम के लिए सर्वोत्तम वेन्यू या सेवा प्रदाता खोजें",
+  "active members": "सक्रिय सदस्य",
+  "verified partners reviews": "सत्यापित भागीदारों की समीक्षा",
+  "success celebrations": "सफल उत्सव",
+  "bestseller": "बेस्टसेलर",
+  "featured": "विशेष रुप से प्रदर्शित",
+  "verified": "सत्यापित",
+  "book now directly": "सीधे बुक करें",
+  "facilities & amenities": "सुविधाएं और सेवाएं",
+  "pricing plans": "मूल्य निर्धारण योजनाएं",
+  "transparent pricing for everyone": "सभी के लिए पारदर्शी मूल्य निर्धारण",
+  "choose a plan that fits your business needs": "एक योजना चुनें जो आपके व्यावसायिक आवश्यकताओं के अनुकूल हो",
+  "get started": "शुरू करें",
+  "current plan": "वर्तमान योजना",
+  "upgrade": "अपग्रेड करें",
+  "unlimited bookings": "असीमित बुकिंग",
+  "advanced reports": "उन्नत रिपोर्ट",
+  "priority support": "प्राथमिकता सहायता",
+  "custom branding": "कस्टम ब्रांडिंग",
+  "analytics dashboard": "एनालिटिक्स डैशबोर्ड"
+};
+
+function getHindiTranslation(text: string): string | null {
+  if (!text) return null;
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+
+  if (HINDI_DICT[lower]) {
+    return HINDI_DICT[lower];
+  }
+
+  const punctuationRegex = /^(.+?)([:\s?.]*)$/;
+  const match = clean.match(punctuationRegex);
+  if (match) {
+    const coreText = match[1];
+    const punctuation = match[2];
+    const coreLower = coreText.trim().toLowerCase();
+    if (HINDI_DICT[coreLower]) {
+      return HINDI_DICT[coreLower] + punctuation;
+    }
+  }
+
+  const venuesServicesMatch = clean.match(/^Found\s+(\d+)\s+venues\s+and\s+(\d+)\s+services$/i);
+  if (venuesServicesMatch) {
+    return `हमें ${venuesServicesMatch[1]} वेन्यू और ${venuesServicesMatch[2]} सेवाएं मिलीं`;
+  }
+
+  const venuesMatch = clean.match(/^Found\s+(\d+)\s+venues$/i);
+  if (venuesMatch) {
+    return `हमें ${venuesMatch[1]} वेन्यू मिले`;
+  }
+
+  const servicesMatch = clean.match(/^Found\s+(\d+)\s+services$/i);
+  if (servicesMatch) {
+    return `हमें ${servicesMatch[1]} सेवाएं मिलीं`;
+  }
+
+  const reviewsMatch = clean.match(/^(\d+)\s+reviews$/i);
+  if (reviewsMatch) {
+    return `${reviewsMatch[1]} समीक्षाएं`;
+  }
+
+  const ratingsMatch = clean.match(/^(\d+)\s+ratings$/i);
+  if (ratingsMatch) {
+    return `${ratingsMatch[1]} रेटिंग`;
+  }
+
+  const bookingsMatch = clean.match(/^(\d+)\s+bookings$/i);
+  if (bookingsMatch) {
+    return `${bookingsMatch[1]} बुकिंग`;
+  }
+
+  const capacityMatch = clean.match(/^Capacity:\s*(\d+)$/i);
+  if (capacityMatch) {
+    return `क्षमता: ${capacityMatch[1]} व्यक्ति`;
+  }
+
+  const priceDayMatch = clean.match(/^Price:\s*₹?\s*([\d,]+)\s*\/\s*Day$/i);
+  if (priceDayMatch) {
+    return `कीमत: ₹${priceDayMatch[1]} / दिन`;
+  }
+
+  const priceMatch = clean.match(/^Price:\s*₹?\s*([\d,]+)$/i);
+  if (priceMatch) {
+    return `कीमत: ₹${priceMatch[1]}`;
+  }
+
+  const ownerMatch = clean.match(/^Owner:\s*(.+)$/i);
+  if (ownerMatch) {
+    return `मालिक: ${ownerMatch[1]}`;
+  }
+
+  return null;
+}
+
+function translateElement(el: Node) {
+  if (el.nodeType === Node.TEXT_NODE) {
+    const text = el.nodeValue || '';
+    const trimmed = text.trim();
+    if (trimmed) {
+      const translation = getHindiTranslation(trimmed);
+      if (translation && translation !== trimmed) {
+        if (!(el as any).__originalText) {
+          (el as any).__originalText = text;
+        }
+        const leadingSpace = text.match(/^\s*/)?.[0] || '';
+        const trailingSpace = text.match(/\s*$/)?.[0] || '';
+        el.nodeValue = leadingSpace + translation + trailingSpace;
+      }
+    }
+  } else if (el.nodeType === Node.ELEMENT_NODE) {
+    const element = el as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === 'script' || tagName === 'style' || tagName === 'code' || tagName === 'iframe') {
+      return;
+    }
+
+    if (tagName === 'input' || tagName === 'textarea') {
+      const placeholder = element.getAttribute('placeholder');
+      if (placeholder) {
+        const trimmed = placeholder.trim();
+        const translation = getHindiTranslation(trimmed);
+        if (translation && translation !== trimmed) {
+          if (!element.hasAttribute('data-original-placeholder')) {
+            element.setAttribute('data-original-placeholder', placeholder);
+          }
+          element.setAttribute('placeholder', translation);
+        }
+      }
+    }
+
+    if (tagName === 'option') {
+      const text = element.textContent || '';
+      const trimmed = text.trim();
+      const translation = getHindiTranslation(trimmed);
+      if (translation && translation !== trimmed) {
+        if (!(element as any).__originalText) {
+          (element as any).__originalText = text;
+        }
+        element.textContent = translation;
+      }
+    }
+
+    let child = element.firstChild;
+    while (child) {
+      translateElement(child);
+      child = child.nextSibling;
+    }
+  }
+}
+
+function restoreElement(el: Node) {
+  if (el.nodeType === Node.TEXT_NODE) {
+    if ((el as any).__originalText !== undefined) {
+      el.nodeValue = (el as any).__originalText;
+    }
+  } else if (el.nodeType === Node.ELEMENT_NODE) {
+    const element = el as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === 'script' || tagName === 'style' || tagName === 'code' || tagName === 'iframe') {
+      return;
+    }
+
+    if (tagName === 'input' || tagName === 'textarea') {
+      const origPlaceholder = element.getAttribute('data-original-placeholder');
+      if (origPlaceholder) {
+        element.setAttribute('placeholder', origPlaceholder);
+      }
+    }
+
+    if (tagName === 'option') {
+      if ((element as any).__originalText !== undefined) {
+        element.textContent = (element as any).__originalText;
+      }
+    }
+
+    let child = element.firstChild;
+    while (child) {
+      restoreElement(child);
+      child = child.nextSibling;
+    }
+  }
+}
+
+let isTranslatingNow = false;
+
+const DOMTranslator = () => {
+  const { lang } = useTranslation();
+
+  React.useEffect(() => {
+    if (lang === 'hi') {
+      translateElement(document.body);
+
+      const observer = new MutationObserver((mutations) => {
+        if (isTranslatingNow) return;
+        isTranslatingNow = true;
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach((node) => {
+              translateElement(node);
+            });
+          } else if (mutation.type === 'attributes' && mutation.attributeName === 'placeholder') {
+            translateElement(mutation.target);
+          }
+        }
+        isTranslatingNow = false;
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['placeholder']
+      });
+
+      return () => {
+        observer.disconnect();
+      };
+    } else {
+      restoreElement(document.body);
+    }
+  }, [lang]);
+
+  return null;
+};
 
 import { AppLogo } from './components/AppLogo';
 import { LogoDisplay } from './components/LogoDisplay';
@@ -2293,16 +2849,16 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
               {user ? (
                 <div className="flex items-center space-x-4">
                   {profile?.role === 'admin' ? (
-                    <Link to="/admin" className="bg-red-600 text-white px-5 py-2 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200">Admin Panel</Link>
+                    <Link to="/admin" className="bg-red-600 text-white px-5 py-2 rounded-full font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200">{t('Admin Panel')}</Link>
                   ) : (
-                    <Link to="/dashboard" className="bg-orange-600 text-white px-5 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">Dashboard</Link>
+                    <Link to="/dashboard" className="bg-orange-600 text-white px-5 py-2 rounded-full font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-200">{t('Dashboard')}</Link>
                   )}
                   <button 
                     onClick={handleLogout} 
                     className="flex items-center space-x-1.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 px-4 py-2 rounded-full font-bold transition-all border border-gray-200"
                   >
                     <LogOut size={16} />
-                    <span>Logout</span>
+                    <span>{t('Logout')}</span>
                   </button>
                 </div>
               ) : (
@@ -2348,7 +2904,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                 )}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
               </Link>
             ))}
 
@@ -2371,7 +2927,7 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <LayoutDashboard size={18} />
-                  <span>{profile?.role === 'admin' ? "Admin Panel" : "Dashboard"}</span>
+                  <span>{profile?.role === 'admin' ? t('Admin Panel') : t('Dashboard')}</span>
                 </Link>
                 <button 
                   onClick={() => {
@@ -2381,18 +2937,18 @@ const Navbar = ({ user, profile, onLogout, onRateApp }: { user: any, profile: Us
                   className="flex items-center space-x-3 px-4 py-3 w-full text-red-600 font-bold bg-red-50 hover:bg-red-100 rounded-2xl transition-all mt-2"
                 >
                   <LogOut size={18} />
-                  <span>Logout</span>
+                  <span>{t('Logout')}</span>
                 </button>
               </div>
             ) : (
               <div className="pt-4 mt-4 border-t border-gray-100 space-y-2">
                 <Link to="/login" className="flex items-center space-x-3 px-4 py-3 text-orange-600 font-bold bg-orange-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
                   <LogIn size={18} />
-                  <span>Login</span>
+                  <span>{t('Login')}</span>
                 </Link>
                 <Link to="/registration" className="flex items-center space-x-3 px-4 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-2xl transition-all" onClick={() => setIsMenuOpen(false)}>
                   <UserPlus size={18} />
-                  <span>Registration</span>
+                  <span>{t('Registration')}</span>
                 </Link>
               </div>
             )}
@@ -3667,6 +4223,7 @@ const LoginView = ({ onLogin }: { onLogin: (user: any, profile: UserProfile) => 
 };
 
 const GalleryView = () => {
+  const { t } = useTranslation();
   const [media, setMedia] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayCount, setDisplayCount] = useState(20);
@@ -3714,12 +4271,12 @@ const GalleryView = () => {
     <div className="max-w-7xl mx-auto px-4 py-16">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Event Gallery</h1>
-          <p className="text-gray-500">Glimpses of beautiful celebrations and special moments</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">{t('Event Gallery')}</h1>
+          <p className="text-gray-500">{t('Glimpses of beautiful celebrations and special moments')}</p>
         </div>
         <Link to="/" className="flex items-center space-x-2 text-orange-600 font-bold hover:underline bg-orange-50 px-4 py-2 rounded-full">
           <Home size={20} />
-          <span>Home</span>
+          <span>{t('Home')}</span>
         </Link>
       </div>
       
@@ -3935,6 +4492,7 @@ const ServiceInfoStickers = () => {
 };
 
 const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boolean) => void }) => {
+  const { t } = useTranslation();
   const [moments, setMoments] = useState<any[]>([]);
   const navigate = useNavigate();
 
@@ -3964,8 +4522,8 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boole
       >
         <div className="max-w-7xl mx-auto px-4 text-center">
            <Camera className="mx-auto text-gray-300 mb-4" size={48} />
-           <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest">Our Moments Gallery</h2>
-           <p className="text-gray-400 mt-2 text-sm italic">Admin highlight photos will appear here</p>
+           <h2 className="text-2xl font-black text-gray-400 uppercase tracking-widest">{t('Our Moments Gallery')}</h2>
+           <p className="text-gray-400 mt-2 text-sm italic">{t('Admin highlight photos will appear here')}</p>
         </div>
       </div>
     );
@@ -3982,9 +4540,9 @@ const MomentsHomeSection = ({ onInteraction }: { onInteraction?: (enabled: boole
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
           <Camera className="mr-4 text-orange-600" size={32} />
-          OUR <span className="text-orange-600 ml-2">MOMENTS</span>
+          {t('OUR')} <span className="text-orange-600 ml-2">{t('MOMENTS')}</span>
         </h2>
-        <p className="text-gray-500 mt-2">Beautiful celebrations captured on our platform</p>
+        <p className="text-gray-500 mt-2">{t('Beautiful celebrations captured on our platform')}</p>
       </div>
       <div className="relative">
         <div className="flex animate-marquee-ltr space-x-6 py-4 w-max hover:[animation-play-state:paused]">
@@ -4364,7 +4922,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
           <div className="flex flex-wrap justify-center gap-x-12 gap-y-6">
             {['Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Party Plot', 'Catering', 'Decoration', 'Photography', 'DJ & Music', 'Makeup Artist', 'Mehendi Artist', 'Tent House', 'Security'].map((type, idx) => (
               <span key={idx} className="text-xs md:text-sm font-black text-gray-400 hover:text-orange-500 transition-colors cursor-default uppercase tracking-[0.3em]">
-                {type}
+                {t(type)}
               </span>
             ))}
           </div>
@@ -4380,11 +4938,11 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-end mb-10">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">Popular Venues</h2>
-              <p className="text-gray-500 mt-2">Handpicked venues for your special celebrations</p>
+              <h2 className="text-3xl font-bold text-gray-900">{t('Popular Venues')}</h2>
+              <p className="text-gray-500 mt-2">{t('Handpicked venues for your special celebrations')}</p>
             </div>
             <Link to="/venues" className="text-orange-600 font-bold flex items-center hover:underline">
-              View All <ChevronRight size={20} />
+              {t('View All')} <ChevronRight size={20} />
             </Link>
           </div>
           <div ref={venuesScrollRef} className="flex overflow-x-auto pb-8 gap-8 scrollbar-hide">
@@ -4407,11 +4965,11 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-end mb-10">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900">Top Service Providers</h2>
-              <p className="text-gray-500 mt-2">Caterers, DJs, and Decorators to make it memorable</p>
+              <h2 className="text-3xl font-bold text-gray-900">{t('Top Service Providers')}</h2>
+              <p className="text-gray-500 mt-2">{t('Caterers, DJs, and Decorators to make it memorable')}</p>
             </div>
             <Link to="/services" className="text-orange-600 font-bold flex items-center hover:underline">
-              View All <ChevronRight size={20} />
+              {t('View All')} <ChevronRight size={20} />
             </Link>
           </div>
           <div ref={topProvidersScrollRef} className="flex overflow-x-auto pb-8 gap-6 scrollbar-hide">
@@ -4443,21 +5001,21 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
                 <CheckCircle size={40} />
               </div>
               <h3 className="text-2xl font-bold mb-4">{t('verifiedPartners')}</h3>
-              <p className="text-orange-100 opacity-80">Every venue and provider is manually verified for quality and reliability.</p>
+              <p className="text-orange-100 opacity-80">{t('Every venue and provider is manually verified for quality and reliability.')}</p>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
                 <IndianRupee size={40} />
               </div>
               <h3 className="text-2xl font-bold mb-4">{t('bestPrices')}</h3>
-              <p className="text-orange-100 opacity-80">Get the best rates by booking directly through our platform.</p>
+              <p className="text-orange-100 opacity-80">{t('Get the best rates by booking directly through our platform.')}</p>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-sm">
                 <Clock size={40} />
               </div>
               <h3 className="text-2xl font-bold mb-4">{t('support247')}</h3>
-              <p className="text-orange-100 opacity-80">Our team is here to help you with every step of your event planning.</p>
+              <p className="text-orange-100 opacity-80">{t('Our team is here to help you with every step of your event planning.')}</p>
             </div>
           </div>
         </div>
@@ -11978,6 +12536,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
 // --- Main App ---
 
 const SearchResultsView = () => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [services, setServices] = useState<ServiceProvider[]>([]);
@@ -12235,7 +12794,7 @@ const SearchResultsView = () => {
           className="bg-orange-50 text-orange-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-orange-100 transition-all flex items-center w-fit"
         >
           <RotateCcw size={16} className="mr-2" />
-          Clear All Filters
+          {t('Clear All Filters')}
         </button>
       </div>
 
@@ -12288,6 +12847,7 @@ const SearchResultsView = () => {
 };
 
 const DatabaseMonitor = () => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'checking' | 'connected' | 'disconnected' | 'mock'>('checking');
   const [errorMessage, setErrorMessage] = useState('');
   const [isRetrying, setIsRetrying] = useState(false);
@@ -12342,7 +12902,7 @@ const DatabaseMonitor = () => {
               <CloudOff size={20} className="animate-pulse" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm">Connection Failed</p>
+              <p className="font-bold text-sm">{t('Connection Failed')}</p>
               <p className="text-xs text-red-100 truncate opacity-90">{errorMessage}</p>
             </div>
             <button 
@@ -12365,8 +12925,8 @@ const DatabaseMonitor = () => {
               <DbIcon size={20} />
             </div>
             <div>
-              <p className="font-bold text-sm">Working Offline</p>
-              <p className="text-xs text-orange-100 opacity-90">Local Storage Active</p>
+              <p className="font-bold text-sm">{t('Working Offline')}</p>
+              <p className="text-xs text-orange-100 opacity-90">{t('Local Storage Active')}</p>
             </div>
             <button 
               onClick={() => {
@@ -12387,7 +12947,7 @@ const DatabaseMonitor = () => {
             className="bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-[9px] uppercase font-bold tracking-widest border border-emerald-500/30 backdrop-blur-sm flex items-center gap-2"
           >
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            <span>MySQL Connected</span>
+            <span>{t('MySQL Connected')}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -12790,6 +13350,7 @@ export default function App() {
 
   return (
     <LanguageContext.Provider value={contextValue}>
+      <DOMTranslator />
       <DatabaseMonitor />
       <Router>
         <div className="min-h-screen bg-white font-sans text-gray-900">
