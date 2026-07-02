@@ -677,7 +677,158 @@ const translations: Record<string, any> = {
     termsAndConditions: "नियम और शर्तें",
     helpCenter: "सहायता केंद्र",
     contactUs: "संपर्क करें",
-    loginNow: "अभी लॉगिन करें"
+    loginNow: "अभी लॉगिन करें",
+    
+    // Dashboard & Sidebar Tabs
+    "overview": "अवलोकन",
+    "profile manage": "प्रोफाइल प्रबंधन",
+    "venue manage": "वेन्यू प्रबंधन",
+    "services manage": "सेवा प्रबंधन",
+    "catalogue manage": "कैटलॉग प्रबंधन",
+    "manually booking": "मैनुअल बुकिंग",
+    "my bookings": "मेरी बुकिंग",
+    "public booking": "पब्लिक बुकिंग",
+    "manage payment": "भुगतान प्रबंधन",
+    "rating accept card": "रेटिंग क्यूआर कार्ड",
+    "reports": "रिपोर्ट्स",
+    "subscription": "सब्सक्रिप्शन",
+    "query or complaint": "सवाल या शिकायत",
+    "reset password": "पासवर्ड रीसेट करें",
+    "dashboard menu": "डैशबोर्ड मेनू",
+    "welcome": "स्वागत हे",
+    "owner": "मालिक",
+    "provider": "सेवा प्रदाता",
+    "user": "उपयोगकर्ता",
+    "admin": "एडमिन",
+    
+    // Exact casing match fallbacks
+    "Overview": "अवलोकन",
+    "Profile Manage": "प्रोफाइल प्रबंधन",
+    "Venue Manage": "वेन्यू प्रबंधन",
+    "Services Manage": "सेवा प्रबंधन",
+    "Catalogue Manage": "कैटलॉग प्रबंधन",
+    "Manually Booking": "मैनुअल बुकिंग",
+    "My Bookings": "मेरी बुकिंग",
+    "Public Booking": "पब्लिक बुकिंग",
+    "Manage Payment": "भुगतान प्रबंधन",
+    "Rating Accept Card": "रेटिंग क्यूआर कार्ड",
+    "Reports": "रिपोर्ट्स",
+    "Subscription": "सब्सक्रिप्शन",
+    "Query or Complaint": "सवाल या शिकायत",
+    "Reset Password": "पासवर्ड रीसेट करें",
+    "Dashboard Menu": "डैशबोर्ड मेनू",
+    "Welcome": "स्वागत हे",
+    "Venue Owner": "वेन्यू मालिक",
+    "Service Provider": "सेवा प्रदाता",
+    "Regular User": "सामान्य उपयोगकर्ता",
+    "Monthly Plan": "मासिक प्लान",
+    "Annual Plan": "वार्षिक प्लान",
+    "Active Subscription": "सक्रिय सदस्यता",
+    "Expired": "समाप्त",
+    "Renewal Date": "नवीनीकरण तिथि",
+    
+    // Form Inputs & Details
+    "Name": "नाम",
+    "Full Name": "पूरा नाम",
+    "Email": "ईमेल",
+    "Email Address": "ईमेल पता",
+    "Mobile Number": "मोबाइल नंबर",
+    "Phone Number": "फ़ोन नंबर",
+    "Password": "पासवर्ड",
+    "Confirm Password": "पासवर्ड की पुष्टि करें",
+    "Current Password": "वर्तमान पासवर्ड",
+    "New Password": "नया पासवर्ड",
+    "Role": "भूमिका",
+    "Select Role": "भूमिका चुनें",
+    "State": "राज्य",
+    "District": "जिला",
+    "Block": "ब्लॉक",
+    "City": "शहर",
+    "Address": "पता",
+    "Full Address": "पूरा पता",
+    "Description": "विवरण",
+    "Price": "कीमत",
+    "Price per Day": "प्रति दिन की कीमत",
+    "Capacity": "क्षमता",
+    "Status": "स्थिति",
+    "Date": "तारीख",
+    "Event Date": "कार्यक्रम की तारीख",
+    "Time": "समय",
+    "Start Time": "शुरू होने का समय",
+    "End Time": "समाप्त होने का समय",
+    "Event Type": "कार्यक्रम का प्रकार",
+    "Select Event Type": "कार्यक्रम का प्रकार चुनें",
+    
+    // General Actions & Common UI Words
+    "Submit": "जमा करें",
+    "Cancel": "रद्द करें",
+    "Save": "सहेजें",
+    "Save Changes": "बदलाव सहेजें",
+    "Edit": "संपादित करें",
+    "Delete": "हटाएं",
+    "Add New": "नया जोड़ें",
+    "Update": "अपडेट करें",
+    "Upload": "अपलोड करें",
+    "Upload Image": "छवि अपलोड करें",
+    "Download": "डाउनलोड करें",
+    "Download Invoice": "इनवॉइस डाउनलोड करें",
+    "Search Now": "अभी खोजें",
+    "Book Now": "अभी बुक करें",
+    "Send Request": "अनुरोध भेजें",
+    "Accept": "स्वीकार करें",
+    "Reject": "अस्वीकार करें",
+    "Pending": "लंबित",
+    "Confirmed": "पुष्टि की गई",
+    "Cancelled": "रद्द किया गया",
+    "Approved": "स्वीकृत",
+    "Completed": "पूरा हुआ",
+    "Paid": "भुगतान किया गया",
+    "Unpaid": "अवैतनिक",
+    "Lock Booking": "बुकिंग लॉक करें",
+    "Unlock Booking": "बुकिंग अनलॉक करें",
+    "Select State": "राज्य चुनें",
+    "Select District": "जिला चुनें",
+    "Select Block": "ब्लॉक चुनें",
+    
+    // Other common sections
+    "Catering": "कैटरिंग",
+    "Decoration": "सजावट",
+    "Photography": "फोटोग्राफी",
+    "Music / DJ": "संगीत / डीजे",
+    "Explore Venues": "वेन्यू खोजें",
+    "Explore Services": "सेवाएं खोजें",
+    "Featured Venues": "विशेष रुप से प्रदर्शित वेन्यू",
+    "Featured Services": "विशेष रुप से प्रदर्शित सेवाएं",
+    "Reviews": "समीक्षाएं",
+    "Rating": "रेटिंग",
+    "Write a Review": "समीक्षा लिखें",
+    "View on Map": "मानचित्र पर देखें",
+    "Call Owner": "मालिक को कॉल करें",
+    "WhatsApp Owner": "मालिक को व्हाट्सएप करें",
+    "Share": "साझा करें",
+    "Veg/Non-Veg": "शाकाहारी/मांसाहारी",
+    "Amenities": "सुविधाएं",
+    "Facilities": "सुविधाएं",
+    "Total Venues": "कुल वेन्यू",
+    "Total Service Providers": "कुल सेवा प्रदाता",
+    "Total Bookings": "कुल बुकिंग",
+    "Total Users": "कुल उपयोगकर्ता",
+    "Today's Bookings": "आज की बुकिंग",
+    "Pending Bookings": "लंबित बुकिंग",
+    "Confirmed Bookings": "पुष्टि की गई बुकिंग",
+    "Completed Bookings": "पूरी हुई बुकिंग",
+    "Revenue": "राजस्व",
+    "Total Revenue": "कुल राजस्व",
+    "Download User Report": "उपयोगकर्ता रिपोर्ट डाउनलोड करें",
+    "Download Booking Report": "बुकिंग रिपोर्ट डाउनलोड करें",
+    "Generate Invoice": "इनवॉइस जनरेट करें",
+    "Booking Reports": "बुकिंग रिपोर्ट",
+    "Filter by Date": "तारीख के अनुसार फ़िल्टर करें",
+    "Filter by Status": "स्थिति के अनुसार फ़िल्टर करें",
+    "BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. We bridge the gap between hosts and the finest venues and service providers in the country. Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VENUE OPTION provides the tools and connections you need to plan with ease and celebrate with joy.": "BEST VENUE OPTION भारत का प्रमुख इवेंट प्लानिंग प्लेटफॉर्म है, जो आपके विशेष क्षणों को वास्तव में अविस्मरणीय बनाने के लिए समर्पित है। हम देश के बेहतरीन वेन्यू और सेवा प्रदाताओं के बीच की दूरी को पाटते हैं। चाहे वह एक भव्य शादी हो, एक कॉर्पोरेट उत्सव हो, या एक छोटा सा जन्मदिन समारोह हो, BEST VENUE OPTION आपको आसान योजना बनाने और खुशियों के साथ उत्सव मनाने के लिए आवश्यक उपकरण और संपर्क प्रदान करता है।",
+    "Verified Venues": "सत्यापित वेन्यू",
+    "Service Partners": "सेवा भागीदार",
+    "Happy Events": "सफल कार्यक्रम"
   }
 };
 
@@ -3630,23 +3781,20 @@ const AboutView = () => {
       </div>
       <h1 className="text-4xl font-bold text-gray-900 mb-6">{t('about')} BEST VENUE OPTION</h1>
       <p className="text-xl text-gray-600 leading-relaxed mb-12">
-        BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. 
-        We bridge the gap between hosts and the finest venues and service providers in the country. 
-        Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VENUE OPTION provides 
-        the tools and connections you need to plan with ease and celebrate with joy.
+        {t("BEST VENUE OPTION is India's premier event planning platform, dedicated to making your special moments truly unforgettable. We bridge the gap between hosts and the finest venues and service providers in the country. Whether it's a grand wedding, a corporate gala, or an intimate birthday party, BEST VENUE OPTION provides the tools and connections you need to plan with ease and celebrate with joy.")}
       </p>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div className="p-8 bg-orange-50 rounded-3xl">
         <div className="text-3xl font-bold text-orange-600 mb-2">500+</div>
-        <div className="text-gray-600">Verified Venues</div>
+        <div className="text-gray-600">{t("Verified Venues")}</div>
       </div>
       <div className="p-8 bg-orange-50 rounded-3xl">
         <div className="text-3xl font-bold text-orange-600 mb-2">1000+</div>
-        <div className="text-gray-600">Service Partners</div>
+        <div className="text-gray-600">{t("Service Partners")}</div>
       </div>
       <div className="p-8 bg-orange-50 rounded-3xl">
         <div className="text-3xl font-bold text-orange-600 mb-2">10k+</div>
-        <div className="text-gray-600">Happy Events</div>
+        <div className="text-gray-600">{t("Happy Events")}</div>
       </div>
     </div>
   </div>
@@ -8175,6 +8323,7 @@ const DashboardView = ({
   activeSubscription: UserSubscription | null,
   onUpgradeNeeded: () => void
 }) => {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialTab = searchParams.get('tab') || 'overview';
@@ -8597,7 +8746,7 @@ const DashboardView = ({
             >
               <div className="flex items-center space-x-2">
                 <Menu size={20} />
-                <span>Dashboard Menu</span>
+                <span>{t('Dashboard Menu')}</span>
               </div>
               <ChevronDown className={cn("transition-transform", isMobileMenuOpen && "rotate-180")} />
             </button>
@@ -8621,7 +8770,7 @@ const DashboardView = ({
                 >
                   <div className="flex items-center space-x-2">
                     {item.icon}
-                    <span>{item.label}</span>
+                    <span>{t(item.label)}</span>
                   </div>
                 </button>
               ))}
@@ -8645,8 +8794,8 @@ const DashboardView = ({
                   animate={{ opacity: 1, y: 0 }}
                   className="p-6 bg-orange-600 text-white"
                 >
-                  <h2 className="font-bold text-lg">Dashboard</h2>
-                  <p className="text-xs opacity-80">Welcome, {profile?.displayName}</p>
+                  <h2 className="font-bold text-lg">{t('Dashboard')}</h2>
+                  <p className="text-xs opacity-80">{t('Welcome')}, {profile?.displayName}</p>
                 </motion.div>
                 <motion.nav 
                   initial="hidden"
@@ -8680,7 +8829,7 @@ const DashboardView = ({
                       )}
                     >
                       {item.icon}
-                      <span>{item.label}</span>
+                      <span>{t(item.label)}</span>
                     </motion.button>
                   ))}
                 </motion.nav>
@@ -12298,7 +12447,22 @@ export default function App() {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
-  const t = React.useCallback((key: string) => translations[lang][key] || key, [lang]);
+  const t = React.useCallback((key: string) => {
+    if (!key) return '';
+    const cleanKey = String(key).trim();
+    if (translations[lang] && translations[lang][cleanKey] !== undefined) {
+      return translations[lang][cleanKey];
+    }
+    // Case-insensitive fallback
+    const lowerKey = cleanKey.toLowerCase();
+    if (translations[lang]) {
+      const foundKey = Object.keys(translations[lang]).find(k => k.toLowerCase() === lowerKey);
+      if (foundKey && translations[lang][foundKey] !== undefined) {
+        return translations[lang][foundKey];
+      }
+    }
+    return key;
+  }, [lang]);
 
   const [user, setUser] = useState<any>(() => {
     const saved = localStorage.getItem('custom_user');
