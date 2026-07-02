@@ -1385,7 +1385,49 @@ const HINDI_DICT: Record<string, string> = {
   "dhol bands": "ढोल और बैंड",
   "flower decor": "फूलों की सजावट",
   "id": "आईडी",
-  "id:": "आईडी:"
+  "id:": "आईडी:",
+  "s.no": "क्र.सं.",
+  "customer": "ग्राहक",
+  "mobile": "मोबाइल",
+  "invoice no": "इनवॉइस नंबर",
+  "paid amount": "भुगतान की गई राशि",
+  "pending amount": "लंबित राशि",
+  "type": "प्रकार",
+  "action": "कार्रवाई",
+  "year": "वर्ष",
+  "all years": "सभी वर्ष",
+  "customer name...": "ग्राहक का नाम...",
+  "all modes": "सभी मोड",
+  "all types": "सभी प्रकार",
+  "order": "ऑर्डर",
+  "manual": "मैनुअल",
+  "cash": "नकद",
+  "online": "ऑनलाइन",
+  "search name": "नाम खोजें",
+  "payment mode": "भुगतान का प्रकार",
+  "booking type": "बुकिंग का प्रकार",
+  "start date": "प्रारंभ तिथि",
+  "end date": "अंतिम तिथि",
+  "total received": "कुल प्राप्त",
+  "total discount": "कुल छूट",
+  "total pending": "कुल लंबित",
+  "complete count": "सफल बुकिंग संख्या",
+  "elite plans": "एलीट प्लान्स",
+  "professional business expansion protocol": "व्यावसायिक व्यवसाय विस्तार प्रोटोकॉल",
+  "active plan benefits": "सक्रिय प्लान के लाभ",
+  "premium status": "प्रीमियम स्थिति",
+  "active": "सक्रिय",
+  "unlimited listing": "असीमित लिस्टिंग",
+  "direct customer contact": "सीधे ग्राहक से संपर्क",
+  "featured visibility": "विशेष रूप से प्रदर्शित दृश्यता",
+  "active plan": "सक्रिय प्लान",
+  "buy this plan": "यह प्लान खरीदें",
+  "loading premium plans...": "प्रीमियम प्लान लोड हो रहे हैं...",
+  "besic plan": "बेसिक प्लान",
+  "basic plan": "बेसिक प्लान",
+  "all roles": "सभी भूमिकाएं",
+  "venue owners": "वेन्यू मालिक",
+  "service providers": "सेवा प्रदाता"
 };
 
 function getHindiTranslation(text: string): string | null {
@@ -1516,6 +1558,40 @@ function getHindiTranslation(text: string): string | null {
   const ratingsValueMatch = clean.match(/^Rating:\s*([\d.]+)\s*\/\s*5$/i);
   if (ratingsValueMatch) {
     return `रेटिंग: ${ratingsValueMatch[1]} / 5`;
+  }
+
+  const totalBookingsMatch = clean.match(/^Total Bookings \(([\d]+)\)$/i);
+  if (totalBookingsMatch) {
+    return `कुल बुकिंग (${totalBookingsMatch[1]})`;
+  }
+
+  const designedForMatch = clean.match(/^Designed for professional (.+?)s$/i);
+  if (designedForMatch) {
+    const role = designedForMatch[1].toLowerCase();
+    const roleHindi = HINDI_DICT[role] || (role === 'provider' ? 'सेवा प्रदाता' : role === 'owner' ? 'वेन्यू मालिक' : role);
+    return `पेशेवर ${roleHindi} के लिए डिज़ाइन किया गया`;
+  }
+
+  const perDurationMatch = clean.match(/^\/\s*(month|year|day)$/i);
+  if (perDurationMatch) {
+    const duration = perDurationMatch[1].toLowerCase();
+    const durationHindi = duration === 'month' ? 'महीना' : duration === 'year' ? 'वर्ष' : 'दिन';
+    return `/ ${durationHindi}`;
+  }
+
+  const validUntilMatch = clean.match(/^Valid until:\s*(.+)$/i);
+  if (validUntilMatch) {
+    return `वैधता तिथि: ${validUntilMatch[1]}`;
+  }
+
+  const welcomeMatch = clean.match(/^Welcome,\s*(.+)$/i);
+  if (welcomeMatch) {
+    return `स्वागत है, ${welcomeMatch[1]}`;
+  }
+
+  const bookingScheduledMatch = clean.match(/^booking\(s\)\s+scheduled\s+for\s+today\.?$/i);
+  if (bookingScheduledMatch) {
+    return `बुकिंग आज के लिए निर्धारित है।`;
   }
 
   return null;
