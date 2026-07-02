@@ -1189,7 +1189,64 @@ const HINDI_DICT: Record<string, string> = {
   "advanced reports": "उन्नत रिपोर्ट",
   "priority support": "प्राथमिकता सहायता",
   "custom branding": "कस्टम ब्रांडिंग",
-  "analytics dashboard": "एनालिटिक्स डैशबोर्ड"
+  "analytics dashboard": "एनालिटिक्स डैशबोर्ड",
+
+  // Extra missing/screenshot strings
+  "search keywords": "खोज कीवर्ड",
+  "search venues or services...": "वेन्यू या सेवाएं खोजें...",
+  "all states": "सभी राज्य",
+  "all districts": "सभी जिले",
+  "all blocks": "सभी ब्लॉक",
+  "results": "परिणाम",
+  "back to home": "होम पर वापस जाएं",
+  "login portal": "लॉगिन पोर्टल",
+  "enter your credentials to continue": "जारी रखने के लिए अपनी साख दर्ज करें",
+  "registration id / email": "पंजीकरण आईडी / ईमेल",
+  "password": "पासवर्ड",
+  "login now": "अभी लॉगिन करें",
+  "register here": "यहाँ पंजीकरण करें",
+  "account does not exist": "खाता मौजूद नहीं है",
+  "invalid credentials": "अमान्य क्रेडेंशियल",
+  "registration portal": "पंजीकरण पोर्टल",
+  "partner registration": "भागीदार पंजीकरण",
+  "join india's largest event planning network": "भारत के सबसे बड़े इवेंट प्लानिंग नेटवर्क से जुड़ें",
+  "personal details": "व्यक्तिगत विवरण",
+  "father's name": "पिता का नाम",
+  "mobile number (password)": "मोबाइल नंबर (पासवर्ड)",
+  "gmail id (optional)": "जीमेल आईडी (वैकल्पिक)",
+  "profile photo": "प्रोफ़ाइल फ़ोटो",
+  "select file": "फ़ाइल चुनें",
+  "supported formats: jpeg, png, webp, gif (max 20mb). suggested dimensions: 1200×1200px (1:1 ratio).": "समर्थित प्रारूप: JPEG, PNG, WEBP, GIF (अधिकतम 20MB)। सुझाए गए आयाम: 1200×1200px (1:1 अनुपात)।",
+  "business details": "व्यावसायिक विवरण",
+  "i am a...": "मैं हूँ...",
+  "i am a ...": "मैं हूँ...",
+  "i agree to the ": "मैं ",
+  " and ": " और ",
+  " of best venue option.": " BEST VENUE OPTION के नियम और शर्तों से सहमत हूँ।",
+  "what our users say": "हमारे उपयोगकर्ता क्या कहते हैं",
+  "real stories from real people who planned their perfect events with us.": "उन वास्तविक लोगों की वास्तविक कहानियाँ जिन्होंने हमारे साथ अपने आदर्श कार्यक्रमों की योजना बनाई।",
+  "total reviews": "कुल समीक्षाएं",
+  "verified user": "सत्यापित उपयोगकर्ता",
+  "verified users": "सत्यापित उपयोगकर्ता",
+  "support": "सहायता",
+  "cookies policy": "कुकीज़ नीति",
+  "powered by chanchal net zone": "संचालित द्वारा CHANCHAL NET ZONE",
+  "plan your perfect event": "अपने आदर्श कार्यक्रम की योजना बनाएं",
+  "everything you need to host an unforgettable celebration, all in one place.": "एक अविस्मरणीय उत्सव की मेजबानी करने के लिए आपको जो कुछ भी चाहिए, वह सब एक ही स्थान पर।",
+  "birthday bashes": "जन्मदिन की पार्टियां",
+  "fun-filled venues and decorators for the most memorable birthday parties.": "सबसे यादगार जन्मदिन पार्टियों के लिए मस्ती से भरे वेन्यू और डेकोरेटर्स।",
+  "explore by ": "श्रेणी के अनुसार ",
+  "category": "खोजें",
+  "discover everything you need for your event with our curated categories.": "हमारी क्यूरेटेड श्रेणियों के साथ अपने कार्यक्रम के लिए आवश्यक सभी चीजें खोजें।",
+  "join us as": "हमारे साथ जुड़ें ",
+  "caterers": "कैटरर्स",
+  "djs": "डीजे",
+  "decorators": "डेकोरेटर्स",
+  "venues": "वेन्यू",
+  "services": "सेवाएं",
+  "privacy policy": "गोपनीयता नीति",
+  "select plan/amenities category": "योजना/सुविधाएं श्रेणी चुनें",
+  "available amenities category": "उपलब्ध सुविधाएं श्रेणी"
 };
 
 function getHindiTranslation(text: string): string | null {
@@ -1201,6 +1258,20 @@ function getHindiTranslation(text: string): string | null {
     return HINDI_DICT[lower];
   }
 
+  // Fallback to translations.hi
+  if (translations && translations.hi) {
+    if (translations.hi[clean] !== undefined) {
+      return translations.hi[clean];
+    }
+    if (translations.hi[lower] !== undefined) {
+      return translations.hi[lower];
+    }
+    const foundKey = Object.keys(translations.hi).find(k => k.toLowerCase() === lower);
+    if (foundKey && translations.hi[foundKey] !== undefined) {
+      return translations.hi[foundKey];
+    }
+  }
+
   const punctuationRegex = /^(.+?)([:\s?.]*)$/;
   const match = clean.match(punctuationRegex);
   if (match) {
@@ -1210,6 +1281,37 @@ function getHindiTranslation(text: string): string | null {
     if (HINDI_DICT[coreLower]) {
       return HINDI_DICT[coreLower] + punctuation;
     }
+  }
+
+  // Dynamic Regex-based Translations
+  const venuesCountMatch = clean.match(/^venues\s*\((\d+)\)$/i);
+  if (venuesCountMatch) {
+    return `वेन्यू (${venuesCountMatch[1]})`;
+  }
+
+  const servicesCountMatch = clean.match(/^services\s*\((\d+)\)$/i);
+  if (servicesCountMatch) {
+    return `सेवाएं (${servicesCountMatch[1]})`;
+  }
+
+  const verifiedUsersMatch = clean.match(/^(\d+)\s+verified\s+users$/i);
+  if (verifiedUsersMatch) {
+    return `${verifiedUsersMatch[1]} सत्यापित उपयोगकर्ता`;
+  }
+
+  const happyEventsMatch = clean.match(/^(\d+k?\+?)\s+happy\s+events$/i);
+  if (happyEventsMatch) {
+    return `${happyEventsMatch[1]} सफल कार्यक्रम`;
+  }
+
+  const verifiedVenuesMatch = clean.match(/^(\d+k?\+?)\s+verified\s+venues$/i);
+  if (verifiedVenuesMatch) {
+    return `${verifiedVenuesMatch[1]} सत्यापित वेन्यू`;
+  }
+
+  const servicePartnersMatch = clean.match(/^(\d+k?\+?)\s+service\s+partners$/i);
+  if (servicePartnersMatch) {
+    return `${servicePartnersMatch[1]} सेवा भागीदार`;
   }
 
   const venuesServicesMatch = clean.match(/^Found\s+(\d+)\s+venues\s+and\s+(\d+)\s+services$/i);
