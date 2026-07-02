@@ -1,7 +1,10 @@
 {
-  "name": "BEST VANUE OPTION",
+  "name": "BEST VENUE OPTION",
   "description": "The best platform for finding and booking venues for your special events. Discover, compare, and book venues with ease.",
   "requestFramePermissions": [
     "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

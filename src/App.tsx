@@ -1246,7 +1246,146 @@ const HINDI_DICT: Record<string, string> = {
   "services": "सेवाएं",
   "privacy policy": "गोपनीयता नीति",
   "select plan/amenities category": "योजना/सुविधाएं श्रेणी चुनें",
-  "available amenities category": "उपलब्ध सुविधाएं श्रेणी"
+  "available amenities category": "उपलब्ध सुविधाएं श्रेणी",
+  "total": "कुल",
+  "complete": "पूर्ण",
+  "dashboard overview": "डैशबोर्ड अवलोकन",
+  "today's bookings alert": "आज की बुकिंग अलर्ट",
+  "you have": "आपके पास",
+  "booking(s) scheduled for today.": "बुकिंग आज के लिए निर्धारित है।",
+  "location not set": "स्थान सेट नहीं है",
+  "best venue option": "BEST VENUE OPTION",
+  "best venue": "बेस्ट वेन्यू",
+  "option": "ऑप्शन",
+  "venue & event & service providers": "वेन्यू, इवेंट और सेवा प्रदाता",
+  "powered by": "संचालित द्वारा",
+  "chanchal net zone": "CHANCHAL NET ZONE",
+  "location & distance": "स्थान और दूरी",
+  "get directions": "दिशा-निर्देश प्राप्त करें",
+  "google maps key not configured. directions available via external link.": "Google Maps कुंजी कॉन्फ़िगर नहीं की गई है। बाहरी लिंक के माध्यम से दिशा-निर्देश उपलब्ध हैं।",
+  "view location on maps": "मानचित्र पर स्थान देखें",
+  "error loading google maps. visit google cloud console to enable 'maps javascript api'.": "Google Maps लोड करने में त्रुटि। 'Maps JavaScript API' को सक्षम करने के लिए Google Cloud Console पर जाएं।",
+  "view on maps instead": "इसके बजाय मानचित्र पर देखें",
+  "select location on map": "मानचित्र पर स्थान चुनें",
+  "use current location": "वर्तमान स्थान का उपयोग करें",
+  "loading map...": "मानचित्र लोड हो रहा है...",
+  "* click anywhere on the map to set your business location pin.": "* अपने व्यवसाय का स्थान सेट करने के लिए मानचित्र पर कहीं भी क्लिक करें।",
+  "query & complaint portal": "पूछताछ और शिकायत पोर्टल",
+  "query and complaint portal": "पूछताछ और शिकायत पोर्टल",
+  "query/complaint portal": "पूछताछ/शिकायत पोर्टल",
+  "review registered inquiries, suggestions, and complaints from members. update status with professional remarks.": "सदस्यों से पंजीकृत पूछताछ, सुझावों और शिकायतों की समीक्षा करें। पेशेवर टिप्पणियों के साथ स्थिति अपडेट करें।",
+  "submit suggestions, report issues, or query the administration. track your request resolutions in real-time.": "सुझाव प्रस्तुत करें, समस्याओं की रिपोर्ट करें, या प्रशासन से पूछताछ करें। वास्तविक समय में अपने अनुरोध के समाधान को ट्रैक करें।",
+  "refresh list": "सूची ताज़ा करें",
+  "retrieving queries and complaints...": "पूछताछ और शिकायतें प्राप्त की जा रही हैं...",
+  "new message": "नया संदेश",
+  "submit your queries or suggestion directly to the system managers.": "अपनी पूछताछ या सुझाव सीधे सिस्टम प्रबंधकों को प्रस्तुत करें।",
+  "sender name": "प्रेषक का नाम",
+  "enter your name": "अपना नाम दर्ज करें",
+  "your active mobile": "आपका सक्रिय मोबाइल",
+  "message category": "संदेश श्रेणी",
+  "complaint": "शिकायत",
+  "suggestion": "सुझाव",
+  "query/inquiry": "पूछताछ",
+  "query": "पूछताछ",
+  "your address": "आपका पता",
+  "your residential / business address": "आपका आवासीय / व्यावसायिक पता",
+  "query / complaint details": "पूछताछ / शिकायत विवरण",
+  "write your suggestions or details of your query here. please be specific...": "यहाँ अपनी पूछताछ या सुझाव का विवरण लिखें। कृपया स्पष्ट रूप से लिखें...",
+  "sending message...": "संदेश भेजा जा रहा है...",
+  "submit message": "संदेश भेजें",
+  "your communication log": "आपका संचार लॉग",
+  "check administrative replies and tracking statuses here.": "यहाँ प्रशासनिक उत्तर और ट्रैकिंग स्थिति की जाँच करें।",
+  "your message:": "आपका संदेश:",
+  "resolved by administration": "प्रशासन द्वारा हल किया गया",
+  "official remark / answer:": "आधिकारिक टिप्पणी / उत्तर:",
+  "status: pending administrative reply. our team is reviewing this query.": "स्थिति: प्रशासनिक उत्तर लंबित है। हमारी टीम इस पूछताछ की समीक्षा कर रही है।",
+  "you haven't submitted any queries or complaints yet.": "आपने अभी तक कोई पूछताछ या शिकायत दर्ज नहीं की है।",
+  "roster filters": "रोस्टर फ़िल्टर",
+  "all statuses": "सभी स्थितियां",
+  "all categories": "सभी श्रेणियां",
+  "complaints": "शिकायतें",
+  "suggestions": "सुझाव",
+  "queries": "पूछताछ",
+  "search name, mobile, query text...": "नाम, मोबाइल, पूछताछ टेक्स्ट खोजें...",
+  "roster history": "रोस्टर इतिहास",
+  "sender details": "प्रेषक का विवरण",
+  "detail summary": "विवरण सारांश",
+  "no queries or complaints found matching the filters.": "फ़िल्टर से मेल खाने वाली कोई पूछताछ या शिकायत नहीं मिली।",
+  "complaint action": "शिकायत पर कार्रवाई",
+  "message query detail": "संदेश पूछताछ विवरण",
+  "administrative remark / answer": "प्रशासनिक टिप्पणी / उत्तर",
+  "already resolved": "पहले से ही हल किया गया",
+  "update remark": "टिप्पणी अपडेट करें",
+  "submit remark & resolve": "टिप्पणी जमा करें और हल करें",
+  "resolving...": "हल किया जा रहा है...",
+  "click on any query card or row to take resolution actions.": "समाधान कार्रवाई करने के लिए किसी भी पूछताछ कार्ड या पंक्ति पर क्लिक करें।",
+  "profile settings": "प्रोफ़ाइल सेटिंग्स",
+  "email id (optional)": "ईमेल आईडी (वैकल्पिक)",
+  "narsinghpur": "नरसिंहपुर",
+  "madhyapradesh": "मध्य प्रदेश",
+  "bhopal": "भोपाल",
+  "indore": "इंदौर",
+  "jabalpur": "जबलपुर",
+  "gwalior": "ग्वालियर",
+  "sagar": "सागर",
+  "satna": "सतना",
+  "rewa": "रीवा",
+  "ujjain": "उज्जैन",
+  "hoshangabad": "होशंगाबाद",
+  "sehore": "सीहोर",
+  "vidisha": "विदिशा",
+  "raisen": "रायसेन",
+  "betul": "बैतूल",
+  "pipariya": "पिपरिया",
+  "itarsi": "इटारसी",
+  "shajapur": "शाजापुर",
+  "dewas": "देवास",
+  "khandwa": "खंडवा",
+  "khargone": "खरगोन",
+  "chhindwara": "छिंदवाड़ा",
+  "katni": "कटनी",
+  "singrauli": "सिंगरौली",
+  "shahdol": "शहडोल",
+  "damoh": "दमोह",
+  "panna": "पन्ना",
+  "tikamgarh": "टीकमगढ़",
+  "guna": "गुना",
+  "shivpuri": "शिवपुरी",
+  "datia": "दतिया",
+  "sheopur": "श्योपुर",
+  "bhind": "भिंड",
+  "morena": "मुरैना",
+  "mandsaur": "मंदसौर",
+  "neemuch": "नीमच",
+  "ratlam": "रतलाम",
+  "dhar": "धार",
+  "jhabua": "झाबुआ",
+  "alirajpur": "अलीराजपुर",
+  "barwani": "बड़वानी",
+  "burhanpur": "बुरहानपुर",
+  "harda": "हरदा",
+  "anuppur": "अनूपपुर",
+  "umaria": "उमरिया",
+  "sidhi": "सीधी",
+  "balaghat": "बालाघाट",
+  "mandla": "मंडला",
+  "seoni": "सिवनी",
+  "dindori": "डिंडोरी",
+  "narmadapuram": "नर्मदापुरम",
+  "makeup": "मेकअप",
+  "event manager": "इवेंट मैनेजर",
+  "event managers": "इवेंट मैनेजर",
+  "pandit ji": "पंडित जी",
+  "pujari ji": "पुजारी जी",
+  "mehendi": "मेहंदी",
+  "drone": "ड्रोन",
+  "rentals": "किराया",
+  "waiters": "वेटर्स",
+  "helpers": "हेल्पर्स/वेटर्स",
+  "dhol bands": "ढोल और बैंड",
+  "flower decor": "फूलों की सजावट",
+  "id": "आईडी",
+  "id:": "आईडी:"
 };
 
 function getHindiTranslation(text: string): string | null {
@@ -1362,6 +1501,21 @@ function getHindiTranslation(text: string): string | null {
   const ownerMatch = clean.match(/^Owner:\s*(.+)$/i);
   if (ownerMatch) {
     return `मालिक: ${ownerMatch[1]}`;
+  }
+
+  const approxDistanceMatch = clean.match(/^Approx\.\s*([\d.]+)\s*km\s*away\s*from\s*you$/i);
+  if (approxDistanceMatch) {
+    return `आपसे लगभग ${approxDistanceMatch[1]} किमी दूर`;
+  }
+
+  const entriesMatchingMatch = clean.match(/^Found\s*(\d+)\s*entries\s*matching\s*current\s*criteria$/i);
+  if (entriesMatchingMatch) {
+    return `वर्तमान मानदंडों से मेल खाने वाली ${entriesMatchingMatch[1]} प्रविष्टियां मिलीं`;
+  }
+
+  const ratingsValueMatch = clean.match(/^Rating:\s*([\d.]+)\s*\/\s*5$/i);
+  if (ratingsValueMatch) {
+    return `रेटिंग: ${ratingsValueMatch[1]} / 5`;
   }
 
   return null;
@@ -4949,8 +5103,8 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
   const venuesScrollRef = useAutoScroll(0.05);
   const topProvidersScrollRef = useAutoScroll(0.04);
   const categoriesScrollRef = useAutoScroll(0.03);
-  const [featuredVenues, setFeaturedVenues] = useState<Venue[]>([]);
-  const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>([]);
+  const [featuredVenues, setFeaturedVenues] = useState<Venue[]>(FALLBACK_VENUES);
+  const [featuredServices, setFeaturedServices] = useState<ServiceProvider[]>(FALLBACK_SERVICES);
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   useEffect(() => {
