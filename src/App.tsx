@@ -4817,6 +4817,133 @@ const TermsView = () => {
 };
 
 
+const FALLBACK_VENUES: Venue[] = [
+  {
+    id: "v-fallback-1",
+    ownerId: "system",
+    name: "Royal Heritage Marriage Garden",
+    description: "Spacious and elegant marriage garden with lush green lawns, perfect for grand weddings and celebrations.",
+    venueType: "marriage garden",
+    address: "Hoshangabad Road, near AIIMS",
+    state: "Madhya Pradesh",
+    district: "Bhopal",
+    block: "Bhopal",
+    pincode: "462026",
+    capacity: 1500,
+    pricePerDay: 75000,
+    images: ["https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800"],
+    facilities: ["Lush Green Lawns", "AC Banquet Hall", "Ample Parking", "Catering Service", "Decorative Lighting"],
+    rating: 4.9,
+    reviewCount: 128,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "v-fallback-2",
+    ownerId: "system",
+    name: "Grand Plaza Banquet Hall",
+    description: "Modern fully air-conditioned banquet hall with beautiful interior decoration, luxurious lighting, and premium sound systems.",
+    venueType: "marriage hall",
+    address: "Vijay Nagar, opposite C21 Mall",
+    state: "Madhya Pradesh",
+    district: "Indore",
+    block: "Indore",
+    pincode: "452010",
+    capacity: 600,
+    pricePerDay: 45000,
+    images: ["https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800"],
+    facilities: ["Air Conditioning", "Valet Parking", "Stage Setup", "Bridal Rooms", "Sound System"],
+    rating: 4.7,
+    reviewCount: 95,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "v-fallback-3",
+    ownerId: "system",
+    name: "The Palms Luxury Resort",
+    description: "Exquisite luxury resort featuring premium cottages, swimming pool, sprawling lawns, and scenic backdrops for destination weddings.",
+    venueType: "hotel",
+    address: "Bhedaghat Road",
+    state: "Madhya Pradesh",
+    district: "Jabalpur",
+    block: "Jabalpur",
+    pincode: "482003",
+    capacity: 2000,
+    pricePerDay: 150000,
+    images: ["https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=800"],
+    facilities: ["Luxury Cottages", "Swimming Pool", "Destination Wedding Lawn", "Multi-cuisine Restaurant", "24/7 Security"],
+    rating: 4.8,
+    reviewCount: 74,
+    createdAt: new Date().toISOString()
+  }
+];
+
+const FALLBACK_SERVICES: ServiceProvider[] = [
+  {
+    id: "s-fallback-1",
+    providerId: "system",
+    name: "Chanchal Gourmet Catering",
+    serviceType: "caterers",
+    description: "Professional catering services serving exquisite Indian, Chinese, and Continental cuisines with impeccable service.",
+    priceRange: "₹300 - ₹800 Per Plate",
+    priceLevel: "as per plate",
+    state: "Madhya Pradesh",
+    district: "Bhopal",
+    block: "Bhopal",
+    images: ["https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800"],
+    rating: 4.9,
+    reviewCount: 112,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "s-fallback-2",
+    providerId: "system",
+    name: "Beat Drop DJ & Sound System",
+    serviceType: "dj and sound service",
+    description: "Premium high-fidelity JBL sound setup, intelligent moving head lights, trussing, and professional wedding DJs.",
+    priceRange: "₹15,000 - ₹35,000 Per Event",
+    priceLevel: "as per work",
+    state: "Madhya Pradesh",
+    district: "Bhopal",
+    block: "Bhopal",
+    images: ["https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=800"],
+    rating: 4.8,
+    reviewCount: 84,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "s-fallback-3",
+    providerId: "system",
+    name: "Dream Frame Photography",
+    serviceType: "photo and videography",
+    description: "Candid photography, cinematic wedding films, pre-wedding shoots, and high-end albums captured by experts.",
+    priceRange: "₹25,000 - ₹60,000 Per Event",
+    priceLevel: "as per work",
+    state: "Madhya Pradesh",
+    district: "Indore",
+    block: "Indore",
+    images: ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=800"],
+    rating: 4.9,
+    reviewCount: 96,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "s-fallback-4",
+    providerId: "system",
+    name: "Royal Tent House & Decorators",
+    serviceType: "tent house",
+    description: "Premium water-proof pandals, designer tents, exquisite draping, and luxury seating arrangements.",
+    priceRange: "₹40,000 - ₹90,000 Per Event",
+    priceLevel: "as per work",
+    state: "Madhya Pradesh",
+    district: "Gwalior",
+    block: "Gwalior",
+    images: ["https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80&w=800"],
+    rating: 4.7,
+    reviewCount: 53,
+    createdAt: new Date().toISOString()
+  }
+];
+
 const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: boolean }) => {
   const { t } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.05);
@@ -4861,26 +4988,34 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
       setLoading(true);
       try {
         const { data: vData } = await db.from('venues').select('*').order('rating', { ascending: false }).limit(6);
-        if (vData) setFeaturedVenues(vData.map(d => ({ 
-          ...d, 
-          ownerId: d.owner_id, 
-          venueType: d.venue_type || d.type, 
-          pricePerDay: d.price_per_day, 
-          rating: d.rating || 0,
-          reviewCount: d.review_count || 0,
-          createdAt: d.created_at 
-        }) as Venue));
+        if (vData && vData.length > 0) {
+          setFeaturedVenues(vData.map(d => ({ 
+            ...d, 
+            ownerId: d.owner_id, 
+            venueType: d.venue_type || d.type, 
+            pricePerDay: d.price_per_day, 
+            rating: d.rating || 0,
+            reviewCount: d.review_count || 0,
+            createdAt: d.created_at 
+          }) as Venue));
+        } else {
+          setFeaturedVenues(FALLBACK_VENUES);
+        }
 
         const { data: sData } = await db.from('service_providers').select('*').order('rating', { ascending: false }).limit(8);
-        if (sData) setFeaturedServices(sData.map(d => ({ 
-          ...d, 
-          ownerId: d.owner_id, 
-          serviceType: d.service_type || d.type, 
-          priceRange: d.price_range, 
-          rating: d.rating || 0,
-          reviewCount: d.review_count || 0,
-          createdAt: d.created_at 
-        }) as ServiceProvider));
+        if (sData && sData.length > 0) {
+          setFeaturedServices(sData.map(d => ({ 
+            ...d, 
+            ownerId: d.owner_id, 
+            serviceType: d.service_type || d.type, 
+            priceRange: d.price_range, 
+            rating: d.rating || 0,
+            reviewCount: d.review_count || 0,
+            createdAt: d.created_at 
+          }) as ServiceProvider));
+        } else {
+          setFeaturedServices(FALLBACK_SERVICES);
+        }
 
         const { data: bData } = await db.from('banners').select('*').eq('is_active', true);
         if (bData) setBanners(bData.map(d => ({ id: d.id, title: d.title, imageUrl: d.image_url, link: d.link, isActive: d.is_active, createdAt: d.created_at }) as AppBanner));
