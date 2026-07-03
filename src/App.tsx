@@ -5395,7 +5395,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
           </motion.div>
           
           <div className="flex flex-wrap justify-center gap-x-12 gap-y-6">
-            {['Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Party Plot', 'Catering', 'Decoration', 'Photography', 'DJ & Music', 'Makeup Artist', 'Mehendi Artist', 'Tent House', 'Security'].map((type, idx) => (
+            {['Marriage Garden', 'Marriage Hall', 'Hotel', 'Resort', 'Party Plot', 'Catering', 'Decoration', 'Photography', 'DJ & Music', 'Makeup Artist', 'Mehendi Artist', 'Tent House', 'Security'].map((type, idx) => (
               <span key={idx} className="text-xs md:text-sm font-black text-gray-400 hover:text-orange-500 transition-colors cursor-default uppercase tracking-[0.3em]">
                 {t(type)}
               </span>
@@ -16040,7 +16040,7 @@ const AdminView = ({
                           className="w-full px-4 py-3 rounded-xl border border-orange-200 bg-white text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
                         >
                           <option value="Marriage Garden">Marriage Garden</option>
-                          <option value="Banquet Hall">Banquet Hall</option>
+                          <option value="Marriage Hall">Marriage Hall</option>
                           <option value="Hotel">Hotel</option>
                           <option value="Resort">Resort</option>
                           <option value="Community Hall">Community Hall</option>
@@ -16063,7 +16063,7 @@ const AdminView = ({
                       {/* Filter Bar */}
                       <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-gray-100">
                         <span className="text-xs font-black uppercase text-gray-400 mr-2">Filter Category:</span>
-                        {['All', 'Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Community Hall'].map((cat) => {
+                        {['All', 'Marriage Garden', 'Marriage Hall', 'Hotel', 'Resort', 'Community Hall'].map((cat) => {
                           const isSelected = adminVenuePhotoFilter === cat;
                           return (
                             <button
