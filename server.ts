@@ -116,7 +116,8 @@ function getJsonDb() {
       { id: '4', role: 'provider', name: 'Annual Plan', price: 300, duration: 'year', isActive: true },
     ],
     user_subscriptions: [],
-    service_type_photos: []
+    service_type_photos: [],
+    venue_photos: []
   };
   
   try {
@@ -372,6 +373,20 @@ async function startServer() {
           console.log(">>> [COMPLAINTS SETUP] Checked and verified complaints table in database.");
         } catch (tableErr: any) {
           console.error(">>> [COMPLAINTS SETUP ERROR] Failed to create complaints table:", tableErr.message);
+        }
+
+        // Initialize venue_photos table
+        try {
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS venue_photos (
+              \`id\` VARCHAR(50) PRIMARY KEY,
+              \`image_url\` TEXT NOT NULL,
+              \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+          `);
+          console.log(">>> [VENUE PHOTOS SETUP] Checked and verified venue_photos table in database.");
+        } catch (tableErr: any) {
+          console.error(">>> [VENUE_PHOTOS SETUP ERROR] Failed to create venue_photos table:", tableErr.message);
         }
         break;
       }

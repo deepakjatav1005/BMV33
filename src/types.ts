@@ -4,7 +4,8 @@ export type VenueType =
   | 'hotel' 
   | 'marriage hall' 
   | 'restorent' 
-  | 'community halls';
+  | 'community halls'
+  | 'community hall';
 
 export interface UserProfile {
   uid: string;

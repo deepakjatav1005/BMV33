@@ -136,6 +136,13 @@ const LocationDisplay = (props: any) => (
   </React.Suspense>
 );
 
+const VenueOwnerJoinSection = React.lazy(() => import('./components/VenueOwnerJoinSection'));
+const VenueOwnerJoinSectionWithSuspense = (props: any) => (
+  <React.Suspense fallback={<div className="h-[420px] bg-gray-50 rounded-3xl animate-pulse flex items-center justify-center text-gray-400 font-bold text-sm">Loading Partnership Banner...</div>}>
+    <VenueOwnerJoinSection {...props} />
+  </React.Suspense>
+);
+
 const SubscriptionUpgradeModal = ({ isOpen, onClose, onUpgrade }: { isOpen: boolean, onClose: () => void, onUpgrade: () => void }) => {
   if (!isOpen) return null;
   return (
@@ -1758,7 +1765,8 @@ const VENUE_TYPES = [
   'hotel', 
   'marriage hall', 
   'restorent', 
-  'community halls'
+  'community halls',
+  'community hall'
 ].sort();
 
 const SERVICE_TYPES = [
@@ -5175,7 +5183,7 @@ const FALLBACK_SERVICES: ServiceProvider[] = [
 ];
 
 const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: boolean }) => {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const venuesScrollRef = useAutoScroll(0.05);
   const topProvidersScrollRef = useAutoScroll(0.04);
   const categoriesScrollRef = useAutoScroll(0.03);
@@ -5397,6 +5405,7 @@ const HomeView = ({ user, forceRateOpen = false }: { user: any, forceRateOpen?: 
       </div>
 
       <MomentsHomeSection onInteraction={setIsAutoScrollEnabled} />
+      <VenueOwnerJoinSectionWithSuspense lang={lang} t={t} />
       <ServiceTypePhotosScroll onInteraction={setIsAutoScrollEnabled} />
       <CategorySection onInteraction={setIsAutoScrollEnabled} />
       <ServiceInfoStickers />
@@ -12391,6 +12400,7 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               <option value="Hotel">Hotel</option>
               <option value="Marriage Hall">Marriage Hall</option>
               <option value="Resort">Resort</option>
+              <option value="Community Hall">Community Hall</option>
             </select>
           </div>
           <div>
@@ -12718,6 +12728,7 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
                 <option value="Hotel">Hotel</option>
                 <option value="Marriage Hall">Marriage Hall</option>
                 <option value="Resort">Resort</option>
+                <option value="Community Hall">Community Hall</option>
               </select>
             </div>
           )}
@@ -12838,6 +12849,7 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               <option value="Hotel">Hotel</option>
               <option value="Marriage Hall">Marriage Hall</option>
               <option value="Resort">Resort</option>
+              <option value="Community Hall">Community Hall</option>
             </select>
           </div>
           <div className="md:col-span-2">
@@ -14637,7 +14649,8 @@ const AdminView = ({
   onLogout?: () => void
 }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'profile' | 'settings' | 'database' | 'flex-download' | 'query-complaint'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'venue-photos' | 'profile' | 'settings' | 'database' | 'flex-download' | 'query-complaint'>('dashboard');
+  const [venuePhotos, setVenuePhotos] = useState<{id: string, image_url: string, created_at: string}[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -14710,6 +14723,7 @@ const AdminView = ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, fetchData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_type_photos' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venue_photos' }, fetchData)
       .subscribe();
 
     return () => {
@@ -14799,6 +14813,11 @@ const AdminView = ({
       if (activeTab === 'moments') {
         const { data } = await db.from('moments').select('*').order('created_at', { ascending: false });
         if (data) setMoments(data);
+      }
+
+      if (activeTab === 'venue-photos') {
+        const { data } = await db.from('venue_photos').select('*').order('created_at', { ascending: false });
+        if (data) setVenuePhotos(data);
       }
 
       if (activeTab === 'flex-download') {
@@ -15192,6 +15211,45 @@ const AdminView = ({
     });
   };
 
+  const handleAddVenuePhoto = async (url: string | string[]) => {
+    if (!url) return;
+    const urls = Array.isArray(url) ? url : [url];
+    setLoading(true);
+    try {
+      const inserts = urls.map(u => ({ 
+        id: generateUUID(),
+        image_url: u
+      }));
+      const { error } = await db.from('venue_photos').insert(inserts);
+      if (error) throw error;
+      toast.success(`${inserts.length} venue photo(s) added successfully`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(`Failed to add venue photo(s): ${err.message || 'Error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteVenuePhoto = async (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Venue Photo',
+      message: 'Are you sure you want to delete this venue photo?',
+      isDanger: true,
+      onConfirm: async () => {
+        const { error } = await db.from('venue_photos').delete().eq('id', id);
+        if (!error) {
+          toast.success('Venue photo deleted');
+          fetchData();
+        } else {
+          toast.error('Failed to delete venue photo');
+        }
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
   const handleEditNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingNotification) return;
@@ -15304,6 +15362,7 @@ const AdminView = ({
             { id: 'banners', label: 'Banners', icon: LucideImage },
             { id: 'servicePhotos', label: 'Service Photos', icon: ImageIcon },
             { id: 'moments', label: 'Moments Photos', icon: Sparkles },
+            { id: 'venue-photos', label: 'Venue Photos', icon: Building2 },
             { id: 'flex-download', label: 'Flex & Banner', icon: QrCode },
             { id: 'query-complaint', label: 'Query or Complaint', icon: MessageSquare },
             { id: 'profile', label: 'Admin Profile', icon: UserIcon },
@@ -15953,6 +16012,47 @@ const AdminView = ({
                     <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                       <Sparkles size={48} className="mx-auto text-gray-300 mb-4" />
                       <p className="text-gray-500">No moments uploaded yet.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'venue-photos' && (
+                <div className="space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Venue Photos</h3>
+                      <p className="text-sm text-gray-500">Upload background photos for "Join us as venue owner" homepage section</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100 max-w-xl">
+                    <ImageUpload 
+                      label="Upload Venue Banner Photo" 
+                      multiple={true}
+                      onUpload={(url) => handleAddVenuePhoto(url)} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {venuePhotos.map(p => (
+                      <div key={p.id} className="group relative aspect-video rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
+                        <img src={resolveUrl(p.image_url)} alt="Venue Photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            onClick={() => deleteVenuePhoto(p.id)}
+                            className="bg-white text-red-600 p-2 rounded-full shadow-lg hover:bg-red-50"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {venuePhotos.length === 0 && (
+                    <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                      <LucideImage size={48} className="mx-auto text-gray-300 mb-4" />
+                      <p className="text-gray-500">No custom venue photos uploaded yet. The homepage section will display the default premium venue photo.</p>
                     </div>
                   )}
                 </div>
