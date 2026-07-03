@@ -14650,7 +14650,9 @@ const AdminView = ({
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'notifications' | 'banners' | 'servicePhotos' | 'moments' | 'venue-photos' | 'profile' | 'settings' | 'database' | 'flex-download' | 'query-complaint'>('dashboard');
-  const [venuePhotos, setVenuePhotos] = useState<{id: string, image_url: string, created_at: string}[]>([]);
+  const [venuePhotos, setVenuePhotos] = useState<{id: string, image_url: string, venue_type?: string, created_at: string}[]>([]);
+  const [uploadVenueType, setUploadVenueType] = useState<string>('Marriage Garden');
+  const [adminVenuePhotoFilter, setAdminVenuePhotoFilter] = useState<string>('All');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
@@ -15218,11 +15220,12 @@ const AdminView = ({
     try {
       const inserts = urls.map(u => ({ 
         id: generateUUID(),
-        image_url: u
+        image_url: u,
+        venue_type: uploadVenueType
       }));
       const { error } = await db.from('venue_photos').insert(inserts);
       if (error) throw error;
-      toast.success(`${inserts.length} venue photo(s) added successfully`);
+      toast.success(`${inserts.length} venue photo(s) added successfully for ${uploadVenueType}`);
       fetchData();
     } catch (err: any) {
       toast.error(`Failed to add venue photo(s): ${err.message || 'Error'}`);
@@ -16021,40 +16024,97 @@ const AdminView = ({
                 <div className="space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">Venue Photos</h3>
-                      <p className="text-sm text-gray-500">Upload background photos for "Join us as venue owner" homepage section</p>
+                      <h3 className="text-xl font-bold text-gray-900">Venue Photos (Category-Wise)</h3>
+                      <p className="text-sm text-gray-500">Upload and manage background photos category-wise for the "Join us as venue owner" homepage section.</p>
                     </div>
                   </div>
 
-                  <div className="bg-orange-50/50 p-8 rounded-[2rem] border border-orange-100 max-w-xl">
-                    <ImageUpload 
-                      label="Upload Venue Banner Photo" 
-                      multiple={true}
-                      onUpload={(url) => handleAddVenuePhoto(url)} 
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                    {venuePhotos.map(p => (
-                      <div key={p.id} className="group relative aspect-video rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
-                        <img src={resolveUrl(p.image_url)} alt="Venue Photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button 
-                            onClick={() => deleteVenuePhoto(p.id)}
-                            className="bg-white text-red-600 p-2 rounded-full shadow-lg hover:bg-red-50"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Upload Section */}
+                    <div className="lg:col-span-1 bg-orange-50/50 p-6 rounded-[2rem] border border-orange-100/80 space-y-5">
+                      <div>
+                        <label className="block text-sm font-black text-orange-800 mb-2">1. Select Venue Category</label>
+                        <select
+                          value={uploadVenueType}
+                          onChange={(e) => setUploadVenueType(e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-orange-200 bg-white text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          <option value="Marriage Garden">Marriage Garden</option>
+                          <option value="Banquet Hall">Banquet Hall</option>
+                          <option value="Hotel">Hotel</option>
+                          <option value="Resort">Resort</option>
+                          <option value="Community Hall">Community Hall</option>
+                        </select>
                       </div>
-                    ))}
-                  </div>
-                  {venuePhotos.length === 0 && (
-                    <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                      <LucideImage size={48} className="mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-500">No custom venue photos uploaded yet. The homepage section will display the default premium venue photo.</p>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-black text-orange-800">2. Upload Photo(s)</label>
+                        <p className="text-xs text-orange-700/80">Selected category: <strong className="font-extrabold">{uploadVenueType}</strong></p>
+                        <ImageUpload 
+                          label={`Upload for ${uploadVenueType}`} 
+                          multiple={true}
+                          onUpload={(url) => handleAddVenuePhoto(url)} 
+                        />
+                      </div>
                     </div>
-                  )}
+
+                    {/* Filter and Gallery Section */}
+                    <div className="lg:col-span-2 space-y-6">
+                      {/* Filter Bar */}
+                      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-gray-100">
+                        <span className="text-xs font-black uppercase text-gray-400 mr-2">Filter Category:</span>
+                        {['All', 'Marriage Garden', 'Banquet Hall', 'Hotel', 'Resort', 'Community Hall'].map((cat) => {
+                          const isSelected = adminVenuePhotoFilter === cat;
+                          return (
+                            <button
+                              key={cat}
+                              onClick={() => setAdminVenuePhotoFilter(cat)}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${
+                                isSelected
+                                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10'
+                                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Photo Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        {venuePhotos
+                          .filter(p => adminVenuePhotoFilter === 'All' || (p.venue_type || 'Marriage Garden') === adminVenuePhotoFilter)
+                          .map(p => (
+                            <div key={p.id} className="group relative aspect-video rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
+                              <img src={resolveUrl(p.image_url)} alt="Venue Photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              
+                              {/* Category Badge overlay */}
+                              <div className="absolute top-3 left-3 z-10 bg-black/60 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                {p.venue_type || 'Marriage Garden'}
+                              </div>
+
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button 
+                                  onClick={() => deleteVenuePhoto(p.id)}
+                                  className="bg-white text-red-600 p-2.5 rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                                  title="Delete Photo"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+
+                      {venuePhotos.filter(p => adminVenuePhotoFilter === 'All' || (p.venue_type || 'Marriage Garden') === adminVenuePhotoFilter).length === 0 && (
+                        <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">
+                          <LucideImage size={40} className="mx-auto text-gray-300 mb-3" />
+                          <p className="text-gray-500 text-sm font-medium">No custom photos uploaded yet under {adminVenuePhotoFilter === 'All' ? 'any category' : `"${adminVenuePhotoFilter}"`}.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

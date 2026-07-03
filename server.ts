@@ -381,10 +381,19 @@ async function startServer() {
             CREATE TABLE IF NOT EXISTS venue_photos (
               \`id\` VARCHAR(50) PRIMARY KEY,
               \`image_url\` TEXT NOT NULL,
+              \`venue_type\` VARCHAR(100) NOT NULL DEFAULT 'Marriage Garden',
               \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
           `);
           console.log(">>> [VENUE PHOTOS SETUP] Checked and verified venue_photos table in database.");
+
+          // Attempt to alter table if venue_type is not present
+          try {
+            await pool.query("ALTER TABLE venue_photos ADD COLUMN \`venue_type\` VARCHAR(100) NOT NULL DEFAULT 'Marriage Garden'");
+            console.log(">>> [VENUE PHOTOS MIGRATION] Added venue_type column to venue_photos table successfully.");
+          } catch (alterErr: any) {
+            // Error means column likely already exists, which is safe to ignore
+          }
         } catch (tableErr: any) {
           console.error(">>> [VENUE_PHOTOS SETUP ERROR] Failed to create venue_photos table:", tableErr.message);
         }
