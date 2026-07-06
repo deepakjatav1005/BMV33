@@ -46,6 +46,30 @@ const CATEGORIES: CategoryConfig[] = [
     labelEn: 'Community Hall', 
     labelHi: 'सामुदायिक भवन', 
     defaultImg: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80&w=1200' 
+  },
+  { 
+    id: 'Restaurent', 
+    labelEn: 'Restaurent', 
+    labelHi: 'रेस्टोरेंट', 
+    defaultImg: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1200' 
+  },
+  { 
+    id: 'Restaurant', 
+    labelEn: 'Restaurant', 
+    labelHi: 'रेस्टोरेंट', 
+    defaultImg: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1200' 
+  },
+  { 
+    id: 'Benquet Hall', 
+    labelEn: 'Benquet Hall', 
+    labelHi: 'बैंक्वेट हॉल', 
+    defaultImg: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80&w=1200' 
+  },
+  { 
+    id: 'Banquet Hall', 
+    labelEn: 'Banquet Hall', 
+    labelHi: 'बैंक्वेट हॉल', 
+    defaultImg: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80&w=1200' 
   }
 ];
 

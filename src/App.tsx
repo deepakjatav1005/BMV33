@@ -838,9 +838,13 @@ const translations: Record<string, any> = {
     "Happy Events": "सफल कार्यक्रम",
     "Marriage Garden": "मैरिज गार्डन",
     "Banquet Hall": "बैंक्वेट हॉल",
+    "Benquet Hall": "बैंक्वेट हॉल",
     "Hotel": "होटल",
     "Resort": "रिसॉर्ट",
     "Party Plot": "पार्टी प्लॉट",
+    "Restaurent": "होटल / रेस्टोरेंट",
+    "Restaurant": "होटल / रेस्टोरेंट",
+    "Event Host": "इवेंट होस्ट",
     "DJ & Music": "डीजे और संगीत",
     "Makeup Artist": "मेकअप आर्टिस्ट",
     "Mehendi Artist": "मेहंदी आर्टिस्ट",
@@ -1026,6 +1030,7 @@ const HINDI_DICT: Record<string, string> = {
   // Venue Types & Service Types
   "marriage garden": "मैरिज गार्डन",
   "banquet hall": "बैंक्वेट हॉल",
+  "benquet hall": "बैंक्वेट हॉल",
   "hotel": "होटल",
   "resort": "रिसॉर्ट",
   "party plot": "पार्टी प्लॉट",
@@ -1039,8 +1044,11 @@ const HINDI_DICT: Record<string, string> = {
   "security": "सुरक्षा",
   "marriage hall": "मैरिज हॉल",
   "restorent": "होटल / रेस्टोरेंट",
+  "restaurent": "होटल / रेस्टोरेंट",
+  "restaurant": "होटल / रेस्टोरेंट",
   "community halls": "सामुदायिक भवन",
   "community hall": "सामुदायिक भवन",
+  "event host": "इवेंट होस्ट",
 
   // Actions
   "submit": "जमा करें",
@@ -1765,6 +1773,10 @@ const VENUE_TYPES = [
   'hotel', 
   'marriage hall', 
   'restorent', 
+  'restaurent',
+  'restaurant',
+  'benquet hall',
+  'banquet hall',
   'community halls',
   'community hall'
 ].sort();
@@ -1792,6 +1804,7 @@ const SERVICE_TYPES = [
   'event managers',
   'helpers',
   'gifts and hampers',
+  'event host',
   'other related services'
 ].sort();
 
@@ -3489,6 +3502,7 @@ const CategoryDisplay = () => {
     { name: 'Waiters', image: 'https://images.unsplash.com/photo-1590650153855-d9e808231d41?auto=format&fit=crop&q=80&w=400', link: '/services?type=helpers', serviceType: 'helpers' },
     { name: 'Dhol Bands', image: 'https://images.unsplash.com/photo-1514525253344-f814d074358a?auto=format&fit=crop&q=80&w=400', link: '/services?type=dhol and bands', serviceType: 'dhol and bands' },
     { name: 'Flower Decor', image: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=400', link: '/services?type=flower decorators', serviceType: 'flower decorators' },
+    { name: 'Event Host', image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400', link: '/services?type=event host', serviceType: 'event host' },
   ];
   
   const [displayCategories, setDisplayCategories] = useState<any[]>(defaultCategories);
@@ -4963,9 +4977,9 @@ const ServiceTypePhotosScroll = ({ onInteraction }: { onInteraction?: (enabled: 
       onBlur={() => handleInteraction(true)}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
-        <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex items-center">
-          <Sparkles className="mr-4 text-orange-600" size={32} />
-          JOIN US <span className="text-orange-600 ml-2">AS</span>
+        <h2 className="text-3xl md:text-5xl font-black text-gray-900 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Sparkles className="text-orange-600 animate-pulse" size={32} />
+          <span>JOIN US</span> <span className="text-orange-600">AS SERVICE PROVIDERS</span>
         </h2>
       </div>
       <div className="relative">
@@ -12401,6 +12415,10 @@ const EditVenueView = ({ user, profile }: { user: any, profile: UserProfile | nu
               <option value="Marriage Hall">Marriage Hall</option>
               <option value="Resort">Resort</option>
               <option value="Community Hall">Community Hall</option>
+              <option value="Restaurent">Restaurent</option>
+              <option value="Restaurant">Restaurant</option>
+              <option value="Benquet Hall">Benquet Hall</option>
+              <option value="Banquet Hall">Banquet Hall</option>
             </select>
           </div>
           <div>
@@ -12729,6 +12747,10 @@ const ProfileEditView = ({ user, profile, onUpdate }: { user: any, profile: User
                 <option value="Marriage Hall">Marriage Hall</option>
                 <option value="Resort">Resort</option>
                 <option value="Community Hall">Community Hall</option>
+                <option value="Restaurent">Restaurent</option>
+                <option value="Restaurant">Restaurant</option>
+                <option value="Benquet Hall">Benquet Hall</option>
+                <option value="Banquet Hall">Banquet Hall</option>
               </select>
             </div>
           )}
@@ -12850,6 +12872,10 @@ const AddVenueView = ({ user, profile }: { user: any, profile: UserProfile | nul
               <option value="Marriage Hall">Marriage Hall</option>
               <option value="Resort">Resort</option>
               <option value="Community Hall">Community Hall</option>
+              <option value="Restaurent">Restaurent</option>
+              <option value="Restaurant">Restaurant</option>
+              <option value="Benquet Hall">Benquet Hall</option>
+              <option value="Banquet Hall">Banquet Hall</option>
             </select>
           </div>
           <div className="md:col-span-2">
@@ -16044,6 +16070,10 @@ const AdminView = ({
                           <option value="Hotel">Hotel</option>
                           <option value="Resort">Resort</option>
                           <option value="Community Hall">Community Hall</option>
+                          <option value="Restaurent">Restaurent</option>
+                          <option value="Restaurant">Restaurant</option>
+                          <option value="Benquet Hall">Benquet Hall</option>
+                          <option value="Banquet Hall">Banquet Hall</option>
                         </select>
                       </div>
 
@@ -16063,7 +16093,7 @@ const AdminView = ({
                       {/* Filter Bar */}
                       <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-gray-100">
                         <span className="text-xs font-black uppercase text-gray-400 mr-2">Filter Category:</span>
-                        {['All', 'Marriage Garden', 'Marriage Hall', 'Hotel', 'Resort', 'Community Hall'].map((cat) => {
+                        {['All', 'Marriage Garden', 'Marriage Hall', 'Hotel', 'Resort', 'Community Hall', 'Restaurent', 'Restaurant', 'Benquet Hall', 'Banquet Hall'].map((cat) => {
                           const isSelected = adminVenuePhotoFilter === cat;
                           return (
                             <button

@@ -4,6 +4,10 @@ export type VenueType =
   | 'hotel' 
   | 'marriage hall' 
   | 'restorent' 
+  | 'restaurent'
+  | 'restaurant'
+  | 'benquet hall'
+  | 'banquet hall'
   | 'community halls'
   | 'community hall';
 
@@ -167,6 +171,7 @@ export type ServiceType =
   | 'pujari ji'
   | 'event managers'
   | 'helpers'
+  | 'event host'
   | 'other related services';
 
 export interface ServiceProvider {
